@@ -6,8 +6,8 @@ A reliable REST and websocket API to interact with a Fabric network and stream e
 ![high level architecture](/images/arch-1.jpg)
 
 ### Objects and Flows
-![objects and flows architecture](/images/arch-2.jpg)
-![kafkal handler architecture](/images/arch-3.jpg)
+![objects and flows architecture](/images/arch-2.png)
+![kafkal handler architecture](/images/arch-3.png)
 
 
 The component provides 3 high level sets of API endpoints:
