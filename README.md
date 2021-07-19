@@ -15,3 +15,5 @@ The component provides 3 high level sets of API endpoints:
 - Transactions: submit transactions and query for transaction result/receipts
 - Events: subscribe to events with regex based filter and stream to the client app via websocket
 
+### License
+This project is licensed under the Apache 2 License - see the [`LICENSE`](LICENSE) file for details.
