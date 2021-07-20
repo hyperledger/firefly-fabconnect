@@ -109,7 +109,10 @@ func (c *webSocketConnection) sender() {
 			cases = buildCases()
 		} else {
 			// Message from one of the existing topics
-			c.conn.WriteJSON(value.Interface())
+			err := c.conn.WriteJSON(value.Interface())
+			if err != nil {
+				log.Errorf("Failed to send JSON message: %s", err)
+			}
 		}
 	}
 }

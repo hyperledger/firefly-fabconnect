@@ -14,3 +14,5 @@
 .DS_Store
 # default built binary
 firefly-fabconnect
+fabcon*
+coverage.txt

@@ -77,7 +77,7 @@ func TestLevelDBBadPath(t *testing.T) {
 	dir := tempdir(t)
 	defer cleanup(t, dir)
 	dbPath := path.Join(dir, "badness")
-	ioutil.WriteFile(dbPath, []byte{}, 0644)
+	_ = ioutil.WriteFile(dbPath, []byte{}, 0644)
 	_, err := NewLDBKeyValueStore(dbPath)
 	assert.Regexp("Failed to open DB", err.Error())
 }

@@ -25,10 +25,10 @@ func TestExerciseMockLDB(t *testing.T) {
 	assert := assert.New(t)
 
 	m := NewMockKV(nil)
-	m.Put("test", []byte("val"))
+	_ = m.Put("test", []byte("val"))
 	o2, _ := m.Get("test")
 	assert.Equal("val", string(o2))
-	m.Delete("test")
+	_ = m.Delete("test")
 	_, err := m.Get("test")
 	assert.EqualError(err, "leveldb: not found")
 	m.NewIterator()

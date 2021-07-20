@@ -31,7 +31,7 @@ import (
 func newTestWebSocketServer() (*webSocketServer, *httptest.Server) {
 	s := NewWebSocketServer().(*webSocketServer)
 	r := &httprouter.Router{}
-	// s.AddRoutes(r)
+	r.GET("/ws", s.NewConnection)
 	ts := httptest.NewServer(r)
 	return s, ts
 }
@@ -42,13 +42,13 @@ func TestConnectSendReceiveCycle(t *testing.T) {
 	w, ts := newTestWebSocketServer()
 	defer ts.Close()
 
-	u, err := url.Parse(ts.URL)
+	u, _ := url.Parse(ts.URL)
 	u.Scheme = "ws"
 	u.Path = "/ws"
 	c, _, err := ws.DefaultDialer.Dial(u.String(), nil)
 	assert.NoError(err)
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type: "listen",
 	})
 
@@ -57,14 +57,14 @@ func TestConnectSendReceiveCycle(t *testing.T) {
 	s <- "Hello World"
 
 	var val string
-	c.ReadJSON(&val)
+	_ = c.ReadJSON(&val)
 	assert.Equal("Hello World", val)
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type: "ignoreme",
 	})
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type: "ack",
 	})
 	err = <-r
@@ -72,10 +72,10 @@ func TestConnectSendReceiveCycle(t *testing.T) {
 
 	s <- "Don't Panic!"
 
-	c.ReadJSON(&val)
+	_ = c.ReadJSON(&val)
 	assert.Equal("Don't Panic!", val)
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type:    "error",
 		Message: "Panic!",
 	})
@@ -93,7 +93,7 @@ func TestConnectTopicIsolation(t *testing.T) {
 	w, ts := newTestWebSocketServer()
 	defer ts.Close()
 
-	u, err := url.Parse(ts.URL)
+	u, _ := url.Parse(ts.URL)
 	u.Scheme = "ws"
 	u.Path = "/ws"
 	c1, _, err := ws.DefaultDialer.Dial(u.String(), nil)
@@ -101,12 +101,12 @@ func TestConnectTopicIsolation(t *testing.T) {
 	c2, _, err := ws.DefaultDialer.Dial(u.String(), nil)
 	assert.NoError(err)
 
-	c1.WriteJSON(&webSocketCommandMessage{
+	_ = c1.WriteJSON(&webSocketCommandMessage{
 		Type:  "listen",
 		Topic: "topic1",
 	})
 
-	c2.WriteJSON(&webSocketCommandMessage{
+	_ = c2.WriteJSON(&webSocketCommandMessage{
 		Type:  "listen",
 		Topic: "topic2",
 	})
@@ -118,18 +118,18 @@ func TestConnectTopicIsolation(t *testing.T) {
 	s2 <- "Hello Number 2"
 
 	var val string
-	c1.ReadJSON(&val)
+	_ = c1.ReadJSON(&val)
 	assert.Equal("Hello Number 1", val)
-	c1.WriteJSON(&webSocketCommandMessage{
+	_ = c1.WriteJSON(&webSocketCommandMessage{
 		Type:  "ack",
 		Topic: "topic1",
 	})
 	err = <-r1
 	assert.NoError(err)
 
-	c2.ReadJSON(&val)
+	_ = c2.ReadJSON(&val)
 	assert.Equal("Hello Number 2", val)
-	c2.WriteJSON(&webSocketCommandMessage{
+	_ = c2.WriteJSON(&webSocketCommandMessage{
 		Type:  "ack",
 		Topic: "topic2",
 	})
@@ -146,13 +146,13 @@ func TestConnectAbandonRequest(t *testing.T) {
 	w, ts := newTestWebSocketServer()
 	defer ts.Close()
 
-	u, err := url.Parse(ts.URL)
+	u, _ := url.Parse(ts.URL)
 	u.Scheme = "ws"
 	u.Path = "/ws"
 	c, _, err := ws.DefaultDialer.Dial(u.String(), nil)
 	assert.NoError(err)
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type: "listen",
 	})
 	_, _, r, closing := w.GetChannels("")
@@ -185,13 +185,13 @@ func TestTimeoutProcessing(t *testing.T) {
 	defer ts.Close()
 	w.processingTimeout = 1 * time.Millisecond
 
-	u, err := url.Parse(ts.URL)
+	u, _ := url.Parse(ts.URL)
 	u.Scheme = "ws"
 	u.Path = "/ws"
 	c, _, err := ws.DefaultDialer.Dial(u.String(), nil)
 	assert.NoError(err)
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type: "ack",
 	})
 
@@ -234,7 +234,7 @@ func TestBroadcast(t *testing.T) {
 	c, _, err := ws.DefaultDialer.Dial(u.String(), nil)
 	assert.NoError(err)
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type:  "listen",
 		Topic: topic,
 	})
@@ -248,12 +248,12 @@ func TestBroadcast(t *testing.T) {
 	b <- "Hello World"
 
 	var val string
-	c.ReadJSON(&val)
+	_ = c.ReadJSON(&val)
 	assert.Equal("Hello World", val)
 
 	b <- "Hello World Again"
 
-	c.ReadJSON(&val)
+	_ = c.ReadJSON(&val)
 	assert.Equal("Hello World Again", val)
 
 	w.Close()
@@ -272,7 +272,7 @@ func TestBroadcastDefaultTopic(t *testing.T) {
 	c, _, err := ws.DefaultDialer.Dial(u.String(), nil)
 	assert.NoError(err)
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type: "listen",
 	})
 
@@ -285,12 +285,12 @@ func TestBroadcastDefaultTopic(t *testing.T) {
 	b <- "Hello World"
 
 	var val string
-	c.ReadJSON(&val)
+	_ = c.ReadJSON(&val)
 	assert.Equal("Hello World", val)
 
 	b <- "Hello World Again"
 
-	c.ReadJSON(&val)
+	_ = c.ReadJSON(&val)
 	assert.Equal("Hello World Again", val)
 
 	w.Close()
@@ -309,7 +309,7 @@ func TestRecvNotOk(t *testing.T) {
 	c, _, err := ws.DefaultDialer.Dial(u.String(), nil)
 	assert.NoError(err)
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type: "listen",
 	})
 
@@ -335,7 +335,7 @@ func TestSendReply(t *testing.T) {
 	c, _, err := ws.DefaultDialer.Dial(u.String(), nil)
 	assert.NoError(err)
 
-	c.WriteJSON(&webSocketCommandMessage{
+	_ = c.WriteJSON(&webSocketCommandMessage{
 		Type: "listenReplies",
 	})
 
@@ -347,6 +347,6 @@ func TestSendReply(t *testing.T) {
 	w.SendReply("Hello World")
 
 	var val string
-	c.ReadJSON(&val)
+	_ = c.ReadJSON(&val)
 	assert.Equal("Hello World", val)
 }

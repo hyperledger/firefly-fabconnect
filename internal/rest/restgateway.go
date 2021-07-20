@@ -51,7 +51,6 @@ type RESTGateway struct {
 	conf        conf.RESTGatewayConf
 	srv         *http.Server
 	sendCond    *sync.Cond
-	receipts    *receipt.ReceiptStore
 	pendingMsgs map[string]bool
 	successMsgs map[string]interface{}
 	failedMsgs  map[string]error
@@ -106,8 +105,7 @@ func (g *RESTGateway) sendError(res http.ResponseWriter, msg string, code int) {
 	reply, _ := json.Marshal(&errMsg{Message: msg})
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(code)
-	res.Write(reply)
-	return
+	_, _ = res.Write(reply)
 }
 
 // Start kicks off the HTTP listener and router
@@ -202,7 +200,7 @@ func (g *RESTGateway) Start() (err error) {
 	// }
 	log.Infof("Shutting down HTTP server")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	g.srv.Shutdown(ctx)
+	_ = g.srv.Shutdown(ctx)
 	defer cancel()
 
 	return

@@ -49,7 +49,6 @@ func NewSyncDispatcher(processor tx.TxProcessor) SyncDispatcher {
 
 type syncTxInflight struct {
 	ctx            context.Context
-	d              *syncDispatcher
 	replyProcessor *syncResponder
 	timeReceived   time.Time
 	msg            *messages.SendTransaction
@@ -109,7 +108,6 @@ func (i *syncResponder) ReplyWithError(err error) {
 	errors.RestErrReply(i.res, i.req, err, 500)
 	i.done = true
 	i.waiter.Broadcast()
-	return
 }
 
 func (i *syncResponder) ReplyWithReceiptAndError(receipt messages.ReplyWithHeaders, err error) {
@@ -119,10 +117,9 @@ func (i *syncResponder) ReplyWithReceiptAndError(receipt messages.ReplyWithHeade
 	log.Debugf("<-- %s", reply)
 	i.res.Header().Set("Content-Type", "application/json")
 	i.res.WriteHeader(status)
-	i.res.Write(reply)
+	_, _ = i.res.Write(reply)
 	i.done = true
 	i.waiter.Broadcast()
-	return
 }
 
 func (i *syncResponder) ReplyWithReceipt(receipt messages.ReplyWithHeaders) {
@@ -135,10 +132,9 @@ func (i *syncResponder) ReplyWithReceipt(receipt messages.ReplyWithHeaders) {
 	log.Debugf("<-- %s", reply)
 	i.res.Header().Set("Content-Type", "application/json")
 	i.res.WriteHeader(status)
-	i.res.Write(reply)
+	_, _ = i.res.Write(reply)
 	i.done = true
 	i.waiter.Broadcast()
-	return
 }
 
 func (d *syncDispatcher) DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg *messages.SendTransaction) {
