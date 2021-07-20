@@ -51,12 +51,12 @@ type asyncDispatcher struct {
 	receiptStore receipt.ReceiptStore
 }
 
-func NewAsyncDispatcher(conf conf.RESTGatewayConf, processor tx.TxProcessor, receiptstore receipt.ReceiptStore) AsyncDispatcher {
+func NewAsyncDispatcher(conf *conf.RESTGatewayConf, processor tx.TxProcessor, receiptstore receipt.ReceiptStore) AsyncDispatcher {
 	var handler asyncRequestHandler
 	if len(conf.Kafka.Brokers) > 0 {
 		handler = newKafkaHandler(conf.Kafka, receiptstore)
 	} else {
-		handler = newDirectHandler(&conf, processor, receiptstore)
+		handler = newDirectHandler(conf, processor, receiptstore)
 	}
 
 	return &asyncDispatcher{

@@ -28,6 +28,7 @@ import (
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
 	restasync "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/async"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/receipt"
@@ -48,7 +49,7 @@ const (
 // RESTGateway as the HTTP gateway interface for fabconnect
 type RESTGateway struct {
 	printYAML   *bool
-	conf        conf.RESTGatewayConf
+	config      *conf.RESTGatewayConf
 	srv         *http.Server
 	sendCond    *sync.Cond
 	pendingMsgs map[string]bool
@@ -65,9 +66,9 @@ type errMsg struct {
 }
 
 // NewRESTGateway constructor
-func NewRESTGateway(conf conf.RESTGatewayConf, printYAML *bool) (g *RESTGateway) {
+func NewRESTGateway(config *conf.RESTGatewayConf, printYAML *bool) (g *RESTGateway) {
 	g = &RESTGateway{
-		conf:        conf,
+		config:      config,
 		printYAML:   printYAML,
 		sendCond:    sync.NewCond(&sync.Mutex{}),
 		pendingMsgs: make(map[string]bool),
@@ -78,6 +79,16 @@ func NewRESTGateway(conf conf.RESTGatewayConf, printYAML *bool) (g *RESTGateway)
 }
 
 func (g *RESTGateway) ValidateConf() error {
+	// HTTP and RPC configurations are mandatory
+	if g.config.HTTP.Port == 0 {
+		return errors.Errorf(errors.ConfigRESTGatewayRequiredHTTPPort)
+	}
+	if g.config.RPC.ConfigPath == "" {
+		return errors.Errorf(errors.ConfigRESTGatewayRequiredRPCPath)
+	}
+	if g.config.HTTP.LocalAddr == "" {
+		g.config.HTTP.LocalAddr = "0.0.0.0"
+	}
 	return nil
 }
 
@@ -108,33 +119,37 @@ func (g *RESTGateway) sendError(res http.ResponseWriter, msg string, code int) {
 	_, _ = res.Write(reply)
 }
 
+func fabricRPCConnect(config conf.RPCConf) (fabric.RPCClient, error) {
+	return fabric.RPCConnect(config)
+}
+
 // Start kicks off the HTTP listener and router
 func (g *RESTGateway) Start() (err error) {
 
 	if *g.printYAML {
-		b, err := utils.MarshalToYAML(&g.conf)
+		b, err := utils.MarshalToYAML(&g.config)
 		print("# YAML Configuration snippet for REST Gateway\n" + string(b))
 		return err
 	}
 
-	tlsConfig, err := utils.CreateTLSConfiguration(&g.conf.HTTP.TLS)
+	tlsConfig, err := utils.CreateTLSConfiguration(&g.config.HTTP.TLS)
 	if err != nil {
 		return
 	}
 
 	var processor tx.TxProcessor
 	var rpcClient fabric.RPCClient
-	if g.conf.RPC.ConfigPath != "" {
-		rpcClient, err = fabric.RPCConnect(g.conf.RPC)
+	if g.config.RPC.ConfigPath != "" {
+		rpcClient, err = fabricRPCConnect(g.config.RPC)
 		if err != nil {
 			return err
 		}
-		processor = tx.NewTxProcessor(&g.conf)
+		processor = tx.NewTxProcessor(g.config)
 		processor.Init(rpcClient)
 	}
 	syncDispatcher := restsync.NewSyncDispatcher(processor)
-	receiptStore, err := receipt.NewReceiptStore(&g.conf)
-	asyncDispatcher := restasync.NewAsyncDispatcher(g.conf, processor, receiptStore)
+	receiptStore, err := receipt.NewReceiptStore(g.config)
+	asyncDispatcher := restasync.NewAsyncDispatcher(g.config, processor, receiptStore)
 	ws := ws.NewWebSocketServer()
 
 	router := httprouter.New()
@@ -150,7 +165,7 @@ func (g *RESTGateway) Start() (err error) {
 	// }
 
 	g.srv = &http.Server{
-		Addr:           fmt.Sprintf("%s:%d", g.conf.HTTP.LocalAddr, g.conf.HTTP.Port),
+		Addr:           fmt.Sprintf("%s:%d", g.config.HTTP.LocalAddr, g.config.HTTP.Port),
 		TLSConfig:      tlsConfig,
 		Handler:        g.newAccessTokenContextHandler(router),
 		MaxHeaderBytes: MaxHeaderSize,

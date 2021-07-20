@@ -1,4 +1,4 @@
-// Copyright 2018, 2021 Kaleido
+// Copyright 2021 Kaleido
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -93,4 +93,18 @@ func newReceipt(response channel.Response) TxReceipt {
 		TransactionID: string(response.TransactionID),
 		Status:        int(response.TxValidationCode),
 	}
+}
+
+type mockRPCClient struct{}
+
+func (m *mockRPCClient) Init(ctx context.Context, channelId, chaincodeName, method string, args []string) (TxReceipt, error) {
+	return TxReceipt{}, nil
+}
+func (m *mockRPCClient) Invoke(ctx context.Context, channelId, chaincodeName, method string, args []string) (TxReceipt, error) {
+	return TxReceipt{}, nil
+}
+func (m *mockRPCClient) Close() {}
+
+func NewMockRPCClient() RPCClient {
+	return &mockRPCClient{}
 }

@@ -40,19 +40,27 @@ func Errorf(msg ErrorID, inserts ...interface{}) error {
 const (
 	// ConfigFileReadFailed failed to read the server config file
 	ConfigFileReadFailed = "Failed to read %s: %s"
-
 	// ConfigNoYAML missing configuration file on server start
 	ConfigNoYAML = "No YAML configuration filename specified"
 	// ConfigYAMLParseFile failed to parse YAML during server startup
 	ConfigYAMLParseFile = "Unable to parse %s as YAML: %s"
 	// ConfigYAMLPostParseFile failed to process YAML as JSON after parsing
 	ConfigYAMLPostParseFile = "Failed to process YAML config from %s: %s"
-
+	// ConfigRESTGatewayRequiredHTTPPort for rest server listening port missing
+	ConfigRESTGatewayRequiredHTTPPort = "Must provide REST Gateway http listening port"
+	// ConfigRESTGatewayRequiredRPCPath for rest server's Fabric client config file missing
+	ConfigRESTGatewayRequiredRPCPath = "Must provide REST Gateway client configuration path"
 	// ConfigRESTGatewayRequiredReceiptStore need to enable params for REST Gatewya
 	ConfigRESTGatewayRequiredReceiptStore = "MongoDB URL, Database and Collection name must be specified to enable the receipt store"
-
 	// ConfigTLSCertOrKey incomplete TLS config
 	ConfigTLSCertOrKey = "Client private key and certificate must both be provided for mutual auth"
+
+	// SecurityModulePluginLoad failed to load .so
+	SecurityModulePluginLoad = "Failed to load plugin: %s"
+	// SecurityModulePluginSymbol missing symbol in plugin
+	SecurityModulePluginSymbol = "Failed to load 'SecurityModule' symbol from '%s': %s"
+	// SecurityModuleNoAuthContext missing auth context in context object at point security module is invoked
+	SecurityModuleNoAuthContext = "No auth context"
 
 	// RequestHandlerInvalidMsgHeaders missing headers section in the JSON/YAML posted
 	RequestHandlerInvalidMsgHeaders = "Invalid message - missing 'headers' (or not an object)"

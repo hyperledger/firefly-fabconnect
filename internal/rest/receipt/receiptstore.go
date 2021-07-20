@@ -69,7 +69,12 @@ func NewReceiptStore(config *conf.RESTGatewayConf) (ReceiptStore, error) {
 		receiptStorePersistence = leveldbStore
 	} else if config.Receipts.MongoDB.URL != "" {
 		mongoStore := newMongoReceipts(&config.Receipts)
-		if err := mongoStore.connect(); err != nil {
+		err := mongoStore.ValidateConf()
+		if err != nil {
+			return nil, err
+		}
+		err = mongoStore.connect()
+		if err != nil {
 			return nil, err
 		}
 		receiptStorePersistence = mongoStore

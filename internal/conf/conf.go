@@ -31,7 +31,7 @@ type RESTGatewayConf struct {
 	Kafka           KafkaConf       `json:"kafka"`
 	Receipts        ReceiptsDBConf  `json:"receipts"`
 	Events          EventstreamConf `json:"events"`
-	HTTP            HTTP            `json:"http"`
+	HTTP            HTTPConf        `json:"http"`
 	RPC             RPCConf         `json:"rpc"`
 }
 
@@ -84,7 +84,7 @@ type RPCConf struct {
 	ConfigPath string `json:"config-path"`
 }
 
-type HTTP struct {
+type HTTPConf struct {
 	LocalAddr string    `json:"localAddr"`
 	Port      int       `json:"port"`
 	TLS       TLSConfig `json:"tls"`
