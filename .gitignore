@@ -12,3 +12,5 @@
 *.out
 
 .DS_Store
+# default built binary
+firefly-fabconnect
