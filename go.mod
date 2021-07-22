@@ -24,7 +24,6 @@ require (
 	github.com/spf13/viper v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.0
-	github.com/vektra/mockery v1.1.2 // indirect
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	golang.org/x/tools v0.1.3 // indirect
 	gopkg.in/yaml.v2 v2.4.0
