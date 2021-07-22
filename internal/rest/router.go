@@ -17,10 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type restErrMsg struct {
-	Message string `json:"error"`
-}
-
 type router struct {
 	syncDispatcher  restsync.SyncDispatcher
 	asyncDispatcher restasync.AsyncDispatcher
@@ -63,15 +59,13 @@ func (r *router) addRoutes(router *httprouter.Router) {
 
 func (r *router) wsHandler(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	r.ws.NewConnection(res, req, params)
-	return
 }
 
 func (r *router) statusHandler(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	reply, _ := json.Marshal(&statusMsg{OK: true})
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(200)
-	res.Write(reply)
-	return
+	_, _ = res.Write(reply)
 }
 
 func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
@@ -88,7 +82,7 @@ func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, par
 	msg.Headers.Signer = c["signer"].(string)
 	msg.ChaincodeName = c["chaincode"].(string)
 	msg.Function = c["function"].(string)
-	msg.Args = c["args"].([]string)
+	msg.Args = getFlyParamMulti("args", req)
 
 	if strings.ToLower(getFlyParam("sync", req, true)) == "true" {
 		r.syncDispatcher.DispatchMsgSync(req.Context(), res, req, msg)
@@ -97,9 +91,15 @@ func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, par
 
 		// Async messages are dispatched as generic map payloads.
 		// We are confident in the re-serialization here as we've deserialized from JSON then built our own structure
-		msgBytes, _ := json.Marshal(msg)
+		msgBytes, err := json.Marshal(msg)
+		if err != nil {
+			errors.RestErrReply(res, req, err, 500)
+		}
 		var mapMsg map[string]interface{}
-		json.Unmarshal(msgBytes, &mapMsg)
+		err = json.Unmarshal(msgBytes, &mapMsg)
+		if err != nil {
+			errors.RestErrReply(res, req, err, 500)
+		}
 		if asyncResponse, err := r.asyncDispatcher.DispatchMsgAsync(req.Context(), mapMsg, ack); err != nil {
 			errors.RestErrReply(res, req, err, 500)
 		} else {
@@ -143,7 +143,7 @@ func (r *router) resolveParams(res http.ResponseWriter, req *http.Request, param
 
 func getQueryParamNoCase(name string, req *http.Request) []string {
 	name = strings.ToLower(name)
-	req.ParseForm()
+	_ = req.ParseForm()
 	for k, vs := range req.Form {
 		if strings.ToLower(k) == name {
 			return vs
@@ -171,12 +171,12 @@ func getFlyParam(name string, req *http.Request, isBool bool) string {
 // getFlyParamMulti returns an array parameter, or nil if none specified.
 // allows multiple query params / headers, or a single comma-separated query param / header
 func getFlyParamMulti(name string, req *http.Request) (val []string) {
-	req.ParseForm()
+	_ = req.ParseForm()
 	val = getQueryParamNoCase(utils.GetenvOrDefaultLowerCase("PREFIX_SHORT", "fly")+"-"+name, req)
 	if len(val) == 0 {
 		val = textproto.MIMEHeader(req.Header)[textproto.CanonicalMIMEHeaderKey("x-"+utils.GetenvOrDefaultLowerCase("PREFIX_LONG", "firefly")+"-"+name)]
 	}
-	if val != nil && len(val) == 1 {
+	if len(val) == 1 {
 		val = strings.Split(val[0], ",")
 	}
 	return
@@ -189,5 +189,5 @@ func restAsyncReply(res http.ResponseWriter, req *http.Request, asyncResponse *m
 	log.Debugf("<-- %s", resBytes)
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(status)
-	res.Write(resBytes)
+	_, _ = res.Write(resBytes)
 }

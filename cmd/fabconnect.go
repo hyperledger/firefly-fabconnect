@@ -52,19 +52,14 @@ func initLogging(debugLevel int) {
 	switch debugLevel {
 	case 0:
 		log.SetLevel(log.ErrorLevel)
-		break
 	case 1:
 		log.SetLevel(log.InfoLevel)
-		break
 	case 2:
 		log.SetLevel(log.DebugLevel)
-		break
 	case 3:
 		log.SetLevel(log.TraceLevel)
-		break
 	default:
 		log.SetLevel(log.DebugLevel)
-		break
 	}
 	log.Debugf("Log level set to %d", debugLevel)
 }

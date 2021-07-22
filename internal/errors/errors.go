@@ -167,6 +167,5 @@ func RestErrReply(res http.ResponseWriter, req *http.Request, err error, status 
 	reply, _ := json.Marshal(&restErrMsg{Message: err.Error()})
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(status)
-	res.Write(reply)
-	return
+	_, _ = res.Write(reply)
 }

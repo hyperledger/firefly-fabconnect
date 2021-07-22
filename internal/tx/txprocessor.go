@@ -103,7 +103,6 @@ func (p *txProcessor) OnMessage(txContext TxContext) {
 			break
 		}
 		p.OnSendTransactionMessage(txContext, &sendTransactionMsg)
-		break
 	default:
 		unmarshalErr = errors.Errorf(errors.TransactionSendMsgTypeUnknown, headers.MsgType)
 	}

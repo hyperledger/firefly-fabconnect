@@ -16,7 +16,6 @@ package async
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"reflect"
 
@@ -45,11 +44,6 @@ type asyncRequestHandler interface {
 	dispatchMsg(ctx context.Context, key, msgID string, msg map[string]interface{}, ack bool) (msgAck string, statusCode int, err error)
 	run() error
 	isInitialized() bool
-}
-
-type handlerErrMsg struct {
-	Sent    bool   `json:"sent"`
-	Message string `json:"error"`
 }
 
 type asyncDispatcher struct {
@@ -86,50 +80,6 @@ func (d *asyncDispatcher) HandleReceipts(res http.ResponseWriter, req *http.Requ
 	}
 }
 
-func (w *asyncDispatcher) errReply(res http.ResponseWriter, req *http.Request, err error, status int) {
-	log.Errorf("<-- %s %s [%d]: %s", req.Method, req.URL, status, err)
-	reply, _ := json.Marshal(&handlerErrMsg{Message: err.Error()})
-	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(status)
-	res.Write(reply)
-	return
-}
-
-func (w *asyncDispatcher) msgSentReply(res http.ResponseWriter, req *http.Request, replyMsg *messages.AsyncSentMsg) {
-	reply, _ := json.Marshal(replyMsg)
-	status := 200
-	log.Infof("<-- %s %s [%d]: Webhook RequestID=%s", req.Method, req.URL, status, replyMsg.Request)
-	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(status)
-	res.Write(reply)
-	return
-}
-
-func (w *asyncDispatcher) handleWithAck(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	w.handleRequest(res, req, true)
-}
-
-func (w *asyncDispatcher) handleNoAck(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	w.handleRequest(res, req, false)
-}
-
-func (w *asyncDispatcher) handleRequest(res http.ResponseWriter, req *http.Request, ack bool) {
-	log.Infof("--> %s %s", req.Method, req.URL)
-
-	msg, err := utils.YAMLorJSONPayload(req)
-	if err != nil {
-		w.errReply(res, req, err, 400)
-		return
-	}
-
-	reply, statusCode, err := w.processMsg(req.Context(), msg, ack)
-	if err != nil {
-		w.errReply(res, req, err, statusCode)
-		return
-	}
-	w.msgSentReply(res, req, reply)
-}
-
 func (w *asyncDispatcher) processMsg(ctx context.Context, msg map[string]interface{}, ack bool) (*messages.AsyncSentMsg, int, error) {
 	// Check we understand the type, and can get the key.
 	// The rest of the validation is performed by the bridge listening to Kafka
@@ -149,7 +99,6 @@ func (w *asyncDispatcher) processMsg(ctx context.Context, msg map[string]interfa
 			return nil, 400, errors.Errorf(errors.RequestHandlerInvalidMsgFromMissing)
 		}
 		key = from.(string)
-		break
 	default:
 		return nil, 400, errors.Errorf(errors.RequestHandlerInvalidMsgType, msgType)
 	}

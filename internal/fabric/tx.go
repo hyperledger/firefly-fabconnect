@@ -16,7 +16,6 @@ package fabric
 
 import (
 	"context"
-	"encoding/hex"
 	"time"
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
@@ -50,13 +49,6 @@ type ChaincodeSpec struct {
 	Type    int    `json:"type"`
 	Name    string `json:"name"`
 	Version string `json:"version"`
-}
-
-func addErrorToRetval(retval map[string]interface{}, retBytes []byte, rawRetval interface{}, err error) {
-	log.Warnf(err.Error())
-	retval["rlp"] = hex.EncodeToString(retBytes)
-	retval["raw"] = rawRetval
-	retval["error"] = err.Error()
 }
 
 // NewSendTxn builds a new ethereum transaction from the supplied
