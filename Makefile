@@ -1,5 +1,5 @@
 VGO=go
-BINARY_NAME=fabcon
+BINARY_NAME=fabconnect
 GOFILES := $(shell find cmd internal -name '*.go' -print)
 # Expect that FireFly compiles with CGO disabled
 CGO_ENABLED=0
@@ -8,24 +8,34 @@ GOGC=30
 
 all: build test go-mod-tidy
 test: deps lint
-		$(VGO) test ./internal/... ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=10s
+	$(VGO) test ./internal/... ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=10s
 coverage.html:
-		$(VGO) tool cover -html=coverage.txt
+	$(VGO) tool cover -html=coverage.txt
 coverage: test coverage.html
 lint:
-		GOGC=20 $(shell go list -f '{{.Target}}' github.com/golangci/golangci-lint/cmd/golangci-lint) run -v --timeout 5m
+	GOGC=20 $(shell go list -f '{{.Target}}' github.com/golangci/golangci-lint/cmd/golangci-lint) run -v --timeout 5m
 firefly-nocgo: ${GOFILES}		
-		CGO_ENABLED=0 $(VGO) build -o ${BINARY_NAME}-nocgo -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v
+	CGO_ENABLED=0 $(VGO) build -o ${BINARY_NAME}-nocgo -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v
 firefly: ${GOFILES}
-		$(VGO) build -o ${BINARY_NAME} -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v
+	$(VGO) build -o ${BINARY_NAME} -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v
 go-mod-tidy: .ALWAYS
-		go mod tidy
+	go mod tidy
 build: firefly-nocgo firefly
 .ALWAYS: ;
 clean: 
-		$(VGO) clean
-		rm -f *.so ${BINARY_NAME}
+	$(VGO) clean
+	rm -f *.so ${BINARY_NAME}
 builddeps:
-		$(VGO) get github.com/golangci/golangci-lint/cmd/golangci-lint
+	$(VGO) get github.com/golangci/golangci-lint/cmd/golangci-lint
 deps: builddeps
-		$(VGO) get
+	$(VGO) get
+mockery: .ALWAYS
+	go get github.com/vektra/mockery/cmd/mockery
+mocks: mockery ${GOFILES}
+	$(eval MOCKERY := $(shell go list -f '{{.Target}}' github.com/vektra/mockery/cmd/mockery))
+	${MOCKERY} --case underscore --dir internal/fabric --name RPCClient --output mocks/fabric --outpkg fabric
+	${MOCKERY} --case underscore --dir internal/rest/async --name AsyncDispatcher --output mocks/rest/async --outpkg async
+	${MOCKERY} --case underscore --dir internal/rest/receipt --name ReceiptStore --output mocks/rest/receipt --outpkg receipt
+	${MOCKERY} --case underscore --dir internal/rest/sync --name SyncDispatcher --output mocks/rest/sync --outpkg sync
+	${MOCKERY} --case underscore --dir internal/tx --name TxProcessor --output mocks/tx --outpkg tx
+	${MOCKERY} --case underscore --dir internal/ws --name WebSocketServer --output mocks/ws --outpkg ws

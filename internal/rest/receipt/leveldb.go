@@ -223,6 +223,10 @@ func (l *levelDBReceipts) GetReceipt(requestID string) (*map[string]interface{},
 	return &result, nil
 }
 
+func (l *levelDBReceipts) Close() {
+	l.store.Close()
+}
+
 func (l *levelDBReceipts) findEndPoint(sinceEpochMS int64) string {
 	searchKey := fmt.Sprintf("receivedAt:%d:", sinceEpochMS)
 	itr := l.store.NewIterator()

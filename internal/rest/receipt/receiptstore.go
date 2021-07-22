@@ -45,12 +45,14 @@ type ReceiptStorePersistence interface {
 	GetReceipts(skip, limit int, ids []string, sinceEpochMS int64, from, to, start string) (*[]map[string]interface{}, error)
 	GetReceipt(requestID string) (*map[string]interface{}, error)
 	AddReceipt(requestID string, receipt *map[string]interface{}) error
+	Close()
 }
 
 type ReceiptStore interface {
 	ProcessReceipt(msgBytes []byte)
 	GetReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params)
 	GetReceipt(res http.ResponseWriter, req *http.Request, params httprouter.Params)
+	Close()
 }
 
 type receiptStore struct {
@@ -304,6 +306,10 @@ func (r *receiptStore) GetReceipt(res http.ResponseWriter, req *http.Request, pa
 	}
 	log.Infof("Reply found")
 	r.marshalAndReply(res, req, result)
+}
+
+func (r *receiptStore) Close() {
+	r.persistence.Close()
 }
 
 func (r *receiptStore) marshalAndReply(res http.ResponseWriter, req *http.Request, result interface{}) {

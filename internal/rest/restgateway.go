@@ -16,17 +16,14 @@ package rest
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
@@ -37,7 +34,6 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/utils"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/ws"
 
-	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,34 +44,54 @@ const (
 
 // RESTGateway as the HTTP gateway interface for fabconnect
 type RESTGateway struct {
-	printYAML   *bool
-	config      *conf.RESTGatewayConf
-	srv         *http.Server
-	sendCond    *sync.Cond
-	pendingMsgs map[string]bool
-	successMsgs map[string]interface{}
-	failedMsgs  map[string]error
+	config          *conf.RESTGatewayConf
+	syncDispatcher  restsync.SyncDispatcher
+	asyncDispatcher restasync.AsyncDispatcher
+	router          *router
+	srv             *http.Server
+	sendCond        *sync.Cond
+	pendingMsgs     map[string]bool
+	successMsgs     map[string]interface{}
+	failedMsgs      map[string]error
 }
 
 type statusMsg struct {
 	OK bool `json:"ok"`
 }
 
-type errMsg struct {
-	Message string `json:"error"`
-}
-
 // NewRESTGateway constructor
-func NewRESTGateway(config *conf.RESTGatewayConf, printYAML *bool) (g *RESTGateway) {
-	g = &RESTGateway{
+func NewRESTGateway(config *conf.RESTGatewayConf) *RESTGateway {
+	g := &RESTGateway{
 		config:      config,
-		printYAML:   printYAML,
 		sendCond:    sync.NewCond(&sync.Mutex{}),
 		pendingMsgs: make(map[string]bool),
 		successMsgs: make(map[string]interface{}),
 		failedMsgs:  make(map[string]error),
 	}
-	return
+	return g
+}
+
+func (g *RESTGateway) Init() error {
+	var processor tx.TxProcessor
+	rpcClient, err := fabric.RPCConnect(g.config.RPC)
+	if err != nil {
+		return err
+	}
+	processor = tx.NewTxProcessor(g.config)
+	processor.Init(rpcClient)
+
+	g.syncDispatcher = restsync.NewSyncDispatcher(processor)
+	receiptStore, err := receipt.NewReceiptStore(g.config)
+	if err != nil {
+		return err
+	}
+	g.asyncDispatcher = restasync.NewAsyncDispatcher(g.config, processor, receiptStore)
+	ws := ws.NewWebSocketServer()
+
+	g.router = newRouter(g.syncDispatcher, g.asyncDispatcher, ws)
+	g.router.addRoutes()
+
+	return nil
 }
 
 func (g *RESTGateway) ValidateConf() error {
@@ -89,72 +105,16 @@ func (g *RESTGateway) ValidateConf() error {
 	if g.config.HTTP.LocalAddr == "" {
 		g.config.HTTP.LocalAddr = "0.0.0.0"
 	}
-	return nil
-}
-
-func (g *RESTGateway) newAccessTokenContextHandler(parent http.Handler) http.Handler {
-	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-
-		// Extract an access token from bearer token (only - no support for query params)
-		accessToken := ""
-		hSplit := strings.SplitN(req.Header.Get("Authorization"), " ", 2)
-		if len(hSplit) == 2 && strings.ToLower(hSplit[0]) == "bearer" {
-			accessToken = hSplit[1]
-		}
-		authCtx, err := auth.WithAuthContext(req.Context(), accessToken)
-		if err != nil {
-			log.Errorf("Error getting auth context: %s", err)
-			g.sendError(res, "Unauthorized", 401)
-			return
-		}
-
-		parent.ServeHTTP(res, req.WithContext(authCtx))
-	})
-}
-
-func (g *RESTGateway) sendError(res http.ResponseWriter, msg string, code int) {
-	reply, _ := json.Marshal(&errMsg{Message: msg})
-	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(code)
-	_, _ = res.Write(reply)
-}
-
-func fabricRPCConnect(config conf.RPCConf) (fabric.RPCClient, error) {
-	return fabric.RPCConnect(config)
+	err := g.asyncDispatcher.ValidateConf()
+	return err
 }
 
 // Start kicks off the HTTP listener and router
-func (g *RESTGateway) Start() (err error) {
-
-	if *g.printYAML {
-		b, err := utils.MarshalToYAML(&g.config)
-		print("# YAML Configuration snippet for REST Gateway\n" + string(b))
-		return err
-	}
-
+func (g *RESTGateway) Start() error {
 	tlsConfig, err := utils.CreateTLSConfiguration(&g.config.HTTP.TLS)
 	if err != nil {
-		return
+		return err
 	}
-
-	var processor tx.TxProcessor
-	var rpcClient fabric.RPCClient
-	if g.config.RPC.ConfigPath != "" {
-		rpcClient, err = fabricRPCConnect(g.config.RPC)
-		if err != nil {
-			return err
-		}
-		processor = tx.NewTxProcessor(g.config)
-		processor.Init(rpcClient)
-	}
-	syncDispatcher := restsync.NewSyncDispatcher(processor)
-	receiptStore, err := receipt.NewReceiptStore(g.config)
-	asyncDispatcher := restasync.NewAsyncDispatcher(g.config, processor, receiptStore)
-	ws := ws.NewWebSocketServer()
-
-	router := httprouter.New()
-	r := newRouter(syncDispatcher, asyncDispatcher, ws)
-	r.addRoutes(router)
 
 	// if conf.EventLevelDBPath != "" {
 	// 	sm := events.NewSubscriptionManager(&conf.SubscriptionManagerConf, rpc, ws)
@@ -167,7 +127,7 @@ func (g *RESTGateway) Start() (err error) {
 	g.srv = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", g.config.HTTP.LocalAddr, g.config.HTTP.Port),
 		TLSConfig:      tlsConfig,
-		Handler:        g.newAccessTokenContextHandler(router),
+		Handler:        g.router.newAccessTokenContextHandler(),
 		MaxHeaderBytes: MaxHeaderSize,
 	}
 
@@ -185,13 +145,13 @@ func (g *RESTGateway) Start() (err error) {
 		svrDone <- err
 	}()
 	go func() {
-		err := asyncDispatcher.Run()
+		err := g.asyncDispatcher.Run()
 		if err != nil {
-			log.Errorf("Webhooks Kafka bridge ended with: %s", err)
+			log.Errorf("Async dispatcher ended with: %s", err)
 		}
 		gwDone <- err
 	}()
-	for !asyncDispatcher.IsInitialized() {
+	for !g.asyncDispatcher.IsInitialized() {
 		time.Sleep(250 * time.Millisecond)
 	}
 	readyToListen <- true
@@ -209,14 +169,16 @@ func (g *RESTGateway) Start() (err error) {
 		break
 	}
 
-	// Ensure we shutdown the server
-	// if sm != nil {
-	// 	sm.Close()
-	// }
+	g.Shutdown()
+
 	log.Infof("Shutting down HTTP server")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	_ = g.srv.Shutdown(ctx)
 	defer cancel()
 
-	return
+	return err
+}
+
+func (g *RESTGateway) Shutdown() {
+	g.asyncDispatcher.Close()
 }

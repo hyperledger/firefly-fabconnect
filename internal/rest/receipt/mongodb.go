@@ -196,3 +196,5 @@ func (m *mongoReceipts) GetReceipt(requestID string) (*map[string]interface{}, e
 		return &result, nil
 	}
 }
+
+func (m *mongoReceipts) Close() {}

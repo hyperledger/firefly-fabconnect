@@ -32,10 +32,12 @@ import (
 // AsyncDispatcher is passed in to process messages over a streaming system with
 // a receipt store. Only used for POST methods, when fly-sync is not set to true
 type AsyncDispatcher interface {
+	ValidateConf() error
 	Run() error
 	IsInitialized() bool
 	DispatchMsgAsync(ctx context.Context, msg map[string]interface{}, ack bool) (*messages.AsyncSentMsg, error)
 	HandleReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params)
+	Close()
 }
 
 // Interface to be implemented by the direct handler and kafka-based handler
@@ -65,6 +67,10 @@ func NewAsyncDispatcher(conf *conf.RESTGatewayConf, processor tx.TxProcessor, re
 	}
 }
 
+func (d *asyncDispatcher) ValidateConf() error {
+	return d.handler.validateHandlerConf()
+}
+
 // DispatchMsgAsync is the interface method for async dispatching of messages
 func (d *asyncDispatcher) DispatchMsgAsync(ctx context.Context, msg map[string]interface{}, ack bool) (*messages.AsyncSentMsg, error) {
 	reply, _, err := d.processMsg(ctx, msg, ack)
@@ -78,6 +84,10 @@ func (d *asyncDispatcher) HandleReceipts(res http.ResponseWriter, req *http.Requ
 	} else {
 		d.receiptStore.GetReceipt(res, req, params)
 	}
+}
+
+func (d *asyncDispatcher) Close() {
+	d.receiptStore.Close()
 }
 
 func (w *asyncDispatcher) processMsg(ctx context.Context, msg map[string]interface{}, ack bool) (*messages.AsyncSentMsg, int, error) {

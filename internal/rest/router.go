@@ -2,10 +2,12 @@ package rest
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/textproto"
 	"strings"
 
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
 	restasync "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/async"
@@ -21,6 +23,7 @@ type router struct {
 	syncDispatcher  restsync.SyncDispatcher
 	asyncDispatcher restasync.AsyncDispatcher
 	ws              ws.WebSocketServer
+	httpRouter      *httprouter.Router
 }
 
 func newRouter(syncDispatcher restsync.SyncDispatcher, asyncDispatcher restasync.AsyncDispatcher, ws ws.WebSocketServer) *router {
@@ -28,17 +31,18 @@ func newRouter(syncDispatcher restsync.SyncDispatcher, asyncDispatcher restasync
 		syncDispatcher:  syncDispatcher,
 		asyncDispatcher: asyncDispatcher,
 		ws:              ws,
+		httpRouter:      httprouter.New(),
 	}
 }
 
-func (r *router) addRoutes(router *httprouter.Router) {
+func (r *router) addRoutes() {
 	// router.POST("/identities", r.restHandler)
 	// router.GET("/identities", r.restHandler)
 	// router.GET("/identities/:username", r.restHandler)
 
-	router.POST("/transactions", r.sendTransaction)
-	router.GET("/receipts", r.handleReceipts)
-	router.GET("/receipts/:receiptId", r.handleReceipts)
+	r.httpRouter.POST("/transactions", r.sendTransaction)
+	r.httpRouter.GET("/receipts", r.handleReceipts)
+	r.httpRouter.GET("/receipts/:receiptId", r.handleReceipts)
 
 	// router.POST("/eventstreams", r.createStream)
 	// router.PATCH("/eventstreams/:streamId", r.updateStream)
@@ -53,8 +57,28 @@ func (r *router) addRoutes(router *httprouter.Router) {
 	// router.DELETE("/eventstreams/:streamId/subscriptions/:subscriptionId", r.deleteSubscription)
 	// router.POST("/eventstreams/:streamId/subscriptions/:subscriptionId/reset", r.resetSubscription)
 
-	router.GET("/ws", r.wsHandler)
-	router.GET("/status", r.statusHandler)
+	r.httpRouter.GET("/ws", r.wsHandler)
+	r.httpRouter.GET("/status", r.statusHandler)
+}
+
+func (r *router) newAccessTokenContextHandler() http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+
+		// Extract an access token from bearer token (only - no support for query params)
+		accessToken := ""
+		hSplit := strings.SplitN(req.Header.Get("Authorization"), " ", 2)
+		if len(hSplit) == 2 && strings.ToLower(hSplit[0]) == "bearer" {
+			accessToken = hSplit[1]
+		}
+		authCtx, err := auth.WithAuthContext(req.Context(), accessToken)
+		if err != nil {
+			log.Errorf("Error getting auth context: %s", err)
+			errors.RestErrReply(res, req, fmt.Errorf("Unauthorized"), 401)
+			return
+		}
+
+		r.httpRouter.ServeHTTP(res, req.WithContext(authCtx))
+	})
 }
 
 func (r *router) wsHandler(res http.ResponseWriter, req *http.Request, params httprouter.Params) {

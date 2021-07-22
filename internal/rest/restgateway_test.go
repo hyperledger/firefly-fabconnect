@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path"
 	"sync"
 	"testing"
 	"time"
@@ -27,69 +29,50 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth/authtest"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/test"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
 )
 
 var lastPort = 9000
+var tmpdir string
+var testConfig *conf.RESTGatewayConf
+
+func TestMain(m *testing.M) {
+	setup()
+	code := m.Run()
+	teardown()
+	os.Exit(code)
+}
+
+func setup() {
+	tmpdir, testConfig = test.Setup()
+}
+
+func teardown() {
+	test.Teardown(tmpdir)
+}
 
 func TestNewRESTGateway(t *testing.T) {
 	assert := assert.New(t)
-	var printYAML = false
-	var config conf.RESTGatewayConf
-	config.HTTP.LocalAddr = "127.0.0.1"
-	g := NewRESTGateway(&config, &printYAML)
+	testConfig.HTTP.LocalAddr = "127.0.0.1"
+	g := NewRESTGateway(testConfig)
 	assert.Equal("127.0.0.1", g.config.HTTP.LocalAddr)
-}
-
-func TestValidateConfInvalidArgs1(t *testing.T) {
-	assert := assert.New(t)
-	var printYAML = false
-	var config conf.RESTGatewayConf
-	g := NewRESTGateway(&config, &printYAML)
-	err := g.ValidateConf()
-	assert.EqualError(err, "Must provide REST Gateway http listening port")
-}
-
-func TestValidateConfInvalidArgs2(t *testing.T) {
-	assert := assert.New(t)
-	var printYAML = false
-	var config conf.RESTGatewayConf
-	config.HTTP.Port = 3000
-	g := NewRESTGateway(&config, &printYAML)
-	err := g.ValidateConf()
-	assert.EqualError(err, "Must provide REST Gateway client configuration path")
-}
-func TestValidateConfDefaultArgs(t *testing.T) {
-	assert := assert.New(t)
-	var printYAML = false
-	var config conf.RESTGatewayConf
-	config.HTTP.Port = 3000
-	config.RPC.ConfigPath = "/fabconnect/config.yaml"
-	g := NewRESTGateway(&config, &printYAML)
-	err := g.ValidateConf()
-	assert.NoError(err)
-	assert.Equal("0.0.0.0", g.config.HTTP.LocalAddr)
 }
 
 func TestStartStatusStopNoKafkaHandlerAccessToken(t *testing.T) {
 	assert := assert.New(t)
 
 	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
-	router := &httprouter.Router{}
-	fakeRPC := httptest.NewServer(router)
-	// Add username/pass to confirm we don't log
-	u, _ := url.Parse(fakeRPC.URL)
-	u.User = url.UserPassword("user1", "pass1")
-
-	var printYAML = false
-	config := conf.RESTGatewayConf{}
-	g := NewRESTGateway(&config, &printYAML)
+	g := NewRESTGateway(testConfig)
 	g.config.HTTP.Port = lastPort
 	g.config.HTTP.LocalAddr = "127.0.0.1"
-	g.config.RPC.ConfigPath = u.String()
+	g.config.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
+	err := g.Init()
+	assert.NoError(err)
+
 	lastPort++
-	var err error
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -123,220 +106,124 @@ func TestStartStatusStopNoKafkaHandlerAccessToken(t *testing.T) {
 
 }
 
-// func TestStartStatusStopNoKafkaWebhooksMissingToken(t *testing.T) {
-// 	assert := assert.New(t)
+func TestStartStatusStopNoKafkaHandlerMissingToken(t *testing.T) {
+	assert := assert.New(t)
 
-// 	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
+	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
 
-// 	router := &httprouter.Router{}
-// 	fakeRPC := httptest.NewServer(router)
-// 	// Add username/pass to confirm we don't log
-// 	u, _ := url.Parse(fakeRPC.URL)
-// 	u.User = url.UserPassword("user1", "pass1")
+	g := NewRESTGateway(testConfig)
+	g.config.HTTP.Port = lastPort
+	g.config.HTTP.LocalAddr = "127.0.0.1"
+	g.config.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
+	err := g.Init()
+	assert.NoError(err)
 
-// 	var printYAML = false
-// 	g := NewRESTGateway(&printYAML)
-// 	g.conf.HTTP.Port = lastPort
-// 	g.conf.HTTP.LocalAddr = "127.0.0.1"
-// 	g.conf.RPC.URL = u.String()
-// 	g.conf.OpenAPI.StoragePath = "/tmp/t"
-// 	lastPort++
-// 	var err error
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	go func() {
-// 		err = g.Start()
-// 		wg.Done()
-// 	}()
+	lastPort++
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err = g.Start()
+		wg.Done()
+	}()
 
-// 	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/status", g.conf.HTTP.Port))
-// 	var resp *http.Response
-// 	for i := 0; i < 5; i++ {
-// 		time.Sleep(200 * time.Millisecond)
-// 		req := &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
-// 			"authorization": []string{"bearer"},
-// 		}}
-// 		resp, err = http.DefaultClient.Do(req)
-// 		if err == nil && resp.StatusCode == 401 {
-// 			break
-// 		}
-// 	}
-// 	assert.NoError(err)
-// 	assert.Equal(401, resp.StatusCode)
-// 	var errResp errMsg
-// 	err = json.NewDecoder(resp.Body).Decode(&errResp)
-// 	assert.Equal("Unauthorized", errResp.Message)
+	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/status", g.config.HTTP.Port))
+	var resp *http.Response
+	for i := 0; i < 5; i++ {
+		time.Sleep(200 * time.Millisecond)
+		req := &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
+			"authorization": []string{"bearer"},
+		}}
+		resp, err = http.DefaultClient.Do(req)
+		if err == nil && resp.StatusCode == 401 {
+			break
+		}
+	}
+	assert.NoError(err)
+	assert.Equal(401, resp.StatusCode)
+	var errResp errors.RestErrMsg
+	err = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal("Unauthorized", errResp.Message)
 
-// 	g.srv.Close()
-// 	wg.Wait()
-// 	assert.EqualError(err, "http: Server closed")
+	g.srv.Close()
+	wg.Wait()
+	assert.EqualError(err, "http: Server closed")
 
-// 	auth.RegisterSecurityModule(nil)
+	auth.RegisterSecurityModule(nil)
 
-// }
+}
 
-// func TestStartWithKafkaWebhooks(t *testing.T) {
-// 	assert := assert.New(t)
+func TestStartWithKafkaHandlerNoBroker(t *testing.T) {
+	assert := assert.New(t)
 
-// 	var printYAML = false
-// 	g := NewRESTGateway(&printYAML)
-// 	g.conf.HTTP.Port = lastPort
-// 	g.conf.HTTP.LocalAddr = "127.0.0.1"
-// 	g.conf.Kafka.Brokers = []string{""}
-// 	lastPort++
-// 	var err error
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	go func() {
-// 		err = g.Start()
-// 		wg.Done()
-// 	}()
+	g := NewRESTGateway(testConfig)
+	g.config.HTTP.Port = lastPort
+	g.config.HTTP.LocalAddr = "127.0.0.1"
+	g.config.Kafka.Brokers = []string{""}
+	err := g.Init()
+	assert.NoError(err)
+	lastPort++
 
-// 	wg.Wait()
-// 	assert.EqualError(err, "No Kafka brokers configured")
-// }
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err = g.Start()
+		wg.Done()
+	}()
 
-// func TestStartWithBadTLS(t *testing.T) {
-// 	assert := assert.New(t)
+	wg.Wait()
+	assert.EqualError(err, "No Kafka brokers configured")
+}
 
-// 	var printYAML = false
-// 	g := NewRESTGateway(&printYAML)
-// 	g.conf.HTTP.Port = lastPort
-// 	g.conf.HTTP.LocalAddr = "127.0.0.1"
-// 	g.conf.HTTP.TLS.Enabled = true
-// 	g.conf.HTTP.TLS.ClientKeyFile = "incomplete config"
-// 	lastPort++
-// 	var err error
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	go func() {
-// 		err = g.Start()
-// 		wg.Done()
-// 	}()
+func TestStartWithBadTLS(t *testing.T) {
+	assert := assert.New(t)
 
-// 	wg.Wait()
-// 	assert.EqualError(err, "Client private key and certificate must both be provided for mutual auth")
-// }
+	g := NewRESTGateway(testConfig)
+	g.config.HTTP.Port = lastPort
+	g.config.HTTP.LocalAddr = "127.0.0.1"
+	g.config.HTTP.TLS.Enabled = true
+	g.config.HTTP.TLS.ClientKeyFile = "incomplete config"
+	err := g.Init()
+	assert.NoError(err)
 
-// func TestStartInvalidMongo(t *testing.T) {
-// 	assert := assert.New(t)
+	lastPort++
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err = g.Start()
+		wg.Done()
+	}()
 
-// 	fakeRouter := &httprouter.Router{}
-// 	fakeMongo := httptest.NewServer(fakeRouter)
-// 	defer fakeMongo.Close()
+	wg.Wait()
+	assert.EqualError(err, "Client private key and certificate must both be provided for mutual auth")
+}
 
-// 	var printYAML = false
-// 	g := NewRESTGateway(&printYAML)
-// 	url, _ := url.Parse(fakeMongo.URL)
-// 	url.Scheme = "mongodb"
-// 	g.conf.MongoDB.URL = url.String()
-// 	g.conf.MongoDB.ConnectTimeoutMS = 100
-// 	err := g.Start()
-// 	assert.EqualError(err, "Unable to connect to MongoDB: no reachable servers")
-// }
+func TestStartInvalidMongo(t *testing.T) {
+	assert := assert.New(t)
 
-// func TestStartWithBadRPCUrl(t *testing.T) {
-// 	assert := assert.New(t)
+	fakeRouter := &httprouter.Router{}
+	fakeMongo := httptest.NewServer(fakeRouter)
+	defer fakeMongo.Close()
 
-// 	var printYAML = false
-// 	g := NewRESTGateway(&printYAML)
-// 	g.conf.HTTP.Port = lastPort
-// 	g.conf.HTTP.LocalAddr = "127.0.0.1"
-// 	g.conf.OpenAPI.StoragePath = "/tmp/t"
-// 	lastPort++
-// 	var err error
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	go func() {
-// 		err = g.Start()
-// 		wg.Done()
-// 	}()
+	g := NewRESTGateway(testConfig)
+	url, _ := url.Parse(fakeMongo.URL)
+	url.Scheme = "mongodb"
+	g.config.Receipts.LevelDB.Path = ""
+	g.config.Receipts.MongoDB.URL = url.String()
+	g.config.Receipts.MongoDB.Database = "test"
+	g.config.Receipts.MongoDB.Collection = "test"
+	g.config.Receipts.MongoDB.ConnectTimeoutMS = 100
+	g.config.HTTP.TLS.ClientKeyFile = ""
+	err := g.Init()
+	assert.EqualError(err, "Unable to connect to MongoDB: no reachable servers")
+}
 
-// 	wg.Wait()
-// 	assert.EqualError(err, "JSON/RPC connection to  failed: dial unix: missing address")
-// }
-// func TestPrintYaml(t *testing.T) {
-// 	assert := assert.New(t)
+func TestStartWithBadRPCConfigPath(t *testing.T) {
+	assert := assert.New(t)
 
-// 	var printYAML = true
-// 	g := NewRESTGateway(&printYAML)
-// 	g.printYAML = &printYAML
-// 	cmd := g.CobraInit("rest")
-// 	cmd.SetArgs([]string{"-l", "8001", "-r", "http://localhost:8545"})
-// 	err := cmd.Execute()
-// 	assert.Nil(err)
-// }
-
-// func TestMissingRPCAndMissingKafka(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	var printYAML = true
-// 	g := NewRESTGateway(&printYAML)
-// 	g.printYAML = &printYAML
-// 	cmd := g.CobraInit("rest")
-// 	cmd.SetArgs([]string{"-l", "8001"})
-// 	err := cmd.Execute()
-// 	assert.EqualError(err, "No JSON/RPC URL set for ethereum node")
-// }
-
-// func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	var printYAML = true
-// 	g := NewRESTGateway(&printYAML)
-// 	g.printYAML = &printYAML
-// 	cmd := g.CobraInit("rest")
-// 	cmd.SetArgs([]string{"-l", "8001", "-r", "http://localhost:8545", "-x", "1"})
-// 	err := cmd.Execute()
-// 	assert.NoError(err)
-// }
-
-// func TestKafkaCobraInitSuccess(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	var printYAML = true
-// 	g := NewRESTGateway(&printYAML)
-// 	g.printYAML = &printYAML
-// 	cmd := g.CobraInit("rest")
-// 	args := []string{
-// 		"-l", "8001",
-// 		"-b", "broker1", "-b", "broker2",
-// 		"-t", "topic1", "-T", "topic2",
-// 		"-g", "group1",
-// 	}
-// 	cmd.SetArgs(args)
-// 	cmd.ParseFlags(args)
-// 	err := cmd.PreRunE(cmd, args)
-// 	assert.Nil(err)
-// 	assert.Equal([]string{"broker1", "broker2"}, g.conf.Kafka.Brokers)
-// }
-
-// func TestKafkaCobraInitFailure(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	var printYAML = true
-// 	g := NewRESTGateway(&printYAML)
-// 	g.printYAML = &printYAML
-// 	cmd := g.CobraInit("rest")
-// 	args := []string{
-// 		"-b", "broker1", "-b", "broker2",
-// 	}
-// 	cmd.SetArgs(args)
-// 	cmd.ParseFlags(args)
-// 	err := cmd.PreRunE(cmd, args)
-// 	assert.EqualError(err, "No output topic specified for bridge to send events to")
-// 	assert.Equal([]string{"broker1", "broker2"}, g.conf.Kafka.Brokers)
-// }
-
-// func TestDispatchMsgAsyncPassesThroughToWebhooks(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	var printYAML = true
-// 	g := NewRESTGateway(&printYAML)
-// 	fakeHandler := &mockHandler{}
-// 	g.webhooks = newWebhooks(fakeHandler, nil)
-
-// 	var fakeMsg map[string]interface{}
-// 	_, err := g.DispatchMsgAsync(context.Background(), fakeMsg, true)
-// 	assert.EqualError(err, "Invalid message - missing 'headers' (or not an object)")
-// }
+	g := NewRESTGateway(testConfig)
+	g.config.HTTP.Port = lastPort
+	g.config.HTTP.LocalAddr = "127.0.0.1"
+	g.config.RPC.ConfigPath = "/bad/path"
+	err := g.Init()
+	assert.EqualError(err, "open /bad/path: no such file or directory")
+}

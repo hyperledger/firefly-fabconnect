@@ -85,3 +85,5 @@ func (m *memoryReceipts) AddReceipt(requestID string, receipt *map[string]interf
 	m.receipts.PushFront(receipt)
 	return nil
 }
+
+func (m *memoryReceipts) Close() {}

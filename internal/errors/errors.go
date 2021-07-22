@@ -41,7 +41,7 @@ const (
 	// ConfigFileReadFailed failed to read the server config file
 	ConfigFileReadFailed = "Failed to read %s: %s"
 	// ConfigNoYAML missing configuration file on server start
-	ConfigNoYAML = "No YAML configuration filename specified"
+	ConfigFileMissing = "No configuration filename specified"
 	// ConfigYAMLParseFile failed to parse YAML during server startup
 	ConfigYAMLParseFile = "Unable to parse %s as YAML: %s"
 	// ConfigYAMLPostParseFile failed to process YAML as JSON after parsing
@@ -166,13 +166,13 @@ const (
 	EventStreamsWebSocketErrorFromClient = "Error received from WebSocket client: %s"
 )
 
-type restErrMsg struct {
+type RestErrMsg struct {
 	Message string `json:"error"`
 }
 
 func RestErrReply(res http.ResponseWriter, req *http.Request, err error, status int) {
 	log.Errorf("<-- %s %s [%d]: %s", req.Method, req.URL, status, err)
-	reply, _ := json.Marshal(&restErrMsg{Message: err.Error()})
+	reply, _ := json.Marshal(&RestErrMsg{Message: err.Error()})
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(status)
 	_, _ = res.Write(reply)

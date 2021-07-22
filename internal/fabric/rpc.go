@@ -38,10 +38,10 @@ type rpcWrapper struct {
 	channelMap map[string]*channel.Client
 }
 
-func RPCConnect(conf conf.RPCConf) (RPCClient, error) {
-	dat, err := ioutil.ReadFile(conf.ConfigPath)
+func RPCConnect(c conf.RPCConf) (RPCClient, error) {
+	dat, err := ioutil.ReadFile(c.ConfigPath)
 	if err != nil {
-		log.Errorf("Failed to read common connection profile file: %s. %s", conf.ConfigPath, err)
+		log.Errorf("Failed to read common connection profile file: %s. %s", c.ConfigPath, err)
 		return nil, err
 	}
 	configProvider := config.FromRaw(dat, "yaml")
@@ -51,7 +51,7 @@ func RPCConnect(conf conf.RPCConf) (RPCClient, error) {
 		return nil, err
 	}
 
-	log.Infof("New JSON/RPC connection established")
+	log.Infof("New gRPC connection established")
 	return &rpcWrapper{sdk: sdk}, nil
 }
 
@@ -93,18 +93,4 @@ func newReceipt(response channel.Response) TxReceipt {
 		TransactionID: string(response.TransactionID),
 		Status:        int(response.TxValidationCode),
 	}
-}
-
-type mockRPCClient struct{}
-
-func (m *mockRPCClient) Init(ctx context.Context, channelId, chaincodeName, method string, args []string) (TxReceipt, error) {
-	return TxReceipt{}, nil
-}
-func (m *mockRPCClient) Invoke(ctx context.Context, channelId, chaincodeName, method string, args []string) (TxReceipt, error) {
-	return TxReceipt{}, nil
-}
-func (m *mockRPCClient) Close() {}
-
-func NewMockRPCClient() RPCClient {
-	return &mockRPCClient{}
 }
