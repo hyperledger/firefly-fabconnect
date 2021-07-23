@@ -68,7 +68,12 @@ func NewAsyncDispatcher(conf *conf.RESTGatewayConf, processor tx.TxProcessor, re
 }
 
 func (d *asyncDispatcher) ValidateConf() error {
-	return d.handler.validateHandlerConf()
+	err := d.handler.validateHandlerConf()
+	if err != nil {
+		return err
+	}
+	err = d.receiptStore.ValidateConf()
+	return err
 }
 
 // DispatchMsgAsync is the interface method for async dispatching of messages

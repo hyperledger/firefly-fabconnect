@@ -19,8 +19,8 @@ import (
 	"testing"
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	"github.com/hyperledger-labs/firefly-fabconnect/mocks/rest/receipt"
-	"github.com/hyperledger-labs/firefly-fabconnect/mocks/tx"
+	mockreceipt "github.com/hyperledger-labs/firefly-fabconnect/mocks/rest/receipt"
+	mocktx "github.com/hyperledger-labs/firefly-fabconnect/mocks/tx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,7 +46,7 @@ func TestDispatchMsgAsyncInvalidMsg(t *testing.T) {
 	assert := assert.New(t)
 
 	testConfig := &conf.RESTGatewayConf{}
-	asyncD := NewAsyncDispatcher(testConfig, &tx.TxProcessor{}, &receipt.ReceiptStore{})
+	asyncD := NewAsyncDispatcher(testConfig, &mocktx.TxProcessor{}, &mockreceipt.ReceiptStore{})
 
 	var fakeMsg map[string]interface{}
 	_, err := asyncD.DispatchMsgAsync(context.Background(), fakeMsg, true)

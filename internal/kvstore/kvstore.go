@@ -38,6 +38,7 @@ type KVIterator interface {
 
 // KVStore interface for key value stores
 type KVStore interface {
+	Init() error
 	Put(key string, val []byte) error
 	Get(key string) ([]byte, error)
 	Delete(key string) error
@@ -55,6 +56,15 @@ func (k *levelDBKeyValueStore) warnIfErr(op, key string, err error) {
 	if err != nil && err != leveldb.ErrNotFound {
 		log.Warnf("LDB %s %s '%s' failed: %s", k.path, op, key, err)
 	}
+}
+
+func (kv *levelDBKeyValueStore) Init() error {
+	db, err := leveldb.OpenFile(kv.path, nil)
+	if err != nil {
+		return errors.Errorf(errors.KVStoreDBLoad, kv.path, err)
+	}
+	kv.db = db
+	return nil
 }
 
 func (k *levelDBKeyValueStore) Put(key string, val []byte) error {
@@ -122,17 +132,14 @@ func (k *levelDBKeyIterator) Release() {
 }
 
 func (k *levelDBKeyValueStore) Close() {
-	k.db.Close()
+	if k.db != nil {
+		k.db.Close()
+	}
 }
 
 // NewLDBKeyValueStore construct a new LevelDB instance of a KV store
-func NewLDBKeyValueStore(ldbPath string) (kv KVStore, err error) {
-	store := &levelDBKeyValueStore{
+func NewLDBKeyValueStore(ldbPath string) KVStore {
+	return &levelDBKeyValueStore{
 		path: ldbPath,
 	}
-	if store.db, err = leveldb.OpenFile(ldbPath, nil); err != nil {
-		return nil, errors.Errorf(errors.KVStoreDBLoad, ldbPath, err)
-	}
-	kv = store
-	return
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/test"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -37,6 +38,8 @@ func TestMain(m *testing.M) {
 
 func setup() {
 	tmpdir, testConfig = test.Setup()
+	os.Setenv("FC_HTTP_PORT", "8002")
+	os.Setenv("FC_EVENTS_POLLINGINTERVAL", "60")
 }
 
 func teardown() {
@@ -47,47 +50,108 @@ func runNothing(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func TestCmdLaunch(t *testing.T) {
-	assert := assert.New(t)
-
-	restGateway = nil
-	cmd, _ := newRootCmd()
-	cmd.RunE = runNothing
-	cmd.SetArgs([]string{"-l", "8001", "-f", path.Join(tmpdir, "config.json")})
-	err := cmd.Execute()
-	assert.Nil(err)
-	restGateway.Shutdown()
-}
-
 func TestMissingConfigFile(t *testing.T) {
 	assert := assert.New(t)
 
 	restGateway = nil
-	cmd, _ := newRootCmd()
-	cmd.RunE = runNothing
-	cmd.SetArgs([]string{"-l", "8001"})
-	err := cmd.Execute()
-	assert.EqualError(err, "No configuration filename specified")
+	rootCmd.RunE = runNothing
+	args := []string{}
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	assert.EqualError(err, "Must provide REST Gateway client configuration path")
 }
 
 func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
 	assert := assert.New(t)
 
 	restGateway = nil
-	cmd, _ := newRootCmd()
-	cmd.RunE = runNothing
-	cmd.SetArgs([]string{"-l", "8001", "-f", path.Join(tmpdir, "config.json"), "-x", "1"})
-	err := cmd.Execute()
+	restGatewayConf.MaxTXWaitTime = 0
+	rootCmd.RunE = runNothing
+	args := []string{
+		"-f", path.Join(tmpdir, "config.json"),
+		"-x", "1",
+	}
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
 	assert.NoError(err)
-	restGateway.Shutdown()
+	assert.Equal(10, restGatewayConf.MaxTXWaitTime)
 }
 
-func TestKafkaCobraInitSuccess(t *testing.T) {
+func TestEnvVarOverride(t *testing.T) {
 	assert := assert.New(t)
 
 	restGateway = nil
-	cmd, _ := newRootCmd()
-	cmd.RunE = runNothing
+	rootCmd.RunE = runNothing
+	_ = rootCmd.Execute()
+	assert.Equal(8002, restGatewayConf.HTTP.Port)
+	assert.Equal(uint64(60), restGatewayConf.Events.PollingIntervalSec)
+}
+
+func TestCmdArgsOverride(t *testing.T) {
+	assert := assert.New(t)
+
+	restGateway = nil
+	rootCmd.RunE = runNothing
+	args := []string{
+		"-l", "8001",
+	}
+	rootCmd.SetArgs(args)
+	_ = rootCmd.Execute()
+	assert.Equal(8001, restGatewayConf.HTTP.Port)
+}
+
+func TestDefaultsInConfigFile(t *testing.T) {
+	assert := assert.New(t)
+
+	restGateway = nil
+	restGatewayConf.HTTP.Port = 0
+	rootCmd.RunE = runNothing
+	viper.Reset()
+	args := []string{
+		"-f", path.Join(tmpdir, "config.json"),
+	}
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	assert.NoError(err)
+	assert.Equal(3000, restGatewayConf.HTTP.Port)
+}
+
+func TestMissingKafkaTopic(t *testing.T) {
+	assert := assert.New(t)
+
+	restGateway = nil
+	rootCmd.RunE = runNothing
+	args := []string{
+		"-l", "8001",
+		"-f", path.Join(tmpdir, "config.json"),
+		"-b", "broker1",
+		"-b", "broker2",
+	}
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	assert.EqualError(err, "No output topic specified for bridge to send events to")
+}
+
+func TestCmdLaunch(t *testing.T) {
+	assert := assert.New(t)
+
+	restGateway = nil
+	restGatewayConf.Kafka.Brokers = []string{}
+	rootCmd.RunE = runNothing
+	args := []string{
+		"-l", "8001",
+		"-f", path.Join(tmpdir, "config.json"),
+	}
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	assert.Nil(err)
+}
+
+func TestKafkaSuccess(t *testing.T) {
+	assert := assert.New(t)
+
+	restGateway = nil
+	rootCmd.RunE = runNothing
 	args := []string{
 		"-l", "8001",
 		"-f", path.Join(tmpdir, "config.json"),
@@ -95,28 +159,8 @@ func TestKafkaCobraInitSuccess(t *testing.T) {
 		"-t", "topic1", "-T", "topic2",
 		"-g", "group1",
 	}
-	cmd.SetArgs(args)
-	err := cmd.Execute()
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
 	assert.Nil(err)
 	assert.Equal([]string{"broker1", "broker2"}, restGatewayConf.Kafka.Brokers)
-	restGateway.Shutdown()
-}
-
-func TestKafkaCobraInitFailure(t *testing.T) {
-	assert := assert.New(t)
-
-	restGateway = nil
-	cmd, _ := newRootCmd()
-	cmd.RunE = runNothing
-	args := []string{
-		"-l", "8001",
-		"-f", path.Join(tmpdir, "config.json"),
-		"-b", "broker1",
-		"-b", "broker2",
-	}
-	cmd.SetArgs(args)
-	err := cmd.Execute()
-	assert.EqualError(err, "No output topic specified for bridge to send events to")
-	assert.Equal([]string{"broker1", "broker2"}, restGatewayConf.Kafka.Brokers)
-	restGateway.Shutdown()
 }

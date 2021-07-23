@@ -26,7 +26,7 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/kvstore"
-	"github.com/oklog/ulid/v2"
+	ulid "github.com/oklog/ulid/v2"
 	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
@@ -39,11 +39,8 @@ type levelDBReceipts struct {
 	defaultLimit int
 }
 
-func newLevelDBReceipts(conf *conf.ReceiptsDBConf) (*levelDBReceipts, error) {
-	store, err := kvstore.NewLDBKeyValueStore(conf.LevelDB.Path)
-	if err != nil {
-		return nil, errors.Errorf(errors.ReceiptStoreLevelDBConnect, err)
-	}
+func newLevelDBReceipts(conf *conf.ReceiptsDBConf) *levelDBReceipts {
+	store := kvstore.NewLDBKeyValueStore(conf.LevelDB.Path)
 	t := time.Unix(1000000, 0)
 	entropy := ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)
 
@@ -52,7 +49,20 @@ func newLevelDBReceipts(conf *conf.ReceiptsDBConf) (*levelDBReceipts, error) {
 		store:        store,
 		idEntropy:    entropy,
 		defaultLimit: conf.QueryLimit,
-	}, nil
+	}
+}
+
+func (m *levelDBReceipts) validateConf() error {
+	// leveldb creates the target directory on demand, no need to check for existence
+	return nil
+}
+
+func (l *levelDBReceipts) Init() error {
+	err := l.store.Init()
+	if err != nil {
+		return errors.Errorf(errors.ReceiptStoreLevelDBConnect, err)
+	}
+	return nil
 }
 
 // AddReceipt processes an individual reply message, and contains all errors

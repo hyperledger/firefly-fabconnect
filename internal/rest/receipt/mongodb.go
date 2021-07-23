@@ -98,7 +98,7 @@ func newMongoReceipts(config *conf.ReceiptsDBConf) *mongoReceipts {
 	}
 }
 
-func (m *mongoReceipts) ValidateConf() (err error) {
+func (m *mongoReceipts) validateConf() (err error) {
 	if !utils.AllOrNoneReqd(m.config.MongoDB.URL, m.config.MongoDB.Database, m.config.MongoDB.Collection) {
 		err = errors.Errorf(errors.ConfigRESTGatewayRequiredReceiptStore)
 		return
@@ -109,7 +109,7 @@ func (m *mongoReceipts) ValidateConf() (err error) {
 	return
 }
 
-func (m *mongoReceipts) connect() (err error) {
+func (m *mongoReceipts) Init() (err error) {
 	if m.config.MongoDB.ConnectTimeoutMS <= 0 {
 		m.config.MongoDB.ConnectTimeoutMS = mongoConnectTimeout
 	}

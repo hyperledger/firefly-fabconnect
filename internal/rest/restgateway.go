@@ -45,6 +45,8 @@ const (
 // RESTGateway as the HTTP gateway interface for fabconnect
 type RESTGateway struct {
 	config          *conf.RESTGatewayConf
+	processor       tx.TxProcessor
+	receiptStore    receipt.ReceiptStore
 	syncDispatcher  restsync.SyncDispatcher
 	asyncDispatcher restasync.AsyncDispatcher
 	router          *router
@@ -68,26 +70,26 @@ func NewRESTGateway(config *conf.RESTGatewayConf) *RESTGateway {
 		successMsgs: make(map[string]interface{}),
 		failedMsgs:  make(map[string]error),
 	}
+	g.processor = tx.NewTxProcessor(g.config)
+	g.syncDispatcher = restsync.NewSyncDispatcher(g.processor)
+	g.receiptStore = receipt.NewReceiptStore(g.config)
+	g.asyncDispatcher = restasync.NewAsyncDispatcher(g.config, g.processor, g.receiptStore)
 	return g
 }
 
 func (g *RESTGateway) Init() error {
-	var processor tx.TxProcessor
 	rpcClient, err := fabric.RPCConnect(g.config.RPC)
 	if err != nil {
 		return err
 	}
-	processor = tx.NewTxProcessor(g.config)
-	processor.Init(rpcClient)
+	g.processor.Init(rpcClient)
 
-	g.syncDispatcher = restsync.NewSyncDispatcher(processor)
-	receiptStore, err := receipt.NewReceiptStore(g.config)
+	err = g.receiptStore.Init()
 	if err != nil {
 		return err
 	}
-	g.asyncDispatcher = restasync.NewAsyncDispatcher(g.config, processor, receiptStore)
-	ws := ws.NewWebSocketServer()
 
+	ws := ws.NewWebSocketServer()
 	g.router = newRouter(g.syncDispatcher, g.asyncDispatcher, ws)
 	g.router.addRoutes()
 

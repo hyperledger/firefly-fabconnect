@@ -33,9 +33,9 @@ mockery: .ALWAYS
 	go get github.com/vektra/mockery/cmd/mockery
 mocks: mockery ${GOFILES}
 	$(eval MOCKERY := $(shell go list -f '{{.Target}}' github.com/vektra/mockery/cmd/mockery))
-	${MOCKERY} --case underscore --dir internal/fabric --name RPCClient --output mocks/fabric --outpkg fabric
-	${MOCKERY} --case underscore --dir internal/rest/async --name AsyncDispatcher --output mocks/rest/async --outpkg async
-	${MOCKERY} --case underscore --dir internal/rest/receipt --name ReceiptStore --output mocks/rest/receipt --outpkg receipt
-	${MOCKERY} --case underscore --dir internal/rest/sync --name SyncDispatcher --output mocks/rest/sync --outpkg sync
-	${MOCKERY} --case underscore --dir internal/tx --name TxProcessor --output mocks/tx --outpkg tx
-	${MOCKERY} --case underscore --dir internal/ws --name WebSocketServer --output mocks/ws --outpkg ws
+	${MOCKERY} --case underscore --dir internal/fabric --name RPCClient --output mocks/fabric --outpkg mockfabric
+	${MOCKERY} --case underscore --dir internal/rest/async --name AsyncDispatcher --output mocks/rest/async --outpkg mockasync
+	${MOCKERY} --case underscore --dir internal/rest/receipt --name ReceiptStore --output mocks/rest/receipt --outpkg mockreceipt
+	${MOCKERY} --case underscore --dir internal/rest/sync --name SyncDispatcher --output mocks/rest/sync --outpkg mocksync
+	${MOCKERY} --case underscore --dir internal/tx --name TxProcessor --output mocks/tx --outpkg mocktx
+	${MOCKERY} --case underscore --dir internal/ws --name WebSocketServer --output mocks/ws --outpkg mockws

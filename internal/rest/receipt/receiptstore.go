@@ -40,8 +40,10 @@ const (
 
 var uuidCharsVerifier, _ = regexp.Compile("^[0-9a-zA-Z-]+$")
 
-// ReceiptStorePersistence interface implemented by persistence layers
-type ReceiptStorePersistence interface {
+// receiptStorePersistence interface implemented by persistence layers
+type receiptStorePersistence interface {
+	Init() error
+	validateConf() error
 	GetReceipts(skip, limit int, ids []string, sinceEpochMS int64, from, to, start string) (*[]map[string]interface{}, error)
 	GetReceipt(requestID string) (*map[string]interface{}, error)
 	AddReceipt(requestID string, receipt *map[string]interface{}) error
@@ -49,6 +51,8 @@ type ReceiptStorePersistence interface {
 }
 
 type ReceiptStore interface {
+	Init() error
+	ValidateConf() error
 	ProcessReceipt(msgBytes []byte)
 	GetReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params)
 	GetReceipt(res http.ResponseWriter, req *http.Request, params httprouter.Params)
@@ -57,28 +61,17 @@ type ReceiptStore interface {
 
 type receiptStore struct {
 	config      *conf.ReceiptsDBConf
-	persistence ReceiptStorePersistence
+	persistence receiptStorePersistence
 	ws          ws.WebSocketChannels
 }
 
-func NewReceiptStore(config *conf.RESTGatewayConf) (ReceiptStore, error) {
-	var receiptStorePersistence ReceiptStorePersistence
+func NewReceiptStore(config *conf.RESTGatewayConf) ReceiptStore {
+	var receiptStorePersistence receiptStorePersistence
 	if config.Receipts.LevelDB.Path != "" {
-		leveldbStore, err := newLevelDBReceipts(&config.Receipts)
-		if err != nil {
-			return nil, err
-		}
+		leveldbStore := newLevelDBReceipts(&config.Receipts)
 		receiptStorePersistence = leveldbStore
 	} else if config.Receipts.MongoDB.URL != "" {
 		mongoStore := newMongoReceipts(&config.Receipts)
-		err := mongoStore.ValidateConf()
-		if err != nil {
-			return nil, err
-		}
-		err = mongoStore.connect()
-		if err != nil {
-			return nil, err
-		}
 		receiptStorePersistence = mongoStore
 	} else {
 		memStore := newMemoryReceipts(&config.Receipts)
@@ -94,7 +87,14 @@ func NewReceiptStore(config *conf.RESTGatewayConf) (ReceiptStore, error) {
 	return &receiptStore{
 		config:      &config.Receipts,
 		persistence: receiptStorePersistence,
-	}, nil
+	}
+}
+func (r *receiptStore) ValidateConf() error {
+	return r.persistence.validateConf()
+}
+
+func (r *receiptStore) Init() error {
+	return r.persistence.Init()
 }
 
 func (r *receiptStore) extractHeaders(parsedMsg map[string]interface{}) map[string]interface{} {

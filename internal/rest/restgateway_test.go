@@ -65,10 +65,10 @@ func TestStartStatusStopNoKafkaHandlerAccessToken(t *testing.T) {
 	assert := assert.New(t)
 
 	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
+	testConfig.HTTP.Port = lastPort
+	testConfig.HTTP.LocalAddr = "127.0.0.1"
+	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
 	g := NewRESTGateway(testConfig)
-	g.config.HTTP.Port = lastPort
-	g.config.HTTP.LocalAddr = "127.0.0.1"
-	g.config.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
 	err := g.Init()
 	assert.NoError(err)
 
@@ -111,10 +111,10 @@ func TestStartStatusStopNoKafkaHandlerMissingToken(t *testing.T) {
 
 	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
 
+	testConfig.HTTP.Port = lastPort
+	testConfig.HTTP.LocalAddr = "127.0.0.1"
+	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
 	g := NewRESTGateway(testConfig)
-	g.config.HTTP.Port = lastPort
-	g.config.HTTP.LocalAddr = "127.0.0.1"
-	g.config.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
 	err := g.Init()
 	assert.NoError(err)
 
@@ -152,36 +152,14 @@ func TestStartStatusStopNoKafkaHandlerMissingToken(t *testing.T) {
 
 }
 
-func TestStartWithKafkaHandlerNoBroker(t *testing.T) {
-	assert := assert.New(t)
-
-	g := NewRESTGateway(testConfig)
-	g.config.HTTP.Port = lastPort
-	g.config.HTTP.LocalAddr = "127.0.0.1"
-	g.config.Kafka.Brokers = []string{""}
-	err := g.Init()
-	assert.NoError(err)
-	lastPort++
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		err = g.Start()
-		wg.Done()
-	}()
-
-	wg.Wait()
-	assert.EqualError(err, "No Kafka brokers configured")
-}
-
 func TestStartWithBadTLS(t *testing.T) {
 	assert := assert.New(t)
 
+	testConfig.HTTP.Port = lastPort
+	testConfig.HTTP.LocalAddr = "127.0.0.1"
+	testConfig.HTTP.TLS.Enabled = true
+	testConfig.HTTP.TLS.ClientKeyFile = "incomplete config"
 	g := NewRESTGateway(testConfig)
-	g.config.HTTP.Port = lastPort
-	g.config.HTTP.LocalAddr = "127.0.0.1"
-	g.config.HTTP.TLS.Enabled = true
-	g.config.HTTP.TLS.ClientKeyFile = "incomplete config"
 	err := g.Init()
 	assert.NoError(err)
 
@@ -204,15 +182,15 @@ func TestStartInvalidMongo(t *testing.T) {
 	fakeMongo := httptest.NewServer(fakeRouter)
 	defer fakeMongo.Close()
 
-	g := NewRESTGateway(testConfig)
 	url, _ := url.Parse(fakeMongo.URL)
 	url.Scheme = "mongodb"
-	g.config.Receipts.LevelDB.Path = ""
-	g.config.Receipts.MongoDB.URL = url.String()
-	g.config.Receipts.MongoDB.Database = "test"
-	g.config.Receipts.MongoDB.Collection = "test"
-	g.config.Receipts.MongoDB.ConnectTimeoutMS = 100
-	g.config.HTTP.TLS.ClientKeyFile = ""
+	testConfig.Receipts.LevelDB.Path = ""
+	testConfig.Receipts.MongoDB.URL = url.String()
+	testConfig.Receipts.MongoDB.Database = "test"
+	testConfig.Receipts.MongoDB.Collection = "test"
+	testConfig.Receipts.MongoDB.ConnectTimeoutMS = 100
+	testConfig.HTTP.TLS.ClientKeyFile = ""
+	g := NewRESTGateway(testConfig)
 	err := g.Init()
 	assert.EqualError(err, "Unable to connect to MongoDB: no reachable servers")
 }
@@ -220,10 +198,10 @@ func TestStartInvalidMongo(t *testing.T) {
 func TestStartWithBadRPCConfigPath(t *testing.T) {
 	assert := assert.New(t)
 
+	testConfig.HTTP.Port = lastPort
+	testConfig.HTTP.LocalAddr = "127.0.0.1"
+	testConfig.RPC.ConfigPath = "/bad/path"
 	g := NewRESTGateway(testConfig)
-	g.config.HTTP.Port = lastPort
-	g.config.HTTP.LocalAddr = "127.0.0.1"
-	g.config.RPC.ConfigPath = "/bad/path"
 	err := g.Init()
 	assert.EqualError(err, "open /bad/path: no such file or directory")
 }

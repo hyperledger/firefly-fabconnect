@@ -38,6 +38,14 @@ func newMemoryReceipts(config *conf.ReceiptsDBConf) *memoryReceipts {
 	return r
 }
 
+func (m *memoryReceipts) validateConf() error {
+	return nil
+}
+
+func (m *memoryReceipts) Init() error {
+	return nil
+}
+
 func (m *memoryReceipts) GetReceipts(skip, limit int, ids []string, sinceEpochMS int64, from, to, start string) (*[]map[string]interface{}, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
