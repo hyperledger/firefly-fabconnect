@@ -40,28 +40,34 @@ func Errorf(msg ErrorID, inserts ...interface{}) error {
 const (
 	// ConfigFileReadFailed failed to read the server config file
 	ConfigFileReadFailed = "Failed to read %s: %s"
-
 	// ConfigNoYAML missing configuration file on server start
-	ConfigNoYAML = "No YAML configuration filename specified"
+	ConfigFileMissing = "No configuration filename specified"
 	// ConfigYAMLParseFile failed to parse YAML during server startup
 	ConfigYAMLParseFile = "Unable to parse %s as YAML: %s"
 	// ConfigYAMLPostParseFile failed to process YAML as JSON after parsing
 	ConfigYAMLPostParseFile = "Failed to process YAML config from %s: %s"
-
+	// ConfigRESTGatewayRequiredHTTPPort for rest server listening port missing
+	ConfigRESTGatewayRequiredHTTPPort = "Must provide REST Gateway http listening port"
+	// ConfigRESTGatewayRequiredRPCPath for rest server's Fabric client config file missing
+	ConfigRESTGatewayRequiredRPCPath = "Must provide REST Gateway client configuration path"
 	// ConfigRESTGatewayRequiredReceiptStore need to enable params for REST Gatewya
 	ConfigRESTGatewayRequiredReceiptStore = "MongoDB URL, Database and Collection name must be specified to enable the receipt store"
-
 	// ConfigTLSCertOrKey incomplete TLS config
 	ConfigTLSCertOrKey = "Client private key and certificate must both be provided for mutual auth"
 
-	// RequestHandlerInvalidMsgHeaders missing headers section in the JSON/YAML posted
-	RequestHandlerInvalidMsgHeaders = "Invalid message - missing 'headers' (or not an object)"
+	// SecurityModulePluginLoad failed to load .so
+	SecurityModulePluginLoad = "Failed to load plugin: %s"
+	// SecurityModulePluginSymbol missing symbol in plugin
+	SecurityModulePluginSymbol = "Failed to load 'SecurityModule' symbol from '%s': %s"
+	// SecurityModuleNoAuthContext missing auth context in context object at point security module is invoked
+	SecurityModuleNoAuthContext = "No auth context"
+
 	// RequestHandlerInvalidMsgTypeMissing need to specify a msg type in the header
 	RequestHandlerInvalidMsgTypeMissing = "Invalid message - missing 'headers.type' (or not a string)"
-	// RequestHandlerInvalidMsgFromMissing need to specify a msg type in the header
-	RequestHandlerInvalidMsgFromMissing = "Invalid message - missing 'from' (or not a string)"
+	// RequestHandlerInvalidMsgSignerMissing need to specify a msg signer in the header
+	RequestHandlerInvalidMsgSignerMissing = "Invalid message - missing 'signer' (or not a string)"
 	// RequestHandlerInvalidMsgType need to specify a valid msg type in the header
-	RequestHandlerInvalidMsgType = "Invalid message type: %s"
+	RequestHandlerInvalidMsgType = "Invalid message type: \"%s\""
 
 	// RequestHandlerDirectTooManyInflight when we're not using a buffered store (Kafka) we have to reject
 	RequestHandlerDirectTooManyInflight = "Too many in-flight transactions"
@@ -103,16 +109,16 @@ const (
 	// WebhooksKafkaDeliveryReportNoMeta delivery reports should contain the metadata we set when we sent
 	WebhooksKafkaDeliveryReportNoMeta = "Sent message did not contain metadata: %+v"
 	// WebhooksKafkaYAMLtoJSON re-serialization of webhook message into JSON failed
-	WebhooksKafkaYAMLtoJSON = "Unable to reserialize YAML payload as JSON: %s"
+	WebhooksKafkaMsgtoJSON = "Unable to reserialize message payload as JSON: %s"
 	// WebhooksKafkaErr wrapper on detailed error from Kafka itself
 	WebhooksKafkaErr = "Failed to deliver message to Kafka: %s"
 
-	// HelperYAMLorJSONPayloadTooLarge input message too large
-	HelperYAMLorJSONPayloadTooLarge = "Message exceeds maximum allowable size"
+	// HelperPayloadTooLarge input message too large
+	HelperPayloadTooLarge = "Message exceeds maximum allowable size"
 	// HelperYAMLorJSONPayloadReadFailed failed to read input
-	HelperYAMLorJSONPayloadReadFailed = "Unable to read input data: %s"
+	HelperPayloadReadFailed = "Unable to read input data: %s"
 	// HelperYAMLorJSONPayloadParseFailed input message got error parsing
-	HelperYAMLorJSONPayloadParseFailed = "Unable to parse as YAML or JSON: %s"
+	HelperPayloadParseFailed = "Unable to parse as JSON: %s"
 
 	// ReceiptStoreDisabled not configured
 	ReceiptStoreDisabled = "Receipt store not enabled"
@@ -158,13 +164,13 @@ const (
 	EventStreamsWebSocketErrorFromClient = "Error received from WebSocket client: %s"
 )
 
-type restErrMsg struct {
+type RestErrMsg struct {
 	Message string `json:"error"`
 }
 
 func RestErrReply(res http.ResponseWriter, req *http.Request, err error, status int) {
 	log.Errorf("<-- %s %s [%d]: %s", req.Method, req.URL, status, err)
-	reply, _ := json.Marshal(&restErrMsg{Message: err.Error()})
+	reply, _ := json.Marshal(&RestErrMsg{Message: err.Error()})
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(status)
 	_, _ = res.Write(reply)

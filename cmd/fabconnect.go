@@ -17,30 +17,20 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 
 	"gopkg.in/yaml.v2"
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest"
-	"github.com/icza/dyno"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	_ "net/http/pprof"
 )
-
-// ServerConfig is the parent YAML structure that configures fabconnect
-// to run with a set of individual commands as goroutines
-// (rather than the simple commandline mode that runs a single command)
-type ServerConfig struct {
-	RESTGateways map[string]*conf.RESTGatewayConf `json:"rest"`
-}
 
 func initLogging(debugLevel int) {
 	log.SetFormatter(&prefixed.TextFormatter{
@@ -64,21 +54,35 @@ func initLogging(debugLevel int) {
 	log.Debugf("Log level set to %d", debugLevel)
 }
 
-var rootConfig struct {
+type cmdConfig struct {
 	DebugLevel int
 	DebugPort  int
 	PrintYAML  bool
+	Filename   string
 }
 
-var serverCmdConfig struct {
-	Filename string
-	Type     string
-}
+var rootConfig = cmdConfig{}
+var restGatewayConf = &conf.RESTGatewayConf{}
+var restGateway *rest.RESTGateway
 
 var rootCmd = &cobra.Command{
-	Use:   "fabconnect [sub]",
+	Use:   "fabconnect",
 	Short: "Connectivity Bridge for Hyperledger Fabric permissioned chains",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		err := viper.Unmarshal(restGatewayConf)
+		if err != nil {
+			return err
+		}
+
+		// allow tests to assign a mock
+		if restGateway == nil {
+			restGateway = rest.NewRESTGateway(restGatewayConf)
+		}
+		err = restGateway.ValidateConf()
+		if err != nil {
+			return err
+		}
+
 		initLogging(rootConfig.DebugLevel)
 
 		if rootConfig.DebugPort > 0 {
@@ -86,97 +90,74 @@ var rootCmd = &cobra.Command{
 				log.Debugf("Debug HTTP endpoint listening on localhost:%d: %s", rootConfig.DebugPort, http.ListenAndServe(fmt.Sprintf("localhost:%d", rootConfig.DebugPort), nil))
 			}()
 		}
+
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := startServer()
+		return err
 	},
 }
 
-func initServerCmd() (serverCmd *cobra.Command) {
-	serverCmd = &cobra.Command{
-		Use:   "server",
-		Short: "Runs all of the bridges defined in a YAML config file",
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			err = startServer()
-			return
-		},
-		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
-			if serverCmdConfig.Filename == "" {
-				err = errors.Errorf(errors.ConfigNoYAML)
-				return
-			}
-			return
-		},
-	}
-	defType := os.Getenv("FABCONNECT_CONFIGFILE_TYPE")
-	if defType == "" {
-		defType = "yaml"
-	}
-	serverCmd.Flags().StringVarP(&serverCmdConfig.Filename, "filename", "f", os.Getenv("FABCONNECT_CONFIGFILE"), "Configuration file")
-	serverCmd.Flags().StringVarP(&serverCmdConfig.Type, "type", "t", defType, "File type (json/yaml). Default to 'yaml'")
-	return
+func init() {
+	cobra.OnInitialize(initConfig)
+	// all environment variables for the "fabconnect" command will have the "FC" prefix
+	// e.g "FC_CONFIGFILE"
+	viper.SetEnvPrefix("FC")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	rootCmd.Flags().IntVarP(&rootConfig.DebugLevel, "debug", "d", 1, "0=error, 1=info, 2=debug")
+	rootCmd.Flags().IntVarP(&rootConfig.DebugPort, "debugPort", "Z", 6060, "Port for pprof HTTP endpoints (localhost only)")
+	rootCmd.Flags().BoolVarP(&rootConfig.PrintYAML, "print-yaml-confg", "Y", false, "Print YAML config snippet and exit")
+	rootCmd.Flags().StringVarP(&rootConfig.Filename, "configfile", "f", "", "Configuration file, must be one of .yml, .yaml, or .json")
+	conf.CobraInit(rootCmd, restGatewayConf)
 }
 
-func readServerConfig() (serverConfig *ServerConfig, err error) {
-	confBytes, err := ioutil.ReadFile(serverCmdConfig.Filename)
-	if err != nil {
-		err = errors.Errorf(errors.ConfigFileReadFailed, serverCmdConfig.Filename, err)
-		return
-	}
-	if strings.ToLower(serverCmdConfig.Type) == "yaml" {
-		// Convert to JSON first
-		yamlGenericPayload := make(map[interface{}]interface{})
-		if err = yaml.Unmarshal(confBytes, &yamlGenericPayload); err != nil {
-			err = errors.Errorf(errors.ConfigYAMLParseFile, serverCmdConfig.Filename, err)
-			return
+func initConfig() {
+	if rootConfig.Filename != "" {
+		viper.SetConfigFile(rootConfig.Filename)
+		if err := viper.ReadInConfig(); err != nil {
+			log.Infof("Can't read config: %s, will rely on environment variables and command line arguments for required configurations\n", err)
+		} else {
+			log.Infof("Using config file: %s\n", viper.ConfigFileUsed())
 		}
-		genericPayload := dyno.ConvertMapI2MapS(yamlGenericPayload).(map[string]interface{})
-		// Reseialize back to JSON
-		confBytes, _ = json.Marshal(&genericPayload)
+	} else {
+		log.Info("No config file specified, will rely on environment variables and command line arguments for required configurations")
 	}
-	serverConfig = &ServerConfig{}
-	err = json.Unmarshal(confBytes, serverConfig)
-	if err != nil {
-		err = errors.Errorf(errors.ConfigYAMLPostParseFile, serverCmdConfig.Filename, err)
-		return
-	}
-
-	return
 }
 
-func startServer() (err error) {
-
-	serverConfig, err := readServerConfig()
-	if err != nil {
-		return
-	}
+func startServer() error {
 
 	if rootConfig.PrintYAML {
-		b, err := marshalToYAML(&serverConfig)
-		print("# Full YAML configuration processed from supplied file\n" + string(b))
-		return err
-	}
-
-	anyRoutineFinished := make(chan bool)
-	var dontPrintYaml = false
-	if serverConfig.RESTGateways == nil {
-		serverConfig.RESTGateways = make(map[string]*conf.RESTGatewayConf)
-	}
-	for name, conf := range serverConfig.RESTGateways {
-		restGateway := rest.NewRESTGateway(*conf, &dontPrintYaml)
-		if err := restGateway.ValidateConf(); err != nil {
+		a, err := marshalToYAML(rootConfig)
+		if err != nil {
 			return err
 		}
-		go func(name string, anyRoutineFinished chan bool) {
-			log.Infof("Starting REST gateway '%s'", name)
-			if err := restGateway.Start(); err != nil {
-				log.Errorf("REST gateway failed: %s", err)
-			}
-			anyRoutineFinished <- true
-		}(name, anyRoutineFinished)
+		b, err := marshalToYAML(restGatewayConf)
+		if err != nil {
+			return err
+		}
+		print(fmt.Sprintf("# Full YAML configuration processed from supplied file\n%s\n%s\n", string(a), string(b)))
 	}
 
-	// Terminate when ANY routine fails (do not wait for them all to complete)
-	<-anyRoutineFinished
+	err := restGateway.Init()
+	if err != nil {
+		return err
+	}
+	serverDone := make(chan bool)
+	go func(done chan bool) {
+		log.Info("Starting REST gateway")
+		if err := restGateway.Start(); err != nil {
+			log.Errorf("REST gateway failed: %s", err)
+		}
+		done <- true
+	}(serverDone)
 
-	return
+	// Terminate when ANY routine fails (do not wait for them all to complete)
+	<-serverDone
+
+	return nil
 }
 
 // MarshalToYAML marshals a JSON annotated structure into YAML, by first going to JSON
@@ -195,13 +176,6 @@ func marshalToYAML(conf interface{}) (yamlBytes []byte, err error) {
 
 // Execute is called by the main method of the package
 func Execute() int {
-	rootCmd.PersistentFlags().IntVarP(&rootConfig.DebugLevel, "debug", "d", 1, "0=error, 1=info, 2=debug")
-	rootCmd.PersistentFlags().IntVarP(&rootConfig.DebugPort, "debugPort", "Z", 6060, "Port for pprof HTTP endpoints (localhost only)")
-	rootCmd.PersistentFlags().BoolVarP(&rootConfig.PrintYAML, "print-yaml-confg", "Y", false, "Print YAML config snippet and exit")
-
-	serverCmd := initServerCmd()
-	rootCmd.AddCommand(serverCmd)
-
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		return 1

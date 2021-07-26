@@ -130,12 +130,12 @@ func (w *kafkaHandler) ProducerSuccessLoop(consumer kafka.KafkaConsumer, produce
 	wg.Done()
 }
 
-func (w *kafkaHandler) dispatchMsg(ctx context.Context, key, msgID string, msg map[string]interface{}, ack bool) (string, int, error) {
+func (w *kafkaHandler) dispatchMsg(ctx context.Context, key, msgID string, msg *messages.SendTransaction, ack bool) (string, int, error) {
 
 	// Reseialize back to JSON with the headers
 	payloadToForward, err := json.Marshal(&msg)
 	if err != nil {
-		return "", 500, errors.Errorf(errors.WebhooksKafkaYAMLtoJSON, err)
+		return "", 500, errors.Errorf(errors.WebhooksKafkaMsgtoJSON, err)
 	}
 	if ack {
 		w.setMsgPending(msgID)

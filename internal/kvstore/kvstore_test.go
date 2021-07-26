@@ -39,7 +39,8 @@ func TestLevelDBPutGet(t *testing.T) {
 	assert := assert.New(t)
 	dir := tempdir(t)
 	defer cleanup(t, dir)
-	kv, err := NewLDBKeyValueStore(path.Join(dir, "db"))
+	kv := NewLDBKeyValueStore(path.Join(dir, "db"))
+	err := kv.Init()
 	assert.NoError(err)
 	err = kv.Put("things", []byte("stuff"))
 	assert.NoError(err)
@@ -55,7 +56,8 @@ func TestLevelDBIterate(t *testing.T) {
 	assert := assert.New(t)
 	dir := tempdir(t)
 	defer cleanup(t, dir)
-	kv, err := NewLDBKeyValueStore(path.Join(dir, "db"))
+	kv := NewLDBKeyValueStore(path.Join(dir, "db"))
+	err := kv.Init()
 	assert.NoError(err)
 	for i := 0; i < 100; i++ {
 		err = kv.Put(fmt.Sprintf("key_%.3d", i), []byte(fmt.Sprintf("val_%.3d", i)))
@@ -78,7 +80,8 @@ func TestLevelDBBadPath(t *testing.T) {
 	defer cleanup(t, dir)
 	dbPath := path.Join(dir, "badness")
 	_ = ioutil.WriteFile(dbPath, []byte{}, 0644)
-	_, err := NewLDBKeyValueStore(dbPath)
+	kv := NewLDBKeyValueStore(dbPath)
+	err := kv.Init()
 	assert.Regexp("Failed to open DB", err.Error())
 }
 
