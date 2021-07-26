@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
 	mockreceipt "github.com/hyperledger-labs/firefly-fabconnect/mocks/rest/receipt"
 	mocktx "github.com/hyperledger-labs/firefly-fabconnect/mocks/tx"
 	"github.com/stretchr/testify/assert"
@@ -48,7 +49,7 @@ func TestDispatchMsgAsyncInvalidMsg(t *testing.T) {
 	testConfig := &conf.RESTGatewayConf{}
 	asyncD := NewAsyncDispatcher(testConfig, &mocktx.TxProcessor{}, &mockreceipt.ReceiptStore{})
 
-	var fakeMsg map[string]interface{}
-	_, err := asyncD.DispatchMsgAsync(context.Background(), fakeMsg, true)
-	assert.EqualError(err, "Invalid message - missing 'headers' (or not an object)")
+	fakeMsg := messages.SendTransaction{}
+	_, err := asyncD.DispatchMsgAsync(context.Background(), &fakeMsg, true)
+	assert.EqualError(err, "Invalid message type: \"\"")
 }

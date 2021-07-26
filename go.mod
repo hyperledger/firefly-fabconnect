@@ -9,7 +9,6 @@ require (
 	github.com/google/certificate-transparency-go v1.1.1 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20210201220314-86344dc25e5d
-	github.com/icza/dyno v0.0.0-20200205103839-49cb13720835
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d

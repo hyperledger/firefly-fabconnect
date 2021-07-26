@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/textproto"
 	"strings"
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
@@ -102,29 +101,22 @@ func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, par
 
 	msg := &messages.SendTransaction{}
 	msg.Headers.MsgType = messages.MsgTypeSendTransaction
-	msg.Headers.ChannelID = c["channel"].(string)
-	msg.Headers.Signer = c["signer"].(string)
+	msg.Headers.ChannelID = c["headers"].(map[string]interface{})["channel"].(string)
+	msg.Headers.Signer = c["headers"].(map[string]interface{})["signer"].(string)
 	msg.ChaincodeName = c["chaincode"].(string)
-	msg.Function = c["function"].(string)
-	msg.Args = getFlyParamMulti("args", req)
+	msg.Function = c["func"].(string)
+	args := make([]string, len(c["args"].([]interface{})))
+	for i, v := range c["args"].([]interface{}) {
+		args[i] = v.(string)
+	}
+	msg.Args = args
 
 	if strings.ToLower(getFlyParam("sync", req, true)) == "true" {
 		r.syncDispatcher.DispatchMsgSync(req.Context(), res, req, msg)
 	} else {
 		ack := (getFlyParam("noack", req, true) != "true") // turn on ack's by default
 
-		// Async messages are dispatched as generic map payloads.
-		// We are confident in the re-serialization here as we've deserialized from JSON then built our own structure
-		msgBytes, err := json.Marshal(msg)
-		if err != nil {
-			errors.RestErrReply(res, req, err, 500)
-		}
-		var mapMsg map[string]interface{}
-		err = json.Unmarshal(msgBytes, &mapMsg)
-		if err != nil {
-			errors.RestErrReply(res, req, err, 500)
-		}
-		if asyncResponse, err := r.asyncDispatcher.DispatchMsgAsync(req.Context(), mapMsg, ack); err != nil {
+		if asyncResponse, err := r.asyncDispatcher.DispatchMsgAsync(req.Context(), msg, ack); err != nil {
 			errors.RestErrReply(res, req, err, 500)
 		} else {
 			restAsyncReply(res, req, asyncResponse)
@@ -137,12 +129,13 @@ func (r *router) handleReceipts(res http.ResponseWriter, req *http.Request, para
 }
 
 func (r *router) resolveParams(res http.ResponseWriter, req *http.Request, params httprouter.Params) (c map[string]interface{}, err error) {
+	// if query parameters are specified, they take precedence over body properties
 	channelParam := params.ByName("channel")
-	methodParam := params.ByName("function")
+	methodParam := params.ByName("func")
 	signer := getFlyParam("signer", req, false)
 	blocknumber := getFlyParam("blocknumber", req, false)
 
-	body, err := utils.YAMLorJSONPayload(req)
+	body, err := utils.ParseJSONPayload(req)
 	if err != nil {
 		errors.RestErrReply(res, req, err, 400)
 		return nil, err
@@ -150,16 +143,16 @@ func (r *router) resolveParams(res http.ResponseWriter, req *http.Request, param
 
 	// consolidate inidividual parameters with the body parameters
 	if channelParam != "" {
-		body["channel"] = channelParam
+		body["headers"].(map[string]string)["channel"] = channelParam
 	}
 	if methodParam != "" {
-		body["function"] = methodParam
+		body["func"] = methodParam
 	}
 	if signer != "" {
-		body["signer"] = signer
+		body["headers"].(map[string]string)["signer"] = signer
 	}
 	if blocknumber != "" {
-		body["blocknumber"] = blocknumber
+		body["headers"].(map[string]string)["blocknumber"] = blocknumber
 	}
 
 	return body, nil
@@ -190,20 +183,6 @@ func getFlyParam(name string, req *http.Request, isBool bool) string {
 		valStr = req.Header.Get("x-" + utils.GetenvOrDefaultLowerCase("PREFIX_LONG", "firefly") + "-" + name)
 	}
 	return valStr
-}
-
-// getFlyParamMulti returns an array parameter, or nil if none specified.
-// allows multiple query params / headers, or a single comma-separated query param / header
-func getFlyParamMulti(name string, req *http.Request) (val []string) {
-	_ = req.ParseForm()
-	val = getQueryParamNoCase(utils.GetenvOrDefaultLowerCase("PREFIX_SHORT", "fly")+"-"+name, req)
-	if len(val) == 0 {
-		val = textproto.MIMEHeader(req.Header)[textproto.CanonicalMIMEHeaderKey("x-"+utils.GetenvOrDefaultLowerCase("PREFIX_LONG", "firefly")+"-"+name)]
-	}
-	if len(val) == 1 {
-		val = strings.Split(val[0], ",")
-	}
-	return
 }
 
 func restAsyncReply(res http.ResponseWriter, req *http.Request, asyncResponse *messages.AsyncSentMsg) {

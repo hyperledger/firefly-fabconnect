@@ -1,6 +1,7 @@
 VGO=go
 BINARY_NAME=fabconnect
 GOFILES := $(shell find cmd internal -name '*.go' -print)
+TESTED_INTERNALS := $(shell go list ./internal/... | grep -v rest/test)
 # Expect that FireFly compiles with CGO disabled
 CGO_ENABLED=0
 GOGC=30
@@ -8,7 +9,7 @@ GOGC=30
 
 all: build test go-mod-tidy
 test: deps lint
-	$(VGO) test ./internal/... ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=10s
+	$(VGO) test $(TESTED_INTERNALS) ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=10s
 coverage.html:
 	$(VGO) tool cover -html=coverage.txt
 coverage: test coverage.html

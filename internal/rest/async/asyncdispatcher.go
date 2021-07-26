@@ -17,7 +17,6 @@ package async
 import (
 	"context"
 	"net/http"
-	"reflect"
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
@@ -35,7 +34,7 @@ type AsyncDispatcher interface {
 	ValidateConf() error
 	Run() error
 	IsInitialized() bool
-	DispatchMsgAsync(ctx context.Context, msg map[string]interface{}, ack bool) (*messages.AsyncSentMsg, error)
+	DispatchMsgAsync(ctx context.Context, msg *messages.SendTransaction, ack bool) (*messages.AsyncSentMsg, error)
 	HandleReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params)
 	Close()
 }
@@ -43,7 +42,7 @@ type AsyncDispatcher interface {
 // Interface to be implemented by the direct handler and kafka-based handler
 type asyncRequestHandler interface {
 	validateHandlerConf() error
-	dispatchMsg(ctx context.Context, key, msgID string, msg map[string]interface{}, ack bool) (msgAck string, statusCode int, err error)
+	dispatchMsg(ctx context.Context, key, msgID string, msg *messages.SendTransaction, ack bool) (msgAck string, statusCode int, err error)
 	run() error
 	isInitialized() bool
 }
@@ -77,7 +76,7 @@ func (d *asyncDispatcher) ValidateConf() error {
 }
 
 // DispatchMsgAsync is the interface method for async dispatching of messages
-func (d *asyncDispatcher) DispatchMsgAsync(ctx context.Context, msg map[string]interface{}, ack bool) (*messages.AsyncSentMsg, error) {
+func (d *asyncDispatcher) DispatchMsgAsync(ctx context.Context, msg *messages.SendTransaction, ack bool) (*messages.AsyncSentMsg, error) {
 	reply, _, err := d.processMsg(ctx, msg, ack)
 	return reply, err
 }
@@ -95,36 +94,23 @@ func (d *asyncDispatcher) Close() {
 	d.receiptStore.Close()
 }
 
-func (w *asyncDispatcher) processMsg(ctx context.Context, msg map[string]interface{}, ack bool) (*messages.AsyncSentMsg, int, error) {
-	// Check we understand the type, and can get the key.
-	// The rest of the validation is performed by the bridge listening to Kafka
-	headers, exists := msg["headers"]
-	if !exists || reflect.TypeOf(headers).Kind() != reflect.Map {
-		return nil, 400, errors.Errorf(errors.RequestHandlerInvalidMsgHeaders)
-	}
-	msgType, exists := headers.(map[string]interface{})["type"]
-	if !exists || reflect.TypeOf(msgType).Kind() != reflect.String {
-		return nil, 400, errors.Errorf(errors.RequestHandlerInvalidMsgTypeMissing)
-	}
-	var key string
-	switch msgType {
+func (w *asyncDispatcher) processMsg(ctx context.Context, msg *messages.SendTransaction, ack bool) (*messages.AsyncSentMsg, int, error) {
+	switch msg.Headers.MsgType {
 	case messages.MsgTypeDeployContract, messages.MsgTypeSendTransaction:
-		from, exists := msg["from"]
-		if !exists || reflect.TypeOf(from).Kind() != reflect.String {
-			return nil, 400, errors.Errorf(errors.RequestHandlerInvalidMsgFromMissing)
+		if msg.Headers.Signer == "" {
+			return nil, 400, errors.Errorf(errors.RequestHandlerInvalidMsgSignerMissing)
 		}
-		key = from.(string)
 	default:
-		return nil, 400, errors.Errorf(errors.RequestHandlerInvalidMsgType, msgType)
+		return nil, 400, errors.Errorf(errors.RequestHandlerInvalidMsgType, msg.Headers.MsgType)
 	}
 
 	// We always generate the ID. It cannot be set by the user
 	msgID := utils.UUIDv4()
-	headers.(map[string]interface{})["id"] = msgID
+	msg.Headers.ID = msgID
 
 	// Pass to the handler
-	log.Infof("Request handler accepted message. MsgID: %s Type: %s", msgID, msgType)
-	msgAck, status, err := w.handler.dispatchMsg(ctx, key, msgID, msg, ack)
+	log.Infof("Request handler accepted message. MsgID: %s Type: %s", msgID, msg.Headers.MsgType)
+	msgAck, status, err := w.handler.dispatchMsg(ctx, msg.Headers.ChannelID, msgID, msg, ack)
 	if err != nil {
 		return nil, status, err
 	}

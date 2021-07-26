@@ -62,14 +62,12 @@ const (
 	// SecurityModuleNoAuthContext missing auth context in context object at point security module is invoked
 	SecurityModuleNoAuthContext = "No auth context"
 
-	// RequestHandlerInvalidMsgHeaders missing headers section in the JSON/YAML posted
-	RequestHandlerInvalidMsgHeaders = "Invalid message - missing 'headers' (or not an object)"
 	// RequestHandlerInvalidMsgTypeMissing need to specify a msg type in the header
 	RequestHandlerInvalidMsgTypeMissing = "Invalid message - missing 'headers.type' (or not a string)"
-	// RequestHandlerInvalidMsgFromMissing need to specify a msg type in the header
-	RequestHandlerInvalidMsgFromMissing = "Invalid message - missing 'from' (or not a string)"
+	// RequestHandlerInvalidMsgSignerMissing need to specify a msg signer in the header
+	RequestHandlerInvalidMsgSignerMissing = "Invalid message - missing 'signer' (or not a string)"
 	// RequestHandlerInvalidMsgType need to specify a valid msg type in the header
-	RequestHandlerInvalidMsgType = "Invalid message type: %s"
+	RequestHandlerInvalidMsgType = "Invalid message type: \"%s\""
 
 	// RequestHandlerDirectTooManyInflight when we're not using a buffered store (Kafka) we have to reject
 	RequestHandlerDirectTooManyInflight = "Too many in-flight transactions"
@@ -111,16 +109,16 @@ const (
 	// WebhooksKafkaDeliveryReportNoMeta delivery reports should contain the metadata we set when we sent
 	WebhooksKafkaDeliveryReportNoMeta = "Sent message did not contain metadata: %+v"
 	// WebhooksKafkaYAMLtoJSON re-serialization of webhook message into JSON failed
-	WebhooksKafkaYAMLtoJSON = "Unable to reserialize YAML payload as JSON: %s"
+	WebhooksKafkaMsgtoJSON = "Unable to reserialize message payload as JSON: %s"
 	// WebhooksKafkaErr wrapper on detailed error from Kafka itself
 	WebhooksKafkaErr = "Failed to deliver message to Kafka: %s"
 
-	// HelperYAMLorJSONPayloadTooLarge input message too large
-	HelperYAMLorJSONPayloadTooLarge = "Message exceeds maximum allowable size"
+	// HelperPayloadTooLarge input message too large
+	HelperPayloadTooLarge = "Message exceeds maximum allowable size"
 	// HelperYAMLorJSONPayloadReadFailed failed to read input
-	HelperYAMLorJSONPayloadReadFailed = "Unable to read input data: %s"
+	HelperPayloadReadFailed = "Unable to read input data: %s"
 	// HelperYAMLorJSONPayloadParseFailed input message got error parsing
-	HelperYAMLorJSONPayloadParseFailed = "Unable to parse as YAML or JSON: %s"
+	HelperPayloadParseFailed = "Unable to parse as JSON: %s"
 
 	// ReceiptStoreDisabled not configured
 	ReceiptStoreDisabled = "Receipt store not enabled"
