@@ -135,8 +135,10 @@ func startServer() error {
 			return err
 		}
 		b, err := marshalToYAML(restGatewayConf)
+		if err != nil {
+			return err
+		}
 		print(fmt.Sprintf("# Full YAML configuration processed from supplied file\n%s\n%s\n", string(a), string(b)))
-		return err
 	}
 
 	err := restGateway.Init()
