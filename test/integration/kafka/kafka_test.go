@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 
 	"github.com/docker/docker/api/types"
@@ -21,7 +22,7 @@ import (
 
 var logr = &lr.Logger{
 	Out:   os.Stdout,
-	Level: lr.DebugLevel,
+	Level: lr.InfoLevel,
 	Formatter: &prefixed.TextFormatter{
 		DisableColors:   false,
 		TimestampFormat: "2006-01-02 15:04:05",
@@ -102,7 +103,7 @@ func kafkaProducer(broker string, topic string) {
 	p.Flush(1 * 100)
 }
 
-func kafkaConsumer(broker string, topic string, groupid string) {
+func kafkaConsumer(broker string, topic string, groupid string) (res string) {
 
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": broker,
@@ -119,12 +120,15 @@ func kafkaConsumer(broker string, topic string, groupid string) {
 	for {
 		msg, err := c.ReadMessage(-1)
 		if err == nil {
-			logr.Debugf("Consumed message from %s: %s", msg.TopicPartition, string(msg.Value))
+			res = string(msg.Value)
+			logr.Debugf("Consumed message from %s: %s", msg.TopicPartition, res)
 			break
 		} else {
 			logr.Errorf("Consumer error: %v (%v)", err, msg)
 		}
 	}
+
+	return res
 }
 
 func TestIntegrationKafka(t *testing.T) {
@@ -182,7 +186,8 @@ func TestIntegrationKafka(t *testing.T) {
 		time.Sleep(10 * time.Second)
 		kafkaProducer(cfg.Kafka.Broker, cfg.Kafka.Topic)
 		time.Sleep(10 * time.Second)
-		kafkaConsumer(cfg.Kafka.Broker, cfg.Kafka.Topic, cfg.Kafka.GroupID)
+		res := kafkaConsumer(cfg.Kafka.Broker, cfg.Kafka.Topic, cfg.Kafka.GroupID)
+		assert.Equal(t, res, "test")
 
 		logr.Debug("Removing Kafka standalone cluster...")
 		cmd := exec.Command("docker-compose", "down")
