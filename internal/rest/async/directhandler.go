@@ -57,7 +57,7 @@ type msgContext struct {
 	timeReceived time.Time
 	key          string
 	msgID        string
-	msg          map[string]interface{}
+	msg          *messages.SendTransaction
 	headers      *messages.CommonHeaders
 }
 
@@ -110,7 +110,7 @@ func (t *msgContext) String() string {
 	return fmt.Sprintf("MsgContext[%s/%s]", t.headers.MsgType, t.msgID)
 }
 
-func (w *directHandler) dispatchMsg(ctx context.Context, key, msgID string, msg map[string]interface{}, ack bool) (string, int, error) {
+func (w *directHandler) dispatchMsg(ctx context.Context, key, msgID string, msg *messages.SendTransaction, ack bool) (string, int, error) {
 	w.inFlightMutex.Lock()
 
 	numInFlight := len(w.inFlight)
@@ -120,18 +120,6 @@ func (w *directHandler) dispatchMsg(ctx context.Context, key, msgID string, msg 
 		return "", 429, errors.Errorf(errors.RequestHandlerDirectTooManyInflight)
 	}
 
-	var headers messages.CommonHeaders
-	var headerBytes []byte
-	var err error
-	headersMap := msg["headers"]
-	if headerBytes, err = json.Marshal(&headersMap); err == nil {
-		err = json.Unmarshal(headerBytes, &headers)
-	}
-	if err != nil {
-		w.inFlightMutex.Unlock()
-		log.Errorf("Unable to unmarshal headers from map payload: %+v: %s", msg, err)
-		return "", 400, errors.Errorf(errors.RequestHandlerDirectBadHeaders)
-	}
 	msgContext := &msgContext{
 		ctx:          context.Background(),
 		w:            w,
@@ -139,7 +127,7 @@ func (w *directHandler) dispatchMsg(ctx context.Context, key, msgID string, msg 
 		key:          key,
 		msgID:        msgID,
 		msg:          msg,
-		headers:      &headers,
+		headers:      &msg.Headers.CommonHeaders,
 	}
 	w.inFlight[msgID] = msgContext
 	w.inFlightMutex.Unlock()

@@ -229,16 +229,14 @@ func (k *kafkaCommon) Start() (err error) {
 	log.Debugf("Kafka initialization complete")
 	k.signals = make(chan os.Signal, 1)
 	signal.Notify(k.signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
-	for {
-		select {
-		case <-k.signals:
-			k.producer.AsyncClose()
-			k.consumer.Close()
-			k.producerWG.Wait()
-			k.consumerWG.Wait()
+	for range k.signals {
+		k.producer.AsyncClose()
+		k.consumer.Close()
+		k.producerWG.Wait()
+		k.consumerWG.Wait()
 
-			log.Infof("Kafka Bridge complete")
-			return
-		}
+		log.Infof("Kafka Bridge complete")
+		return
 	}
+	return
 }

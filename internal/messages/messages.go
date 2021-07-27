@@ -46,9 +46,9 @@ type AsyncSentMsg struct {
 // CommonHeaders are common to all messages
 type CommonHeaders struct {
 	ID        string                 `json:"id,omitempty"`
-	MsgType   string                 `json:"type"`
-	Signer    string                 `json:"account,omitempty"`
-	ChannelID string                 `json:"channel"`
+	MsgType   string                 `json:"type,omitempty"`
+	Signer    string                 `json:"signer,omitempty"`
+	ChannelID string                 `json:"channel,omitempty"`
 	Context   map[string]interface{} `json:"ctx,omitempty"`
 }
 
@@ -90,7 +90,7 @@ func (r *ReplyCommon) ReplyHeaders() *ReplyHeaders {
 // for sending either contract call or creation transactions
 type TransactionCommon struct {
 	RequestCommon
-	ChaincodeName string `json:"chaincodeName"`
+	ChaincodeName string `json:"chaincode"`
 }
 
 // SendTransaction message instructs the bridge to install a contract

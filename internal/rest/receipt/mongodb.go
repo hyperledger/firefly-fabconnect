@@ -109,11 +109,7 @@ func (m *mongoReceipts) validateConf() (err error) {
 	return
 }
 
-func (m *mongoReceipts) connect() (err error) {
-	err = m.validateConf()
-	if err != nil {
-		return
-	}
+func (m *mongoReceipts) Init() (err error) {
 	if m.config.MongoDB.ConnectTimeoutMS <= 0 {
 		m.config.MongoDB.ConnectTimeoutMS = mongoConnectTimeout
 	}
@@ -200,3 +196,5 @@ func (m *mongoReceipts) GetReceipt(requestID string) (*map[string]interface{}, e
 		return &result, nil
 	}
 }
+
+func (m *mongoReceipts) Close() {}

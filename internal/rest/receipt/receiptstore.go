@@ -40,38 +40,38 @@ const (
 
 var uuidCharsVerifier, _ = regexp.Compile("^[0-9a-zA-Z-]+$")
 
-// ReceiptStorePersistence interface implemented by persistence layers
-type ReceiptStorePersistence interface {
+// receiptStorePersistence interface implemented by persistence layers
+type receiptStorePersistence interface {
+	Init() error
+	validateConf() error
 	GetReceipts(skip, limit int, ids []string, sinceEpochMS int64, from, to, start string) (*[]map[string]interface{}, error)
 	GetReceipt(requestID string) (*map[string]interface{}, error)
 	AddReceipt(requestID string, receipt *map[string]interface{}) error
+	Close()
 }
 
 type ReceiptStore interface {
+	Init() error
+	ValidateConf() error
 	ProcessReceipt(msgBytes []byte)
 	GetReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params)
 	GetReceipt(res http.ResponseWriter, req *http.Request, params httprouter.Params)
+	Close()
 }
 
 type receiptStore struct {
 	config      *conf.ReceiptsDBConf
-	persistence ReceiptStorePersistence
+	persistence receiptStorePersistence
 	ws          ws.WebSocketChannels
 }
 
-func NewReceiptStore(config *conf.RESTGatewayConf) (ReceiptStore, error) {
-	var receiptStorePersistence ReceiptStorePersistence
+func NewReceiptStore(config *conf.RESTGatewayConf) ReceiptStore {
+	var receiptStorePersistence receiptStorePersistence
 	if config.Receipts.LevelDB.Path != "" {
-		leveldbStore, err := newLevelDBReceipts(&config.Receipts)
-		if err != nil {
-			return nil, err
-		}
+		leveldbStore := newLevelDBReceipts(&config.Receipts)
 		receiptStorePersistence = leveldbStore
 	} else if config.Receipts.MongoDB.URL != "" {
 		mongoStore := newMongoReceipts(&config.Receipts)
-		if err := mongoStore.connect(); err != nil {
-			return nil, err
-		}
 		receiptStorePersistence = mongoStore
 	} else {
 		memStore := newMemoryReceipts(&config.Receipts)
@@ -87,7 +87,14 @@ func NewReceiptStore(config *conf.RESTGatewayConf) (ReceiptStore, error) {
 	return &receiptStore{
 		config:      &config.Receipts,
 		persistence: receiptStorePersistence,
-	}, nil
+	}
+}
+func (r *receiptStore) ValidateConf() error {
+	return r.persistence.validateConf()
+}
+
+func (r *receiptStore) Init() error {
+	return r.persistence.Init()
 }
 
 func (r *receiptStore) extractHeaders(parsedMsg map[string]interface{}) map[string]interface{} {
@@ -200,7 +207,7 @@ func (r *receiptStore) GetReceipts(res http.ResponseWriter, req *http.Request, p
 
 	// Default limit - which is set to zero (infinite) if we have specific IDs being request
 	limit := defaultReceiptLimit
-	req.ParseForm()
+	_ = req.ParseForm()
 	ids, ok := req.Form["id"]
 	if ok {
 		limit = 0 // can be explicitly set below, but no imposed limit when we have a list of IDs
@@ -301,6 +308,10 @@ func (r *receiptStore) GetReceipt(res http.ResponseWriter, req *http.Request, pa
 	r.marshalAndReply(res, req, result)
 }
 
+func (r *receiptStore) Close() {
+	r.persistence.Close()
+}
+
 func (r *receiptStore) marshalAndReply(res http.ResponseWriter, req *http.Request, result interface{}) {
 	// Serialize and return
 	resBytes, err := json.MarshalIndent(result, "", "  ")
@@ -313,5 +324,5 @@ func (r *receiptStore) marshalAndReply(res http.ResponseWriter, req *http.Reques
 	log.Infof("<-- %s %s [%d]", req.Method, req.URL, status)
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(status)
-	res.Write(resBytes)
+	_, _ = res.Write(resBytes)
 }

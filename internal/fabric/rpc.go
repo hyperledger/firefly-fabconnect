@@ -1,4 +1,4 @@
-// Copyright 2018, 2021 Kaleido
+// Copyright 2021 Kaleido
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,10 +38,10 @@ type rpcWrapper struct {
 	channelMap map[string]*channel.Client
 }
 
-func RPCConnect(conf conf.RPCConf) (RPCClient, error) {
-	dat, err := ioutil.ReadFile(conf.ConfigPath)
+func RPCConnect(c conf.RPCConf) (RPCClient, error) {
+	dat, err := ioutil.ReadFile(c.ConfigPath)
 	if err != nil {
-		log.Errorf("Failed to read common connection profile file: %s. %s", conf.ConfigPath, err)
+		log.Errorf("Failed to read common connection profile file: %s. %s", c.ConfigPath, err)
 		return nil, err
 	}
 	configProvider := config.FromRaw(dat, "yaml")
@@ -51,7 +51,7 @@ func RPCConnect(conf conf.RPCConf) (RPCClient, error) {
 		return nil, err
 	}
 
-	log.Infof("New JSON/RPC connection established")
+	log.Infof("New gRPC connection established")
 	return &rpcWrapper{sdk: sdk}, nil
 }
 

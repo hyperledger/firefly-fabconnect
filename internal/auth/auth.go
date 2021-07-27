@@ -16,6 +16,9 @@ package auth
 
 import (
 	"context"
+
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger-labs/firefly-fabconnect/pkg/plugins"
 )
 
 type ContextKey int
@@ -25,6 +28,13 @@ const (
 	ContextKeyAuthContext
 	ContextKeyAccessToken
 )
+
+var securityModule plugins.SecurityModule
+
+// RegisterSecurityModule is the plug point to register a security module
+func RegisterSecurityModule(sm plugins.SecurityModule) {
+	securityModule = sm
+}
 
 // NewSystemAuthContext creates a system background context
 func NewSystemAuthContext() context.Context {
@@ -39,6 +49,15 @@ func IsSystemContext(ctx context.Context) bool {
 
 // WithAuthContext adds an access token to a base context
 func WithAuthContext(ctx context.Context, token string) (context.Context, error) {
+	if securityModule != nil {
+		ctxValue, err := securityModule.VerifyToken(token)
+		if err != nil {
+			return nil, err
+		}
+		ctx = context.WithValue(ctx, ContextKeyAccessToken, token)
+		ctx = context.WithValue(ctx, ContextKeyAuthContext, ctxValue)
+		return ctx, nil
+	}
 	return ctx, nil
 }
 
@@ -58,25 +77,60 @@ func GetAccessToken(ctx context.Context) string {
 
 // AuthRPC authorize an RPC call
 func AuthRPC(ctx context.Context, method string, args ...interface{}) error {
+	if securityModule != nil && !IsSystemContext(ctx) {
+		authCtx := GetAuthContext(ctx)
+		if authCtx == nil {
+			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+		}
+		return securityModule.AuthRPC(authCtx, method, args...)
+	}
 	return nil
 }
 
 // AuthRPCSubscribe authorize a subscribe RPC call
 func AuthRPCSubscribe(ctx context.Context, namespace string, channel interface{}, args ...interface{}) error {
+	if securityModule != nil && !IsSystemContext(ctx) {
+		authCtx := GetAuthContext(ctx)
+		if authCtx == nil {
+			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+		}
+		return securityModule.AuthRPCSubscribe(authCtx, namespace, channel, args...)
+	}
 	return nil
 }
 
 // AuthEventStreams authorize the whole of event streams
 func AuthEventStreams(ctx context.Context) error {
+	if securityModule != nil && !IsSystemContext(ctx) {
+		authCtx := GetAuthContext(ctx)
+		if authCtx == nil {
+			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+		}
+		return securityModule.AuthEventStreams(authCtx)
+	}
 	return nil
 }
 
 // AuthListAsyncReplies authorize the listing or searching of all replies
 func AuthListAsyncReplies(ctx context.Context) error {
+	if securityModule != nil && !IsSystemContext(ctx) {
+		authCtx := GetAuthContext(ctx)
+		if authCtx == nil {
+			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+		}
+		return securityModule.AuthListAsyncReplies(authCtx)
+	}
 	return nil
 }
 
 // AuthReadAsyncReplyByUUID authorize the query of an invidual reply by UUID
 func AuthReadAsyncReplyByUUID(ctx context.Context) error {
+	if securityModule != nil && !IsSystemContext(ctx) {
+		authCtx := GetAuthContext(ctx)
+		if authCtx == nil {
+			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+		}
+		return securityModule.AuthReadAsyncReplyByUUID(authCtx)
+	}
 	return nil
 }
