@@ -4,13 +4,20 @@ go 1.16
 
 require (
 	github.com/Shopify/sarama v1.29.1
+	github.com/confluentinc/confluent-kafka-go v1.7.0
+	github.com/containerd/containerd v1.5.4 // indirect
+	github.com/docker/docker v20.10.7+incompatible
+	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/fatih/color v1.12.0 // indirect
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8
 	github.com/google/certificate-transparency-go v1.1.1 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20210201220314-86344dc25e5d
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
+	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
+	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/oklog/ulid/v2 v2.0.2
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
