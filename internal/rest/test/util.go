@@ -46,6 +46,10 @@ var testConfigJSON = `{
   }
 }`
 var testRPCConfig = `name: "test profile"
+client:
+  organization: org1
+  credentialStore:
+    path: "/tmp-client-creds-path"
 organizations:
   org1:
     mspid: "org1MSP"
@@ -126,6 +130,8 @@ func Setup() (string, *conf.RESTGatewayConf) {
 	// modify ca cert path
 	ccp := strings.Replace(testRPCConfig, "/tmp-cert", certPath, 1)
 	// set up crypto path for each org
+	clientCredsPath := path.Join(tmpdir, "client")
+	ccp = strings.Replace(ccp, "/tmp-client-creds-path", clientCredsPath, 1)
 	org1MSPPath := path.Join(tmpdir, "org1")
 	ccp = strings.Replace(ccp, "/tmp-crypto-path-org1", org1MSPPath, 1)
 	org2MSPPath := path.Join(tmpdir, "org2")

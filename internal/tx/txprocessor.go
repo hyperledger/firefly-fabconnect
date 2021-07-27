@@ -120,6 +120,7 @@ func (p *txProcessor) addInflightWrapper(txContext TxContext, msg *messages.Tran
 
 	inflight = &inflightTx{
 		txContext: txContext,
+		signer:    msg.Headers.Signer,
 	}
 
 	// Use the correct RPC for sending transactions
@@ -213,8 +214,8 @@ func (p *txProcessor) waitForCompletion(inflight *inflightTx, initialWaitDelay t
 		p.inflightTxsLock.Unlock()
 
 		receipt := inflight.tx.Receipt
-		isSuccess := receipt.Status == 0
-		log.Infof("Receipt for %s obtained after %.2fs Success=%t", inflight.tx.Hash, elapsed.Seconds(), isSuccess)
+		isSuccess := receipt.IsSuccess()
+		log.Infof("Receipt for %s obtained after %.2fs Success=%t", inflight.tx.Receipt.TransactionID, elapsed.Seconds(), isSuccess)
 
 		// Build our reply
 		var reply messages.TransactionReceipt

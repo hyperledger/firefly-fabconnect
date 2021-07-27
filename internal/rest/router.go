@@ -41,7 +41,7 @@ func (r *router) addRoutes() {
 
 	r.httpRouter.POST("/transactions", r.sendTransaction)
 	r.httpRouter.GET("/receipts", r.handleReceipts)
-	r.httpRouter.GET("/receipts/:receiptId", r.handleReceipts)
+	r.httpRouter.GET("/receipts/:id", r.handleReceipts)
 
 	// router.POST("/eventstreams", r.createStream)
 	// router.PATCH("/eventstreams/:streamId", r.updateStream)
