@@ -62,21 +62,21 @@ type cmdConfig struct {
 }
 
 var rootConfig = cmdConfig{}
-var restGatewayConf = &conf.RESTGatewayConf{}
+var restGatewayConf = conf.RESTGatewayConf{}
 var restGateway *rest.RESTGateway
 
 var rootCmd = &cobra.Command{
 	Use:   "fabconnect",
 	Short: "Connectivity Bridge for Hyperledger Fabric permissioned chains",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		err := viper.Unmarshal(restGatewayConf)
+		err := viper.Unmarshal(&restGatewayConf)
 		if err != nil {
 			return err
 		}
 
 		// allow tests to assign a mock
 		if restGateway == nil {
-			restGateway = rest.NewRESTGateway(restGatewayConf)
+			restGateway = rest.NewRESTGateway(&restGatewayConf)
 		}
 		err = restGateway.ValidateConf()
 		if err != nil {
@@ -95,7 +95,10 @@ var rootCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := startServer()
-		return err
+		if err != nil {
+			return err
+		}
+		return nil
 	},
 }
 
@@ -111,7 +114,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&rootConfig.DebugPort, "debugPort", "Z", 6060, "Port for pprof HTTP endpoints (localhost only)")
 	rootCmd.Flags().BoolVarP(&rootConfig.PrintYAML, "print-yaml-confg", "Y", false, "Print YAML config snippet and exit")
 	rootCmd.Flags().StringVarP(&rootConfig.Filename, "configfile", "f", "", "Configuration file, must be one of .yml, .yaml, or .json")
-	conf.CobraInit(rootCmd, restGatewayConf)
+	conf.CobraInit(rootCmd, &restGatewayConf)
 }
 
 func initConfig() {

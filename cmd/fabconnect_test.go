@@ -16,6 +16,7 @@ package cmd
 import (
 	"os"
 	"path"
+	"regexp"
 	"testing"
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
@@ -54,11 +55,36 @@ func TestMissingConfigFile(t *testing.T) {
 	assert := assert.New(t)
 
 	restGateway = nil
-	rootCmd.RunE = runNothing
 	args := []string{}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	assert.EqualError(err, "Must provide REST Gateway client configuration path")
+}
+
+func TestBadConfigFile(t *testing.T) {
+	assert := assert.New(t)
+
+	restGateway = nil
+	args := []string{
+		"-f", path.Join(tmpdir, "config-bad.json"),
+	}
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	assert.Regexp(regexp.MustCompile(`cannot parse 'maxInFlight' as int`), err)
+}
+
+func TestStartServerError(t *testing.T) {
+	assert := assert.New(t)
+
+	restGateway = nil
+	args := []string{
+		"-Y",
+		"-f", path.Join(tmpdir, "config.json"),
+		"-r", "/bad-path",
+	}
+	rootCmd.SetArgs(args)
+	err := rootCmd.Execute()
+	assert.Regexp(regexp.MustCompile(`Failed to initialize a new SDK instance`), err)
 }
 
 func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
