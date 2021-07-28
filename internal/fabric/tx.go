@@ -18,8 +18,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
+	pb "github.com/hyperledger/fabric-protos-go/peer"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -32,17 +32,18 @@ type Tx struct {
 	Function      string
 	Args          []string
 	Hash          string
-	Receipt       TxReceipt
+	Receipt       *TxReceipt
 	Signer        string
 }
 
 type TxReceipt struct {
-	BlockNumber   uint64        `json:"blockNumber"`
-	BlockHash     string        `json:"blockHash"`
-	SignerMSP     string        `json:"signer"`
-	ChaincodeSpec ChaincodeSpec `json:"chaincode"`
-	TransactionID string        `json:"transactionID"`
-	Status        int           `json:"status"`
+	BlockNumber   uint64              `json:"blockNumber"`
+	SignerMSP     string              `json:"signerMSP"`
+	Signer        string              `json:"signer"`
+	ChaincodeSpec ChaincodeSpec       `json:"chaincode"`
+	TransactionID string              `json:"transactionID"`
+	Status        pb.TxValidationCode `json:"status"`
+	SourcePeer    string              `json:"peer"`
 }
 
 type ChaincodeSpec struct {
@@ -74,20 +75,7 @@ func buildTX(signer, channelID, chaincodeName, function string, args []string) (
 
 // GetTXReceipt gets the receipt for the transaction
 func (tx *Tx) GetTXReceipt(ctx context.Context, rpc RPCClient) (bool, error) {
-	start := time.Now().UTC()
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	result, err := rpc.Invoke(ctx, tx.ChannelID, "qscc", "GetTransactionByID", []string{tx.Hash})
-	if err != nil {
-		return false, errors.Errorf(errors.RPCCallReturnedError, "GetTransactionByID", err)
-	}
-	tx.Receipt = result
-	callTime := time.Now().UTC().Sub(start)
 	isMined := tx.Receipt.BlockNumber > 0
-	log.Debugf("GetTransactionByID(%x,latest)=%t [%.2fs]", tx.Hash, isMined, callTime.Seconds())
-
 	return isMined, nil
 }
 
@@ -98,7 +86,7 @@ func (tx *Tx) Send(ctx context.Context, rpc RPCClient) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	tx.Receipt, err = rpc.Invoke(ctx, tx.ChannelID, tx.ChaincodeName, tx.Function, tx.Args)
+	tx.Receipt, err = rpc.Invoke(ctx, tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args)
 
 	callTime := time.Now().UTC().Sub(start)
 	if err != nil {
@@ -107,4 +95,8 @@ func (tx *Tx) Send(ctx context.Context, rpc RPCClient) (err error) {
 		log.Infof("TX:%s Sent OK [%.2fs]", tx.Hash, callTime.Seconds())
 	}
 	return err
+}
+
+func (r *TxReceipt) IsSuccess() bool {
+	return r.Status == pb.TxValidationCode_VALID
 }

@@ -82,8 +82,8 @@ func (d *asyncDispatcher) DispatchMsgAsync(ctx context.Context, msg *messages.Se
 }
 
 func (d *asyncDispatcher) HandleReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
-	path := req.URL.Path
-	if path == "receipts" {
+	p := req.URL.Path
+	if p == "/receipts" {
 		d.receiptStore.GetReceipts(res, req, params)
 	} else {
 		d.receiptStore.GetReceipt(res, req, params)

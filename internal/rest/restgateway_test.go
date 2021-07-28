@@ -203,5 +203,5 @@ func TestStartWithBadRPCConfigPath(t *testing.T) {
 	testConfig.RPC.ConfigPath = "/bad/path"
 	g := NewRESTGateway(testConfig)
 	err := g.Init()
-	assert.EqualError(err, "open /bad/path: no such file or directory")
+	assert.EqualError(err, "Failed to initialize a new SDK instance. failed to initialize configuration: unable to load config backend: loading config file failed: /bad/path: Unsupported Config Type \"\"")
 }

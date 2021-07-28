@@ -78,7 +78,7 @@ func NewRESTGateway(config *conf.RESTGatewayConf) *RESTGateway {
 }
 
 func (g *RESTGateway) Init() error {
-	rpcClient, err := fabric.RPCConnect(g.config.RPC)
+	rpcClient, err := fabric.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime)
 	if err != nil {
 		return err
 	}

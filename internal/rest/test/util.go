@@ -45,7 +45,31 @@ var testConfigJSON = `{
     "configPath": "/test-config-path"
   }
 }`
+var testConfigJSONBad = `{
+  "maxInFlight": "abc",
+  "maxTXWaitTime": 60,
+  "sendConcurrency": 25,
+  "receipts": {
+    "maxDocs": 1000,
+    "queryLimit": 100,
+    "retryInitialDelay": 5,
+    "retryTimeout": 30,
+    "leveldb": {
+      "path": "/test-receipt-path"
+    }
+  },
+  "http": {
+    "port": 3000
+  },
+  "rpc": {
+    "configPath": "/test-config-path"
+  }
+}`
 var testRPCConfig = `name: "test profile"
+client:
+  organization: org1
+  credentialStore:
+    path: "/tmp-client-creds-path"
 organizations:
   org1:
     mspid: "org1MSP"
@@ -126,6 +150,8 @@ func Setup() (string, *conf.RESTGatewayConf) {
 	// modify ca cert path
 	ccp := strings.Replace(testRPCConfig, "/tmp-cert", certPath, 1)
 	// set up crypto path for each org
+	clientCredsPath := path.Join(tmpdir, "client")
+	ccp = strings.Replace(ccp, "/tmp-client-creds-path", clientCredsPath, 1)
 	org1MSPPath := path.Join(tmpdir, "org1")
 	ccp = strings.Replace(ccp, "/tmp-crypto-path-org1", org1MSPPath, 1)
 	org2MSPPath := path.Join(tmpdir, "org2")
@@ -142,6 +168,7 @@ func Setup() (string, *conf.RESTGatewayConf) {
 	testConfigJSON = strings.Replace(testConfigJSON, "/test-receipt-path", receiptStorePath, 1)
 	// write the config file
 	_ = ioutil.WriteFile(path.Join(tmpdir, "config.json"), []byte(testConfigJSON), 0644)
+	_ = ioutil.WriteFile(path.Join(tmpdir, "config-bad.json"), []byte(testConfigJSONBad), 0644)
 
 	// init the default config
 	testConfig := &conf.RESTGatewayConf{}
