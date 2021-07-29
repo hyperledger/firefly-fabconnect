@@ -1,0 +1,7 @@
+---
+kafka:
+  broker: "localhost:9092"
+  topic: "ffin"
+  groupid: "ff"
+  partitions: 1
+  replfactor: 1
