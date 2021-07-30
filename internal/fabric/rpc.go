@@ -1,5 +1,7 @@
 // Copyright 2021 Kaleido
-
+//
+// SPDX-License-Identifier: Apache-2.0
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19,12 +21,14 @@ import (
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/identity"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel/invoke"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/errors/retry"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
+	fabcontext "github.com/hyperledger/fabric-sdk-go/pkg/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite/bccsp/sw"
@@ -32,6 +36,7 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/keyvaluestore"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
+	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,82 +52,99 @@ type clientWrapper struct {
 }
 
 type rpcWrapper struct {
+	txTimeout         int
 	sdk               *fabsdk.FabricSDK
 	cryptoSuiteConfig core.CryptoSuiteConfig
 	identityConfig    msp.IdentityConfig
-	userStore         *mspImpl.CertFileUserStore
-	identityMgr       *mspImpl.IdentityManager
-	// msp.IdentityIdentifier.ID <-> channel.Client
-	// one channel client per channel ID, per signer org, per signer ID
-	channelClients map[string](map[string](map[string]*clientWrapper))
-	txTimeout      int
+	userStore         msp.UserStore
+	identityMgr       msp.IdentityManager
+	caClient          mspApi.CAClient
+	// one channel client per channel ID, per signer ID
+	channelClients map[string](map[string]*clientWrapper)
 }
 
-func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, error) {
+func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClient, error) {
 	configProvider := config.FromFile(c.ConfigPath)
 	sdk, err := fabsdk.New(configProvider)
 	if err != nil {
-		return nil, errors.Errorf("Failed to initialize a new SDK instance. %s", err)
+		return nil, nil, errors.Errorf("Failed to initialize a new SDK instance. %s", err)
 	}
 	configBackend, _ := configProvider()
 	endpointConfig, err := fabImpl.ConfigFromBackend(configBackend...)
 	if err != nil {
-		return nil, errors.Errorf("Failed to read config: %s", err)
+		return nil, nil, errors.Errorf("Failed to read config: %s", err)
 	}
 	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
 	if err != nil {
-		return nil, errors.Errorf("Failed to load crypto suite configurations: %s", err)
+		return nil, nil, errors.Errorf("Failed to load crypto suite configurations: %s", err)
 	}
 	identityConfig, err := mspImpl.ConfigFromBackend(configBackend...)
 	if err != nil {
-		return nil, errors.Errorf("Failed to load identity configurations: %s", err)
+		return nil, nil, errors.Errorf("Failed to load identity configurations: %s", err)
 	}
 	clientConfig := identityConfig.Client()
 	if clientConfig.CredentialStore.Path == "" {
-		return nil, errors.Errorf("User credentials store path is empty")
+		return nil, nil, errors.Errorf("User credentials store path is empty")
 	}
 	store, err := keyvaluestore.New(&keyvaluestore.FileKeyValueStoreOptions{
 		Path: clientConfig.CredentialStore.Path,
 	})
 	if err != nil {
-		return nil, errors.Errorf("Key-value store creation failed. Path: %s", clientConfig.CredentialStore.Path)
+		return nil, nil, errors.Errorf("Key-value store creation failed. Path: %s", clientConfig.CredentialStore.Path)
 	}
 	userStore, err := mspImpl.NewCertFileUserStore1(store)
 	if err != nil {
-		return nil, errors.Errorf("User credentials store creation failed. Path: %s", err)
+		return nil, nil, errors.Errorf("User credentials store creation failed. Path: %s", err)
 	}
 	cs, err := sw.GetSuiteByConfig(cryptoConfig)
 	if err != nil {
-		return nil, errors.Errorf("Failed to get suite by config: %s", err)
+		return nil, nil, errors.Errorf("Failed to get suite by config: %s", err)
 	}
 	mgr, err := mspImpl.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig)
 	if err != nil {
-		return nil, errors.Errorf("Identity manager creation failed. %s", err)
+		return nil, nil, errors.Errorf("Identity manager creation failed. %s", err)
+	}
+
+	identityManagerProvider := &identityManagerProvider{
+		identityManager: mgr,
+	}
+	ctxProvider := fabcontext.NewProvider(
+		fabcontext.WithIdentityManagerProvider(identityManagerProvider),
+		fabcontext.WithUserStore(userStore),
+		fabcontext.WithCryptoSuite(cs),
+		fabcontext.WithCryptoSuiteConfig(cryptoConfig),
+		fabcontext.WithEndpointConfig(endpointConfig),
+		fabcontext.WithIdentityConfig(identityConfig),
+	)
+	ctx := &fabcontext.Client{
+		Providers: ctxProvider,
+	}
+	caClient, err := mspImpl.NewCAClient(clientConfig.Organization, ctx)
+	if err != nil {
+		return nil, nil, errors.Errorf("CA Client creation failed. %s", err)
 	}
 
 	log.Infof("New gRPC connection established")
-	return &rpcWrapper{
+	w := &rpcWrapper{
 		sdk:               sdk,
 		cryptoSuiteConfig: cryptoConfig,
 		identityConfig:    identityConfig,
 		userStore:         userStore,
 		identityMgr:       mgr,
-		channelClients:    make(map[string]map[string]map[string]*clientWrapper),
+		caClient:          caClient,
+		channelClients:    make(map[string]map[string]*clientWrapper),
 		txTimeout:         txTimeout,
-	}, nil
+	}
+	return w, w, nil
 }
 
 func (w *rpcWrapper) getChannelClient(channelId string, signer *msp.IdentityIdentifier) (*clientWrapper, error) {
 	allClientsOfChannel := w.channelClients[channelId]
 	if allClientsOfChannel == nil {
-		w.channelClients[channelId] = make(map[string]map[string]*clientWrapper)
+		w.channelClients[channelId] = make(map[string]*clientWrapper)
 	}
-	channelClientsOfOrg := w.channelClients[channelId][signer.MSPID]
-	if channelClientsOfOrg == nil {
-		w.channelClients[channelId][signer.MSPID] = make(map[string]*clientWrapper)
-	}
-	orgClientOfUser := w.channelClients[channelId][signer.MSPID][signer.ID]
-	if orgClientOfUser == nil {
+	clientOfUser := w.channelClients[channelId][signer.ID]
+	if clientOfUser == nil {
 		channelContext := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(signer.MSPID), fabsdk.WithUser(signer.ID))
 		newClient, err := channel.New(channelContext)
 		if err != nil {
@@ -140,10 +162,10 @@ func (w *rpcWrapper) getChannelClient(channelId string, signer *msp.IdentityIden
 			channelClient: newClient,
 			eventService:  eventService,
 		}
-		w.channelClients[channelId][signer.MSPID][signer.ID] = newWrapper
-		orgClientOfUser = newWrapper
+		w.channelClients[channelId][signer.ID] = newWrapper
+		clientOfUser = newWrapper
 	}
-	return orgClientOfUser, nil
+	return clientOfUser, nil
 }
 
 func (w *rpcWrapper) Init(ctx context.Context, channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error) {

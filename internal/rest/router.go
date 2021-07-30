@@ -1,3 +1,19 @@
+// Copyright 2021 Kaleido
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package rest
 
 import (
@@ -10,8 +26,9 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
 	restasync "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/async"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/identity"
 	restsync "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/sync"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/utils"
+	restutil "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/utils"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/ws"
 	"github.com/julienschmidt/httprouter"
 
@@ -21,23 +38,26 @@ import (
 type router struct {
 	syncDispatcher  restsync.SyncDispatcher
 	asyncDispatcher restasync.AsyncDispatcher
+	identityClient  identity.IdentityClient
 	ws              ws.WebSocketServer
 	httpRouter      *httprouter.Router
 }
 
-func newRouter(syncDispatcher restsync.SyncDispatcher, asyncDispatcher restasync.AsyncDispatcher, ws ws.WebSocketServer) *router {
+func newRouter(syncDispatcher restsync.SyncDispatcher, asyncDispatcher restasync.AsyncDispatcher, idClient identity.IdentityClient, ws ws.WebSocketServer) *router {
 	return &router{
 		syncDispatcher:  syncDispatcher,
 		asyncDispatcher: asyncDispatcher,
+		identityClient:  idClient,
 		ws:              ws,
 		httpRouter:      httprouter.New(),
 	}
 }
 
 func (r *router) addRoutes() {
-	// router.POST("/identities", r.restHandler)
-	// router.GET("/identities", r.restHandler)
-	// router.GET("/identities/:username", r.restHandler)
+	r.httpRouter.POST("/identities", r.registerUser)
+	r.httpRouter.POST("/identities/:username/enroll", r.enrollUser)
+	r.httpRouter.GET("/identities", r.listUsers)
+	r.httpRouter.GET("/identities/:username", r.getUser)
 
 	r.httpRouter.POST("/transactions", r.sendTransaction)
 	r.httpRouter.GET("/receipts", r.handleReceipts)
@@ -94,7 +114,7 @@ func (r *router) statusHandler(res http.ResponseWriter, req *http.Request, _ htt
 func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 
-	c, err := r.resolveParams(res, req, params)
+	c, err := restutil.ResolveParams(res, req, params)
 	if err != nil {
 		return
 	}
@@ -111,10 +131,10 @@ func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, par
 	}
 	msg.Args = args
 
-	if strings.ToLower(getFlyParam("sync", req, true)) == "true" {
+	if strings.ToLower(restutil.GetFlyParam("sync", req, true)) == "true" {
 		r.syncDispatcher.DispatchMsgSync(req.Context(), res, req, msg)
 	} else {
-		ack := (getFlyParam("noack", req, true) != "true") // turn on ack's by default
+		ack := (restutil.GetFlyParam("noack", req, true) != "true") // turn on ack's by default
 
 		if asyncResponse, err := r.asyncDispatcher.DispatchMsgAsync(req.Context(), msg, ack); err != nil {
 			errors.RestErrReply(res, req, err, 500)
@@ -124,72 +144,70 @@ func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, par
 	}
 }
 
+func (r *router) registerUser(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+
+	result, err := r.identityClient.Register(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) enrollUser(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+
+	result, err := r.identityClient.Enroll(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) listUsers(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	result, err := r.identityClient.List(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) getUser(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	result, err := r.identityClient.Get(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
 func (r *router) handleReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	r.asyncDispatcher.HandleReceipts(res, req, params)
-}
-
-func (r *router) resolveParams(res http.ResponseWriter, req *http.Request, params httprouter.Params) (c map[string]interface{}, err error) {
-	// if query parameters are specified, they take precedence over body properties
-	channelParam := params.ByName("channel")
-	methodParam := params.ByName("func")
-	signer := getFlyParam("signer", req, false)
-	blocknumber := getFlyParam("blocknumber", req, false)
-
-	body, err := utils.ParseJSONPayload(req)
-	if err != nil {
-		errors.RestErrReply(res, req, err, 400)
-		return nil, err
-	}
-
-	// consolidate inidividual parameters with the body parameters
-	if channelParam != "" {
-		body["headers"].(map[string]string)["channel"] = channelParam
-	}
-	if methodParam != "" {
-		body["func"] = methodParam
-	}
-	if signer != "" {
-		body["headers"].(map[string]string)["signer"] = signer
-	}
-	if blocknumber != "" {
-		body["headers"].(map[string]string)["blocknumber"] = blocknumber
-	}
-
-	return body, nil
-}
-
-func getQueryParamNoCase(name string, req *http.Request) []string {
-	name = strings.ToLower(name)
-	_ = req.ParseForm()
-	for k, vs := range req.Form {
-		if strings.ToLower(k) == name {
-			return vs
-		}
-	}
-	return nil
-}
-
-// getFlyParam standardizes how special 'fly' params are specified, in query params, or headers
-func getFlyParam(name string, req *http.Request, isBool bool) string {
-	valStr := ""
-	vs := getQueryParamNoCase(utils.GetenvOrDefaultLowerCase("PREFIX_SHORT", "fly")+"-"+name, req)
-	if len(vs) > 0 {
-		valStr = vs[0]
-	}
-	if isBool && valStr == "" && len(vs) > 0 {
-		valStr = "true"
-	}
-	if valStr == "" {
-		valStr = req.Header.Get("x-" + utils.GetenvOrDefaultLowerCase("PREFIX_LONG", "firefly") + "-" + name)
-	}
-	return valStr
 }
 
 func restAsyncReply(res http.ResponseWriter, req *http.Request, asyncResponse *messages.AsyncSentMsg) {
 	resBytes, _ := json.Marshal(asyncResponse)
 	status := 202 // accepted
 	log.Infof("<-- %s %s [%d]:\n%s", req.Method, req.URL, status, string(resBytes))
-	log.Debugf("<-- %s", resBytes)
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(status)
+	_, _ = res.Write(resBytes)
+}
+
+func marshalAndReply(res http.ResponseWriter, req *http.Request, result interface{}) {
+	resBytes, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		log.Errorf("Error serializing receipts: %s", err)
+		errors.RestErrReply(res, req, errors.Errorf(errors.ReceiptStoreSerializeResponse), 500)
+		return
+	}
+	status := 200
+	log.Infof("<-- %s %s [%d]", req.Method, req.URL, status)
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(status)
 	_, _ = res.Write(resBytes)
