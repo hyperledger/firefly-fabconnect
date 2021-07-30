@@ -28,6 +28,7 @@ import (
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/events"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
 	restasync "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/async"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/receipt"
@@ -51,6 +52,7 @@ type RESTGateway struct {
 	receiptStore    receipt.ReceiptStore
 	syncDispatcher  restsync.SyncDispatcher
 	asyncDispatcher restasync.AsyncDispatcher
+	sm              events.SubscriptionManager
 	router          *router
 	srv             *http.Server
 	sendCond        *sync.Cond
@@ -92,7 +94,16 @@ func (g *RESTGateway) Init() error {
 	}
 
 	ws := ws.NewWebSocketServer()
-	g.router = newRouter(g.syncDispatcher, g.asyncDispatcher, identityClient, ws)
+
+	if g.config.Events.LevelDB.Path != "" {
+		g.sm = events.NewSubscriptionManager(&g.config.Events, rpcClient, ws)
+		err = g.sm.Init()
+		if err != nil {
+			return errors.Errorf(errors.RESTGatewayEventManagerInitFailed, err)
+		}
+	}
+
+	g.router = newRouter(g.syncDispatcher, g.asyncDispatcher, identityClient, g.sm, ws)
 	g.router.addRoutes()
 
 	return nil
@@ -119,14 +130,6 @@ func (g *RESTGateway) Start() error {
 	if err != nil {
 		return err
 	}
-
-	// if conf.EventLevelDBPath != "" {
-	// 	sm := events.NewSubscriptionManager(&conf.SubscriptionManagerConf, rpc, ws)
-	// 	err = sm.Init()
-	// 	if err != nil {
-	// 		return nil, ethconnecterrors.Errorf(ethconnecterrors.RESTGatewayEventManagerInitFailed, err)
-	// 	}
-	// }
 
 	g.srv = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", g.config.HTTP.LocalAddr, g.config.HTTP.Port),

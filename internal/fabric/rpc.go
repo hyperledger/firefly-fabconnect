@@ -17,13 +17,13 @@
 package fabric
 
 import (
-	"context"
-
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/identity"
+	cb "github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel/invoke"
+	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/errors/retry"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
@@ -33,6 +33,10 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite/bccsp/sw"
 	fabImpl "github.com/hyperledger/fabric-sdk-go/pkg/fab"
+	eventsClient "github.com/hyperledger/fabric-sdk-go/pkg/fab/events/client"
+	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/deliverclient"
+	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/deliverclient/seek"
+	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/service/blockfilter/headertypefilter"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/keyvaluestore"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
@@ -41,14 +45,19 @@ import (
 )
 
 type RPCClient interface {
-	Init(ctx context.Context, channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error)
-	Invoke(ctx context.Context, channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error)
+	Init(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error)
+	Invoke(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error)
+	Query(channelId, signer, chaincodeName, method string, args []string) (*channel.Response, error)
+	QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error)
+	SubscribeEvent(channelId, signer string, since uint64) (fab.Registration, <-chan *fab.BlockEvent, fab.EventService, error)
 	Close()
 }
 
 type clientWrapper struct {
-	channelClient *channel.Client
-	eventService  fab.EventService
+	channelClient  *channel.Client
+	ledgerClient   *ledger.Client
+	channelService fab.ChannelService
+	signer         *msp.IdentityIdentifier
 }
 
 type rpcWrapper struct {
@@ -138,15 +147,27 @@ func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClie
 	return w, w, nil
 }
 
-func (w *rpcWrapper) getChannelClient(channelId string, signer *msp.IdentityIdentifier) (*clientWrapper, error) {
+func (w *rpcWrapper) getChannelClient(channelId string, signer string) (*clientWrapper, error) {
+	id, err := w.identityMgr.GetSigningIdentity(signer)
+	if err == msp.ErrUserNotFound {
+		return nil, errors.Errorf("Signer %s does not exist", signer)
+	}
+	if err != nil {
+		return nil, errors.Errorf("Failed to retrieve signing identity: %s", err)
+	}
+
 	allClientsOfChannel := w.channelClients[channelId]
 	if allClientsOfChannel == nil {
 		w.channelClients[channelId] = make(map[string]*clientWrapper)
 	}
-	clientOfUser := w.channelClients[channelId][signer.ID]
+	clientOfUser := w.channelClients[channelId][id.Identifier().ID]
 	if clientOfUser == nil {
-		channelContext := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(signer.MSPID), fabsdk.WithUser(signer.ID))
-		newClient, err := channel.New(channelContext)
+		channelContext := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(id.Identifier().MSPID), fabsdk.WithUser(id.Identifier().ID))
+		cClient, err := channel.New(channelContext)
+		if err != nil {
+			return nil, err
+		}
+		lClient, err := ledger.New(channelContext)
 		if err != nil {
 			return nil, err
 		}
@@ -154,21 +175,23 @@ func (w *rpcWrapper) getChannelClient(channelId string, signer *msp.IdentityIden
 		if err != nil {
 			return nil, err
 		}
-		eventService, err := channelProvider.ChannelService().EventService()
+		channelService := channelProvider.ChannelService()
 		if err != nil {
 			return nil, err
 		}
 		newWrapper := &clientWrapper{
-			channelClient: newClient,
-			eventService:  eventService,
+			channelClient:  cClient,
+			ledgerClient:   lClient,
+			channelService: channelService,
+			signer:         id.Identifier(),
 		}
-		w.channelClients[channelId][signer.ID] = newWrapper
+		w.channelClients[channelId][id.Identifier().ID] = newWrapper
 		clientOfUser = newWrapper
 	}
 	return clientOfUser, nil
 }
 
-func (w *rpcWrapper) Init(ctx context.Context, channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error) {
+func (w *rpcWrapper) Init(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error) {
 	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
 
 	signerID, result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, true)
@@ -180,7 +203,7 @@ func (w *rpcWrapper) Init(ctx context.Context, channelId, signer, chaincodeName,
 	return newReceipt(result, txStatus, signerID), err
 }
 
-func (w *rpcWrapper) Invoke(ctx context.Context, channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error) {
+func (w *rpcWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error) {
 	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
 
 	signerID, result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, false)
@@ -192,16 +215,80 @@ func (w *rpcWrapper) Invoke(ctx context.Context, channelId, signer, chaincodeNam
 	return newReceipt(result, txStatus, signerID), err
 }
 
-func (w *rpcWrapper) sendTransaction(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*msp.IdentityIdentifier, *channel.Response, *fab.TxStatusEvent, error) {
-	id, err := w.identityMgr.GetSigningIdentity(signer)
-	if err == msp.ErrUserNotFound {
-		return nil, nil, nil, errors.Errorf("Signer %s does not exist", signer)
-	}
+func (w *rpcWrapper) Query(channelId, signer, chaincodeName, method string, args []string) (*channel.Response, error) {
+	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
+
+	client, err := w.getChannelClient(channelId, signer)
 	if err != nil {
-		return nil, nil, nil, errors.Errorf("Failed to retrieve signing identity: %s", err)
+		return nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
 
-	client, err := w.getChannelClient(channelId, id.Identifier())
+	result, err := client.channelClient.Query(
+		channel.Request{
+			ChaincodeID: chaincodeName,
+			Fcn:         method,
+			Args:        convert(args),
+		},
+		channel.WithRetry(retry.DefaultChannelOpts),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
+	return &result, nil
+}
+
+func (w *rpcWrapper) QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error) {
+	log.Tracef("RPC [%s] --> ChainInfo", channelId)
+
+	client, err := w.getChannelClient(channelId, signer)
+	if err != nil {
+		return nil, errors.Errorf("Failed to get channel client. %s", err)
+	}
+
+	result, err := client.ledgerClient.QueryInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Tracef("RPC [%s] <-- %+v", channelId, result)
+	return result, nil
+}
+
+// The returned registration must be closed when done
+func (w *rpcWrapper) SubscribeEvent(channelId, signer string, since uint64) (fab.Registration, <-chan *fab.BlockEvent, fab.EventService, error) {
+	client, err := w.getChannelClient(channelId, signer)
+	if err != nil {
+		return nil, nil, nil, errors.Errorf("Failed to get channel client. %s", err)
+	}
+
+	var eventService fab.EventService
+	if since == 0 {
+		// default is the latest block
+		eventService, err = client.channelService.EventService(
+			eventsClient.WithBlockEvents(),
+		)
+	} else {
+		eventService, err = client.channelService.EventService(
+			eventsClient.WithBlockEvents(),
+			deliverclient.WithSeekType(seek.FromBlock),
+			deliverclient.WithBlockNum(since),
+		)
+	}
+	if err != nil {
+		log.Errorf("Failed to create event service. %s", err)
+		return nil, nil, nil, errors.Errorf("Failed to create event service. %s", err)
+	}
+	reg, notifier, err := eventService.RegisterBlockEvent(headertypefilter.New(cb.HeaderType_ENDORSER_TRANSACTION))
+	if err != nil {
+		return nil, nil, nil, errors.Errorf("Failed to subscribe to block events. %s", err)
+	}
+	return reg, notifier, eventService, nil
+}
+
+func (w *rpcWrapper) sendTransaction(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*msp.IdentityIdentifier, *channel.Response, *fab.TxStatusEvent, error) {
+	client, err := w.getChannelClient(channelId, signer)
 	if err != nil {
 		return nil, nil, nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
@@ -218,7 +305,12 @@ func (w *rpcWrapper) sendTransaction(channelId, signer, chaincodeName, method st
 	)
 	result, err := client.channelClient.InvokeHandler(
 		handlerChain,
-		channel.Request{ChaincodeID: chaincodeName, Fcn: method, Args: convert(args), IsInit: isInit},
+		channel.Request{
+			ChaincodeID: chaincodeName,
+			Fcn:         method,
+			Args:        convert(args),
+			IsInit:      isInit,
+		},
 		channel.WithRetry(retry.DefaultChannelOpts),
 	)
 	if err != nil {
@@ -227,7 +319,7 @@ func (w *rpcWrapper) sendTransaction(channelId, signer, chaincodeName, method st
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return id.Identifier(), &result, &txStatus, nil
+	return client.signer, &result, &txStatus, nil
 }
 
 func (w *rpcWrapper) Close() {

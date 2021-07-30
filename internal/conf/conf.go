@@ -81,8 +81,9 @@ type LevelDBReceiptsConf struct {
 }
 
 type EventstreamConf struct {
-	PollingIntervalSec uint64              `mapstructure:"pollingInterval"`
-	LevelDB            LevelDBReceiptsConf `mapstructure:"leveldb"`
+	PollingIntervalSec      uint64              `mapstructure:"pollingInterval"`
+	WebhooksAllowPrivateIPs bool                `json:"webhooksAllowPrivateIPs,omitempty"`
+	LevelDB                 LevelDBReceiptsConf `mapstructure:"leveldb"`
 }
 
 type RPCConf struct {
@@ -132,6 +133,8 @@ func CobraInit(cmd *cobra.Command, conf *RESTGatewayConf) {
 	_ = viper.BindPFlag("events.leveldb.path", cmd.Flags().Lookup("events-db"))
 	cmd.Flags().Uint64VarP(&conf.Events.PollingIntervalSec, "events-polling-int", "j", 10, "Event polling interval (ms)")
 	_ = viper.BindPFlag("events.pollingInterval", cmd.Flags().Lookup("events-polling-int"))
+	cmd.Flags().BoolVarP(&conf.Events.WebhooksAllowPrivateIPs, "events-privips", "J", false, "Allow private IPs in Webhooks")
+	_ = viper.BindPFlag("events.webhooksAllowPrivateIPs", cmd.Flags().Lookup("events-privips"))
 
 	defBrokerList := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
 	if len(defBrokerList) == 1 && defBrokerList[0] == "" {

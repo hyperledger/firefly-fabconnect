@@ -118,7 +118,7 @@ func (p *txProcessor) OnMessage(txContext TxContext) {
 // newInflightWrapper uses the supplied transaction, the inflight txn list.
 // Builds a new wrapper containing this information, that can be added to
 // the inflight list if the transaction is submitted
-func (p *txProcessor) addInflightWrapper(txContext TxContext, msg *messages.TransactionCommon) (inflight *inflightTx, err error) {
+func (p *txProcessor) addInflightWrapper(txContext TxContext, msg *messages.RequestCommon) (inflight *inflightTx, err error) {
 
 	inflight = &inflightTx{
 		txContext: txContext,
@@ -268,19 +268,13 @@ func (p *txProcessor) trackMining(inflight *inflightTx, tx *fabric.Tx) {
 
 func (p *txProcessor) OnSendTransactionMessage(txContext TxContext, msg *messages.SendTransaction) {
 
-	inflight, err := p.addInflightWrapper(txContext, &msg.TransactionCommon)
+	inflight, err := p.addInflightWrapper(txContext, &msg.RequestCommon)
 	if err != nil {
 		txContext.SendErrorReply(400, err)
 		return
 	}
 
-	tx, err := fabric.NewSendTx(msg, inflight.signer)
-	if err != nil {
-		p.cancelInFlight(inflight, false /* not yet submitted */)
-		txContext.SendErrorReply(400, err)
-		return
-	}
-
+	tx := fabric.NewSendTx(msg, inflight.signer)
 	p.sendTransactionCommon(txContext, inflight, tx)
 }
 

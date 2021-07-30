@@ -47,11 +47,12 @@ type AsyncSentMsg struct {
 
 // CommonHeaders are common to all messages
 type CommonHeaders struct {
-	ID        string                 `json:"id,omitempty"`
-	MsgType   string                 `json:"type,omitempty"`
-	Signer    string                 `json:"signer,omitempty"`
-	ChannelID string                 `json:"channel,omitempty"`
-	Context   map[string]interface{} `json:"ctx,omitempty"`
+	ID            string                 `json:"id,omitempty"`
+	MsgType       string                 `json:"type,omitempty"`
+	Signer        string                 `json:"signer,omitempty"`
+	ChannelID     string                 `json:"channel,omitempty"`
+	ChaincodeName string                 `json:"chaincode,omitempty"`
+	Context       map[string]interface{} `json:"ctx,omitempty"`
 }
 
 // RequestHeaders are common to all requests
@@ -88,30 +89,22 @@ func (r *ReplyCommon) ReplyHeaders() *ReplyHeaders {
 	return &r.Headers
 }
 
-// TransactionCommon is the common fields
-// for sending either contract call or creation transactions
-type TransactionCommon struct {
-	RequestCommon
-	ChaincodeName string `json:"chaincode"`
-}
-
 // SendTransaction message instructs the bridge to install a contract
 type SendTransaction struct {
-	TransactionCommon
+	RequestCommon
+	IsInit   bool     `json:"init"`
 	Function string   `json:"func"`
 	Args     []string `json:"args,omitempty"`
 }
 
 // DeployChaincode message instructs the bridge to install a contract
 type DeployChaincode struct {
-	TransactionCommon
-	ChaincodeName string `json:"contractName,omitempty"`
-	Description   string `json:"description,omitempty"`
+	RequestCommon
+	Version     string `json:"version,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // TransactionReceipt is sent when a transaction has been successfully mined
-// For the big numbers, we pass a simple string as well as a full
-// ethereum hex encoding version
 type TransactionReceipt struct {
 	ReplyCommon
 }
