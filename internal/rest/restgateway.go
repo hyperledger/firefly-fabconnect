@@ -78,7 +78,7 @@ func NewRESTGateway(config *conf.RESTGatewayConf) *RESTGateway {
 }
 
 func (g *RESTGateway) Init() error {
-	rpcClient, err := fabric.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime)
+	rpcClient, identityClient, err := fabric.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (g *RESTGateway) Init() error {
 	}
 
 	ws := ws.NewWebSocketServer()
-	g.router = newRouter(g.syncDispatcher, g.asyncDispatcher, ws)
+	g.router = newRouter(g.syncDispatcher, g.asyncDispatcher, identityClient, ws)
 	g.router.addRoutes()
 
 	return nil
