@@ -11,7 +11,12 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# OS specific
 .DS_Store
+
+# Development GUI
+.idea/
+
 # default built binary
 firefly-fabconnect
 fabconnect
