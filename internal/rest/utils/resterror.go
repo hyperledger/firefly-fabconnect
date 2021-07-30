@@ -14,26 +14,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package kvstore
+package util
 
-import (
-	"testing"
+import "fmt"
 
-	"github.com/stretchr/testify/assert"
-)
+type RestError struct {
+	Error      error
+	StatusCode int
+}
 
-func TestExerciseMockLDB(t *testing.T) {
-
-	assert := assert.New(t)
-
-	m := NewMockKV(nil)
-	_ = m.Put("test", []byte("val"))
-	o2, _ := m.Get("test")
-	assert.Equal("val", string(o2))
-	_ = m.Delete("test")
-	_, err := m.Get("test")
-	assert.EqualError(err, "leveldb: not found")
-	m.NewIterator()
-	m.Close()
-
+func NewRestError(msg string, code ...int) *RestError {
+	statusCode := 500
+	if len(code) > 0 {
+		statusCode = code[0]
+	}
+	return &RestError{
+		Error:      fmt.Errorf(msg),
+		StatusCode: statusCode,
+	}
 }

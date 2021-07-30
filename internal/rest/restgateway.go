@@ -1,5 +1,7 @@
 // Copyright 2021 Kaleido
-
+//
+// SPDX-License-Identifier: Apache-2.0
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -78,7 +80,7 @@ func NewRESTGateway(config *conf.RESTGatewayConf) *RESTGateway {
 }
 
 func (g *RESTGateway) Init() error {
-	rpcClient, err := fabric.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime)
+	rpcClient, identityClient, err := fabric.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime)
 	if err != nil {
 		return err
 	}
@@ -90,7 +92,7 @@ func (g *RESTGateway) Init() error {
 	}
 
 	ws := ws.NewWebSocketServer()
-	g.router = newRouter(g.syncDispatcher, g.asyncDispatcher, ws)
+	g.router = newRouter(g.syncDispatcher, g.asyncDispatcher, identityClient, ws)
 	g.router.addRoutes()
 
 	return nil
