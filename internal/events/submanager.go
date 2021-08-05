@@ -17,7 +17,6 @@
 package events
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -46,6 +45,10 @@ const (
 	checkpointIDPrefix = "cp-"
 )
 
+type ResetRequest struct {
+	InitialBlock string `json:"initialBlock"`
+}
+
 // SubscriptionManager provides REST APIs for managing events
 type SubscriptionManager interface {
 	Init() error
@@ -57,10 +60,10 @@ type SubscriptionManager interface {
 	ResumeStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError)
 	DeleteStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError)
 	AddSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*SubscriptionInfo, *restutil.RestError)
-	Subscriptions(ctx context.Context) []*SubscriptionInfo
-	SubscriptionByID(ctx context.Context, id string) (*SubscriptionInfo, error)
-	ResetSubscription(ctx context.Context, id, initialBlock string) error
-	DeleteSubscription(ctx context.Context, id string) error
+	Subscriptions(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*SubscriptionInfo
+	SubscriptionByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*SubscriptionInfo, *restutil.RestError)
+	ResetSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError)
+	DeleteSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError)
 	Close()
 }
 
@@ -99,16 +102,17 @@ func NewSubscriptionManager(config *conf.EventstreamConf, rpc fabric.RPCClient, 
 }
 
 // SubscriptionByID used externally to get serializable details
-func (s *subscriptionMGR) SubscriptionByID(ctx context.Context, id string) (*SubscriptionInfo, error) {
+func (s *subscriptionMGR) SubscriptionByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*SubscriptionInfo, *restutil.RestError) {
+	id := params.ByName("subscriptionId")
 	sub, err := s.subscriptionByID(id)
 	if err != nil {
-		return nil, err
+		return nil, restutil.NewRestError(err.Error(), 404)
 	}
-	return sub.info, err
+	return sub.info, nil
 }
 
 // Subscriptions used externally to get list subscriptions
-func (s *subscriptionMGR) Subscriptions(ctx context.Context) []*SubscriptionInfo {
+func (s *subscriptionMGR) Subscriptions(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*SubscriptionInfo {
 	l := make([]*SubscriptionInfo, 0, len(s.subscriptions))
 	for _, sub := range s.subscriptions {
 		l = append(l, sub.info)
@@ -125,11 +129,13 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 	if spec.ChannelId == "" {
 		return nil, restutil.NewRestError(`Missing required parameter "channel"`, 400)
 	}
+	if spec.Stream == "" {
+		return nil, restutil.NewRestError(`Missing required parameter "stream"`, 400)
+	}
 	spec.TimeSorted = TimeSorted{
 		CreatedISO8601: time.Now().UTC().Format(time.RFC3339),
 	}
 	spec.ID = subIDPrefix + utils.UUIDv4()
-	spec.Stream = params.ByName("streamId")
 	spec.Path = SubPathPrefix + "/" + spec.ID
 	// Check initial block number to subscribe from
 	if spec.FromBlock == "" {
@@ -154,15 +160,27 @@ func (s *subscriptionMGR) getConfig() *conf.EventstreamConf {
 }
 
 // ResetSubscription restarts the steam from the specified block
-func (s *subscriptionMGR) ResetSubscription(ctx context.Context, id, initialBlock string) error {
+func (s *subscriptionMGR) ResetSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
+	id := params.ByName("subscriptionId")
 	sub, err := s.subscriptionByID(id)
 	if err != nil {
-		return err
+		return nil, restutil.NewRestError(err.Error(), 404)
 	}
-	return s.resetSubscription(ctx, sub, initialBlock)
+	var request ResetRequest
+	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("Failed to parse request body. %s", err), 400)
+	}
+	err = s.resetSubscription(sub, request.InitialBlock)
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error(), 500)
+	}
+	result := map[string]string{}
+	result["id"] = sub.info.ID
+	result["reset"] = "true"
+	return &result, nil
 }
 
-func (s *subscriptionMGR) resetSubscription(ctx context.Context, sub *subscription, initialBlock string) error {
+func (s *subscriptionMGR) resetSubscription(sub *subscription, initialBlock string) error {
 	// Re-set the inital block on the subscription and save it
 	if initialBlock == "" || initialBlock == FromBlockNewest {
 		sub.info.FromBlock = FromBlockNewest
@@ -178,12 +196,20 @@ func (s *subscriptionMGR) resetSubscription(ctx context.Context, sub *subscripti
 }
 
 // DeleteSubscription deletes a subscription
-func (s *subscriptionMGR) DeleteSubscription(ctx context.Context, id string) error {
+func (s *subscriptionMGR) DeleteSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
+	id := params.ByName("subscriptionId")
 	sub, err := s.subscriptionByID(id)
 	if err != nil {
-		return err
+		return nil, restutil.NewRestError(err.Error(), 404)
 	}
-	return s.deleteSubscription(sub)
+	err = s.deleteSubscription(sub)
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error(), 500)
+	}
+	result := map[string]string{}
+	result["id"] = sub.info.ID
+	result["deleted"] = "true"
+	return &result, nil
 }
 
 func (s *subscriptionMGR) deleteSubscription(sub *subscription) error {
@@ -466,6 +492,9 @@ func (s *subscriptionMGR) Close() {
 	log.Infof("Event stream subscription manager shutting down")
 	for _, stream := range s.streams {
 		stream.stop()
+	}
+	for _, sub := range s.subscriptions {
+		sub.close()
 	}
 	if !s.closed && s.db != nil {
 		s.db.Close()

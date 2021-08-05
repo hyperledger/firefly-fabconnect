@@ -284,6 +284,8 @@ func (w *rpcWrapper) SubscribeEvent(channelId, signer string, since uint64) (fab
 	if err != nil {
 		return nil, nil, nil, errors.Errorf("Failed to subscribe to block events. %s", err)
 	}
+	log.Infof("Subscribed to events in channel %s from block %d (0 means newest)", channelId, since)
+	log.Debugf("event service used: %s", eventService)
 	return reg, notifier, eventService, nil
 }
 

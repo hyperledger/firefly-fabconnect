@@ -38,7 +38,6 @@ type persistedFilter struct {
 	BlockType   string `json:"blockType,omitempty"`
 	ChaincodeId string `json:"chaincodeId,omitempty"`
 	Filter      string `json:"filter,omitempty"`
-	FromBlock   uint64 `json:"fromBlock,omitempty"`
 	ToBlock     uint64 `json:"toBlock,omitempty"`
 }
 
@@ -64,7 +63,7 @@ type subscription struct {
 	registration   fab.Registration
 	notifier       <-chan *fab.BlockEvent
 	eventService   fab.EventService
-	stop           <-chan bool
+	stop           chan bool
 	filterStale    bool
 	deleting       bool
 	resetRequested bool
@@ -79,10 +78,10 @@ func newSubscription(sm subscriptionManager, rpc fabric.RPCClient, i *Subscripti
 		info:        i,
 		client:      rpc,
 		ep:          newEvtProcessor(i.ID, stream),
-		stop:        make(<-chan bool),
+		stop:        make(chan bool),
 		filterStale: true,
 	}
-	i.Summary = fmt.Sprintf(`FromBlock=%d,Chaincode=%s,Filter=%s`, i.Filter.FromBlock, i.Filter.ChaincodeId, i.Filter.Filter)
+	i.Summary = fmt.Sprintf(`FromBlock=%s,Chaincode=%s,Filter=%s`, i.FromBlock, i.Filter.ChaincodeId, i.Filter.Filter)
 	// If a name was not provided by the end user, set it to the system generated summary
 	if i.Name == "" {
 		log.Debugf("No name provided for subscription, using auto-generated ID:%s", i.ID)
@@ -115,11 +114,13 @@ func restoreSubscription(sm subscriptionManager, rpc fabric.RPCClient, i *Subscr
 }
 
 func (s *subscription) setInitialBlockHeight(ctx context.Context) (uint64, error) {
+	log.Debugf(`%s: Setting initial block height. "fromBlock" value in the subscription is %s`, s.info.ID, s.info.FromBlock)
 	if s.info.FromBlock != "" && s.info.FromBlock != FromBlockNewest {
 		fromBlock, err := strconv.ParseUint(s.info.FromBlock, 10, 64)
 		if err != nil {
 			return 0, errors.Errorf(errors.EventStreamsSubscribeBadBlock)
 		}
+		log.Infof("%s: initial block height for subscription (latest block): %d", s.info.ID, fromBlock)
 		return fromBlock, nil
 	}
 	result, err := s.client.QueryChainInfo(s.info.ChannelId, s.info.Signer)
@@ -160,7 +161,7 @@ func (s *subscription) processNewEvents() {
 		select {
 		case blockEvent, ok := <-s.notifier:
 			if !ok {
-				log.Errorf("Unexpected close event from channel %s for subscription %s", s.info.ChannelId, s.info.ID)
+				log.Errorf("%s: Event listener unregistered with channel %s", s.info.ID, s.info.ChannelId)
 				return
 			}
 			events := fabric.GetEvents(blockEvent.Block)
@@ -171,7 +172,7 @@ func (s *subscription) processNewEvents() {
 			}
 		case stopMsg, ok := <-s.stop:
 			if ok && stopMsg {
-				log.Infof("Event channel for subscription %s stopped", s.info.ID)
+				log.Infof("Event channel for subscription %s closed", s.info.ID)
 			}
 		}
 	}
@@ -204,4 +205,8 @@ func (s *subscription) markFilterStale(newFilterStale bool) {
 		log.Infof("%s: Uninstalled subscription by unregistering", s.info.ID)
 	}
 	s.filterStale = newFilterStale
+}
+
+func (s *subscription) close() {
+	s.stop <- true
 }

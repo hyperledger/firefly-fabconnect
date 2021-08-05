@@ -77,11 +77,11 @@ func (r *router) addRoutes() {
 	r.httpRouter.DELETE("/eventstreams/:streamId", r.deleteStream)
 	r.httpRouter.POST("/eventstreams/:streamId/suspend", r.suspendStream)
 	r.httpRouter.POST("/eventstreams/:streamId/resume", r.resumeStream)
-	r.httpRouter.POST("/eventstreams/:streamId/subscriptions", r.createSubscription)
-	// router.GET("/eventstreams/:streamId/subscriptions", r.listSubscription)
-	// router.GET("/eventstreams/:streamId/subscriptions/:subscriptionId", r.getSubscription)
-	// router.DELETE("/eventstreams/:streamId/subscriptions/:subscriptionId", r.deleteSubscription)
-	// router.POST("/eventstreams/:streamId/subscriptions/:subscriptionId/reset", r.resetSubscription)
+	r.httpRouter.POST("/subscriptions", r.createSubscription)
+	r.httpRouter.GET("/subscriptions", r.listSubscription)
+	r.httpRouter.GET("/subscriptions/:subscriptionId", r.getSubscription)
+	r.httpRouter.DELETE("/subscriptions/:subscriptionId", r.deleteSubscription)
+	r.httpRouter.POST("/subscriptions/:subscriptionId/reset", r.resetSubscription)
 
 	r.httpRouter.GET("/ws", r.wsHandler)
 	r.httpRouter.GET("/status", r.statusHandler)
@@ -291,6 +291,62 @@ func (r *router) createSubscription(res http.ResponseWriter, req *http.Request, 
 	}
 
 	result, err := r.subManager.AddSubscription(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) listSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result := r.subManager.Subscriptions(res, req, params)
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) getSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.SubscriptionByID(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) deleteSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.DeleteSubscription(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) resetSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.ResetSubscription(res, req, params)
 	if err != nil {
 		errors.RestErrReply(res, req, err.Error, err.StatusCode)
 		return
