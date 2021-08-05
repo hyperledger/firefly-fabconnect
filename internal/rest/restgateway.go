@@ -53,6 +53,8 @@ type RESTGateway struct {
 	syncDispatcher  restsync.SyncDispatcher
 	asyncDispatcher restasync.AsyncDispatcher
 	sm              events.SubscriptionManager
+	ws              ws.WebSocketServer
+	rpc             fabric.RPCClient
 	router          *router
 	srv             *http.Server
 	sendCond        *sync.Cond
@@ -86,6 +88,7 @@ func (g *RESTGateway) Init() error {
 	if err != nil {
 		return err
 	}
+	g.rpc = rpcClient
 	g.processor.Init(rpcClient)
 
 	err = g.receiptStore.Init()
@@ -94,6 +97,7 @@ func (g *RESTGateway) Init() error {
 	}
 
 	ws := ws.NewWebSocketServer()
+	g.ws = ws
 
 	if g.config.Events.LevelDB.Path != "" {
 		g.sm = events.NewSubscriptionManager(&g.config.Events, rpcClient, ws)
@@ -187,5 +191,10 @@ func (g *RESTGateway) Start() error {
 }
 
 func (g *RESTGateway) Shutdown() {
+	if g.sm != nil {
+		g.sm.Close()
+	}
 	g.asyncDispatcher.Close()
+	g.rpc.Close()
+	g.ws.Close()
 }

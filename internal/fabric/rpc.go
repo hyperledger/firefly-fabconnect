@@ -23,8 +23,10 @@ import (
 	cb "github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel/invoke"
+	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/errors/retry"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
@@ -33,8 +35,6 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite/bccsp/sw"
 	fabImpl "github.com/hyperledger/fabric-sdk-go/pkg/fab"
-	eventsClient "github.com/hyperledger/fabric-sdk-go/pkg/fab/events/client"
-	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/deliverclient"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/deliverclient/seek"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/service/blockfilter/headertypefilter"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/keyvaluestore"
@@ -49,15 +49,15 @@ type RPCClient interface {
 	Invoke(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error)
 	Query(channelId, signer, chaincodeName, method string, args []string) (*channel.Response, error)
 	QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error)
-	SubscribeEvent(channelId, signer string, since uint64) (fab.Registration, <-chan *fab.BlockEvent, fab.EventService, error)
+	SubscribeEvent(channelId, signer string, since uint64) (fab.Registration, <-chan *fab.BlockEvent, *event.Client, error)
 	Close()
 }
 
 type clientWrapper struct {
-	channelClient  *channel.Client
-	ledgerClient   *ledger.Client
-	channelService fab.ChannelService
-	signer         *msp.IdentityIdentifier
+	channelClient   *channel.Client
+	ledgerClient    *ledger.Client
+	channelProvider context.ChannelProvider
+	signer          *msp.IdentityIdentifier
 }
 
 type rpcWrapper struct {
@@ -162,28 +162,20 @@ func (w *rpcWrapper) getChannelClient(channelId string, signer string) (*clientW
 	}
 	clientOfUser := w.channelClients[channelId][id.Identifier().ID]
 	if clientOfUser == nil {
-		channelContext := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(id.Identifier().MSPID), fabsdk.WithUser(id.Identifier().ID))
-		cClient, err := channel.New(channelContext)
+		channelProvider := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(id.Identifier().MSPID), fabsdk.WithUser(id.Identifier().ID))
+		cClient, err := channel.New(channelProvider)
 		if err != nil {
 			return nil, err
 		}
-		lClient, err := ledger.New(channelContext)
-		if err != nil {
-			return nil, err
-		}
-		channelProvider, err := channelContext()
-		if err != nil {
-			return nil, err
-		}
-		channelService := channelProvider.ChannelService()
+		lClient, err := ledger.New(channelProvider)
 		if err != nil {
 			return nil, err
 		}
 		newWrapper := &clientWrapper{
-			channelClient:  cClient,
-			ledgerClient:   lClient,
-			channelService: channelService,
-			signer:         id.Identifier(),
+			channelClient:   cClient,
+			ledgerClient:    lClient,
+			channelProvider: channelProvider,
+			signer:          id.Identifier(),
 		}
 		w.channelClients[channelId][id.Identifier().ID] = newWrapper
 		clientOfUser = newWrapper
@@ -257,36 +249,30 @@ func (w *rpcWrapper) QueryChainInfo(channelId, signer string) (*fab.BlockchainIn
 }
 
 // The returned registration must be closed when done
-func (w *rpcWrapper) SubscribeEvent(channelId, signer string, since uint64) (fab.Registration, <-chan *fab.BlockEvent, fab.EventService, error) {
+func (w *rpcWrapper) SubscribeEvent(channelId, signer string, since uint64) (fab.Registration, <-chan *fab.BlockEvent, *event.Client, error) {
 	client, err := w.getChannelClient(channelId, signer)
 	if err != nil {
 		return nil, nil, nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
 
-	var eventService fab.EventService
-	if since == 0 {
-		// default is the latest block
-		eventService, err = client.channelService.EventService(
-			eventsClient.WithBlockEvents(),
-		)
-	} else {
-		eventService, err = client.channelService.EventService(
-			eventsClient.WithBlockEvents(),
-			deliverclient.WithSeekType(seek.FromBlock),
-			deliverclient.WithBlockNum(since),
-		)
+	eventOpts := []event.ClientOption{
+		event.WithBlockEvents(),
 	}
+	if since != 0 {
+		eventOpts = append(eventOpts, event.WithSeekType(seek.FromBlock), event.WithBlockNum(since))
+	}
+	eventClient, err := event.New(client.channelProvider, eventOpts...)
 	if err != nil {
-		log.Errorf("Failed to create event service. %s", err)
-		return nil, nil, nil, errors.Errorf("Failed to create event service. %s", err)
+		log.Errorf("Failed to create event client. %s", err)
+		return nil, nil, nil, errors.Errorf("Failed to create event client. %s", err)
 	}
-	reg, notifier, err := eventService.RegisterBlockEvent(headertypefilter.New(cb.HeaderType_ENDORSER_TRANSACTION))
+	reg, notifier, err := eventClient.RegisterBlockEvent(headertypefilter.New(cb.HeaderType_ENDORSER_TRANSACTION))
 	if err != nil {
 		return nil, nil, nil, errors.Errorf("Failed to subscribe to block events. %s", err)
 	}
 	log.Infof("Subscribed to events in channel %s from block %d (0 means newest)", channelId, since)
-	log.Debugf("event service used: %s", eventService)
-	return reg, notifier, eventService, nil
+	log.Debugf("event service used: %+v", eventClient)
+	return reg, notifier, eventClient, nil
 }
 
 func (w *rpcWrapper) sendTransaction(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*msp.IdentityIdentifier, *channel.Response, *fab.TxStatusEvent, error) {

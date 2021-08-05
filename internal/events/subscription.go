@@ -23,6 +23,7 @@ import (
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
+	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	log "github.com/sirupsen/logrus"
 )
@@ -62,8 +63,7 @@ type subscription struct {
 	ep             *evtProcessor
 	registration   fab.Registration
 	notifier       <-chan *fab.BlockEvent
-	eventService   fab.EventService
-	stop           chan bool
+	eventClient    *event.Client
 	filterStale    bool
 	deleting       bool
 	resetRequested bool
@@ -78,7 +78,6 @@ func newSubscription(sm subscriptionManager, rpc fabric.RPCClient, i *Subscripti
 		info:        i,
 		client:      rpc,
 		ep:          newEvtProcessor(i.ID, stream),
-		stop:        make(chan bool),
 		filterStale: true,
 	}
 	i.Summary = fmt.Sprintf(`FromBlock=%s,Chaincode=%s,Filter=%s`, i.FromBlock, i.Filter.ChaincodeId, i.Filter.Filter)
@@ -139,13 +138,13 @@ func (s *subscription) setCheckpointBlockHeight(i uint64) {
 }
 
 func (s *subscription) restartFilter(ctx context.Context, since uint64) error {
-	reg, notifier, eventService, err := s.client.SubscribeEvent(s.info.ChannelId, s.info.Signer, since)
+	reg, notifier, eventClient, err := s.client.SubscribeEvent(s.info.ChannelId, s.info.Signer, since)
 	if err != nil {
 		return errors.Errorf(errors.RPCCallReturnedError, "SubscribeEvent", err)
 	}
 	s.registration = reg
 	s.notifier = notifier
-	s.eventService = eventService
+	s.eventClient = eventClient
 	s.markFilterStale(false)
 
 	// launch the events relay from the events pipe coming from the node to the batch queue
@@ -156,23 +155,16 @@ func (s *subscription) restartFilter(ctx context.Context, since uint64) error {
 }
 
 func (s *subscription) processNewEvents() {
-	defer s.eventService.Unregister(s.registration)
 	for {
-		select {
-		case blockEvent, ok := <-s.notifier:
-			if !ok {
-				log.Errorf("%s: Event listener unregistered with channel %s", s.info.ID, s.info.ChannelId)
-				return
-			}
-			events := fabric.GetEvents(blockEvent.Block)
-			for _, event := range events {
-				if err := s.ep.processEventEntry(s.info.ID, event); err != nil {
-					log.Errorf("Failed to process event: %s", err)
-				}
-			}
-		case stopMsg, ok := <-s.stop:
-			if ok && stopMsg {
-				log.Infof("Event channel for subscription %s closed", s.info.ID)
+		blockEvent, ok := <-s.notifier
+		if !ok {
+			log.Infof("%s: Event notifier channel closed", s.info.ID)
+			return
+		}
+		events := fabric.GetEvents(blockEvent.Block)
+		for _, event := range events {
+			if err := s.ep.processEventEntry(s.info.ID, event); err != nil {
+				log.Errorf("Failed to process event: %s", err)
 			}
 		}
 	}
@@ -200,7 +192,7 @@ func (s *subscription) markFilterStale(newFilterStale bool) {
 	log.Debugf("%s: Marking filter stale=%t, current sub filter stale=%t", s.info.ID, newFilterStale, s.filterStale)
 	// If unsubscribe is called multiple times, we might not have a filter
 	if newFilterStale && !s.filterStale {
-		s.eventService.Unregister(s.registration)
+		s.eventClient.Unregister(s.registration)
 		// We treat error as informational here - the filter might already not be valid (if the node restarted)
 		log.Infof("%s: Uninstalled subscription by unregistering", s.info.ID)
 	}
@@ -208,5 +200,8 @@ func (s *subscription) markFilterStale(newFilterStale bool) {
 }
 
 func (s *subscription) close() {
-	s.stop <- true
+	// the unregistration will close the notifier channel which will
+	// terminate the processNewEvents() go routine
+	log.Debugf("%s: Unregistering event listener", s.info.ID)
+	s.eventClient.Unregister(s.registration)
 }
