@@ -297,6 +297,7 @@ func (p *txProcessor) sendAndTrackMining(txContext TxContext, inflight *inflight
 	}
 	if err != nil {
 		p.cancelInFlight(inflight, false /* not confirmed as submitted, as send failed */)
+		txContext.SendErrorReply(500, err)
 		return
 	}
 
