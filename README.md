@@ -21,7 +21,7 @@ After checking out the repo, simply run `make` to build and test.
 To launch, first prepare the 2 configurations files:
 - sample main config file:
 
-```yaml
+```json
 {
   "maxInFlight": 10,
   "maxTXWaitTime": 60,

@@ -76,7 +76,7 @@ const (
 	// RequestHandlerDirectBadHeaders problem processing for in-memory operation
 	RequestHandlerDirectBadHeaders = "Failed to process headers in message"
 
-	// TransactionSendMsgTypeUnknown we got a JSON message into the core processor (from Kafka, Webhooks etc.) that we don't understand
+	// TransactionSendMsgTypeUnknown we got a JSON message into the core processor (from Kafka, direct handler etc.) that we don't understand
 	TransactionSendMsgTypeUnknown = "Unknown message type '%s'"
 
 	// TransactionSendReceiptCheckError we continually had bad RCs back from the node while trying to check for the receipt up to the timeout
@@ -96,7 +96,7 @@ const (
 	// RESTGatewaySyncWrapErrorWithTXDetail wraps a low level error with transaction hash context on sync APIs before returning
 	RESTGatewaySyncWrapErrorWithTXDetail = "TX %s: %s"
 	// RESTGatewayEventManagerInitFailed constructor failure for event manager
-	RESTGatewayEventManagerInitFailed = "Event-stream subscription manager: %s"
+	RESTGatewayEventManagerInitFailed = "Event-stream subscription manager failed to initialize: %s"
 	// RESTGatewayEventStreamInvalid attempt to create an event stream with invalid parameters
 	RESTGatewayEventStreamInvalid = "Invalid event stream specification: %s"
 	// RESTGatewaySubscriptionInvalid attempt to create an event stream with invalid parameters
@@ -189,7 +189,7 @@ const (
 	// EventStreamsSubscribeStoreFailed problem saving a subscription to our DB
 	EventStreamsSubscribeStoreFailed = "Failed to store subscription: %s"
 	// EventStreamsSubscribeNoEvent missing event
-	EventStreamsSubscribeNoEvent = "Solidity event name must be specified"
+	EventStreamsSubscribeNoEvent = "Chaincode event name must be specified"
 	// EventStreamsSubscriptionNotFound sub not found
 	EventStreamsSubscriptionNotFound = "Subscription with ID '%s' not found"
 	// EventStreamsCreateStreamStoreFailed problem saving a subscription to our DB

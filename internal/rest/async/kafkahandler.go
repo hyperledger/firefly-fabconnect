@@ -92,7 +92,7 @@ func (w *kafkaHandler) ConsumerMessagesLoop(consumer kafka.KafkaConsumer, produc
 
 // ProducerErrorLoop - consume errors
 func (w *kafkaHandler) ProducerErrorLoop(consumer kafka.KafkaConsumer, producer kafka.KafkaProducer, wg *sync.WaitGroup) {
-	log.Debugf("Webhooks listening for errors sending to Kafka")
+	log.Debugf("Kafka handler listening for errors sending to Kafka")
 	for err := range producer.Errors() {
 		log.Errorf("Error sending message: %s", err)
 		if err.Msg == nil || err.Msg.Metadata == nil {
@@ -113,9 +113,9 @@ func (w *kafkaHandler) ProducerErrorLoop(consumer kafka.KafkaConsumer, producer 
 
 // ProducerSuccessLoop - consume successes
 func (w *kafkaHandler) ProducerSuccessLoop(consumer kafka.KafkaConsumer, producer kafka.KafkaProducer, wg *sync.WaitGroup) {
-	log.Debugf("Webhooks listening for successful sends to Kafka")
+	log.Debugf("Kafka handler listening for successful sends to Kafka")
 	for msg := range producer.Successes() {
-		log.Infof("Webhooks sent message ok: %s", msg.Metadata)
+		log.Infof("Kafka handler sent message ok: %s", msg.Metadata)
 		if msg.Metadata == nil {
 			// This should not be possible
 			panic(errors.Errorf(errors.WebhooksKafkaDeliveryReportNoMeta, msg))
