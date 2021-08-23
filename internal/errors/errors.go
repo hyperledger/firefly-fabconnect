@@ -76,7 +76,7 @@ const (
 	// RequestHandlerDirectBadHeaders problem processing for in-memory operation
 	RequestHandlerDirectBadHeaders = "Failed to process headers in message"
 
-	// TransactionSendMsgTypeUnknown we got a JSON message into the core processor (from Kafka, Webhooks etc.) that we don't understand
+	// TransactionSendMsgTypeUnknown we got a JSON message into the core processor (from Kafka, direct handler etc.) that we don't understand
 	TransactionSendMsgTypeUnknown = "Unknown message type '%s'"
 
 	// TransactionSendReceiptCheckError we continually had bad RCs back from the node while trying to check for the receipt up to the timeout
@@ -95,6 +95,12 @@ const (
 	RESTGatewaySyncMsgTypeMismatch = "Unexpected condition (message types do not match when processing)"
 	// RESTGatewaySyncWrapErrorWithTXDetail wraps a low level error with transaction hash context on sync APIs before returning
 	RESTGatewaySyncWrapErrorWithTXDetail = "TX %s: %s"
+	// RESTGatewayEventManagerInitFailed constructor failure for event manager
+	RESTGatewayEventManagerInitFailed = "Event-stream subscription manager failed to initialize: %s"
+	// RESTGatewayEventStreamInvalid attempt to create an event stream with invalid parameters
+	RESTGatewayEventStreamInvalid = "Invalid event stream specification: %s"
+	// RESTGatewaySubscriptionInvalid attempt to create an event stream with invalid parameters
+	RESTGatewaySubscriptionInvalid = "Invalid event subscription specification: %s"
 
 	// ConfigKafkaMissingOutputTopic response topic missing
 	ConfigKafkaMissingOutputTopic = "No output topic specified for bridge to send events to"
@@ -162,8 +168,54 @@ const (
 	// Unauthorized (401 error)
 	Unauthorized = "Unauthorized"
 
+	// EventStreamsDBLoad failed to init DB
+	EventStreamsDBLoad = "Failed to open DB at %s: %s"
+	// EventStreamsNoID attempt to create an event stream/sub without an ID
+	EventStreamsNoID = "No ID"
+	// EventStreamsInvalidActionType unknown action type
+	EventStreamsInvalidActionType = "Unknown action type '%s'"
+	// EventStreamsWebhookNoURL attempt to create a Webhook event stream without a URL
+	EventStreamsWebhookNoURL = "Must specify webhook.url for action type 'webhook'"
+	// EventStreamsWebhookInvalidURL attempt to create a Webhook event stream with an invalid URL
+	EventStreamsWebhookInvalidURL = "Invalid URL in webhook action"
+	// EventStreamsWebhookResumeActive resume when already resumed
+	EventStreamsWebhookResumeActive = "Event processor is already active. Suspending:%t"
+	// EventStreamsWebhookProhibitedAddress some IP ranges can be restricted
+	EventStreamsWebhookProhibitedAddress = "Cannot send Webhook POST to address: %s"
+	// EventStreamsWebhookFailedHTTPStatus server at the other end of a webhook returned a non-OK response
+	EventStreamsWebhookFailedHTTPStatus = "%s: Failed with status=%d"
+	// EventStreamsSubscribeBadBlock the starting block for a subscription request is invalid
+	EventStreamsSubscribeBadBlock = "FromBlock cannot be parsed as a BigInt"
+	// EventStreamsSubscribeStoreFailed problem saving a subscription to our DB
+	EventStreamsSubscribeStoreFailed = "Failed to store subscription: %s"
+	// EventStreamsSubscribeNoEvent missing event
+	EventStreamsSubscribeNoEvent = "Chaincode event name must be specified"
+	// EventStreamsSubscriptionNotFound sub not found
+	EventStreamsSubscriptionNotFound = "Subscription with ID '%s' not found"
+	// EventStreamsCreateStreamStoreFailed problem saving a subscription to our DB
+	EventStreamsCreateStreamStoreFailed = "Failed to store stream: %s"
+	// EventStreamsCreateStreamResourceErr problem creating a resource required by the eventstream
+	EventStreamsCreateStreamResourceErr = "Failed to create a resource for the stream: %s"
+	// EventStreamsStreamNotFound stream not found
+	EventStreamsStreamNotFound = "Stream with ID '%s' not found"
+	// EventStreamsLogDecode problem decoding the logs for an event emitted on the chain
+	EventStreamsLogDecode = "%s: Failed to decode data: %s"
+	// EventStreamsLogDecodeInsufficientTopics ran out of topics according to the indexed fields described on the ABI event
+	EventStreamsLogDecodeInsufficientTopics = "%s: Ran out of topics for indexed fields at field %d of %s"
+	// EventStreamsLogDecodeData RLP decoding of the data section of the logs failed
+	EventStreamsLogDecodeData = "%s: Failed to parse RLP data from event: %s"
+	// EventStreamsWebSocketNotConfigured WebSocket not configured
+	EventStreamsWebSocketNotConfigured = "WebSocket listener not configured"
+	// EventStreamsWebSocketInterruptedSend When we are interrupted waiting for a viable connection to send down
+	EventStreamsWebSocketInterruptedSend = "Interrupted waiting for WebSocket connection to send event"
+	// EventStreamsWebSocketInterruptedReceive When we are interrupted waiting for a viable connection to send down
+	EventStreamsWebSocketInterruptedReceive = "Interrupted waiting for WebSocket acknowledgment"
 	// EventStreamsWebSocketErrorFromClient Error message received from client
 	EventStreamsWebSocketErrorFromClient = "Error received from WebSocket client: %s"
+	// EventStreamsCannotUpdateType cannot change tyep
+	EventStreamsCannotUpdateType = "The type of an event stream cannot be changed"
+	// EventStreamsInvalidDistributionMode unknown distribution mode
+	EventStreamsInvalidDistributionMode = "Invalid distribution mode '%s'. Valid distribution modes are: 'workloadDistribution' and 'broadcast'."
 )
 
 type RestErrMsg struct {

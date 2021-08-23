@@ -149,6 +149,7 @@ func (c *webSocketConnection) listen() {
 		t := c.server.getTopic(msg.Topic)
 		switch strings.ToLower(msg.Type) {
 		case "listen":
+			log.Debugf("Client requested listening on topic: \"%s\"", t.topic)
 			c.listenTopic(t)
 		case "listenreplies":
 			c.listenReplies()

@@ -164,6 +164,7 @@ func (s *webSocketServer) processBroadcasts() {
 		cases := make([]reflect.SelectCase, len(s.topics)+1)
 		i := 0
 		for _, t := range s.topics {
+			log.Infof("found topic: \"%v\"", t)
 			cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(t.broadcastChannel)}
 			topics[i] = t.topic
 			i++
@@ -186,6 +187,7 @@ func (s *webSocketServer) processBroadcasts() {
 			// Message on one of the existing topics
 			// Gather all connections interested in this topic and send to them
 			topic := topics[chosen]
+			log.Debugf("Broadcasting %v to connections for topic %s", value.Interface(), topic)
 			s.broadcastToConnections(s.topicMap[topic], value.Interface())
 		}
 	}

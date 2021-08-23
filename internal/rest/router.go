@@ -24,6 +24,7 @@ import (
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/events"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
 	restasync "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/async"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/identity"
@@ -35,19 +36,25 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	errEventSupportMissing = "Event support is not configured on this gateway"
+)
+
 type router struct {
 	syncDispatcher  restsync.SyncDispatcher
 	asyncDispatcher restasync.AsyncDispatcher
 	identityClient  identity.IdentityClient
+	subManager      events.SubscriptionManager
 	ws              ws.WebSocketServer
 	httpRouter      *httprouter.Router
 }
 
-func newRouter(syncDispatcher restsync.SyncDispatcher, asyncDispatcher restasync.AsyncDispatcher, idClient identity.IdentityClient, ws ws.WebSocketServer) *router {
+func newRouter(syncDispatcher restsync.SyncDispatcher, asyncDispatcher restasync.AsyncDispatcher, idClient identity.IdentityClient, sm events.SubscriptionManager, ws ws.WebSocketServer) *router {
 	return &router{
 		syncDispatcher:  syncDispatcher,
 		asyncDispatcher: asyncDispatcher,
 		identityClient:  idClient,
+		subManager:      sm,
 		ws:              ws,
 		httpRouter:      httprouter.New(),
 	}
@@ -63,18 +70,18 @@ func (r *router) addRoutes() {
 	r.httpRouter.GET("/receipts", r.handleReceipts)
 	r.httpRouter.GET("/receipts/:id", r.handleReceipts)
 
-	// router.POST("/eventstreams", r.createStream)
-	// router.PATCH("/eventstreams/:streamId", r.updateStream)
-	// router.GET("/eventstreams", r.listStreams)
-	// router.GET("/eventstreams/:streamId", r.getStream)
-	// router.DELETE("/eventstreams/:streamId", r.deleteStream)
-	// router.POST("/eventstreams/:streamId/suspend", r.suspendStream)
-	// router.POST("/eventstreams/:streamId/resume", r.resumeStream)
-	// router.POST("/eventstreams/:streamId/subscriptions", r.createSubscription)
-	// router.GET("/eventstreams/:streamId/subscriptions", r.listSubscription)
-	// router.GET("/eventstreams/:streamId/subscriptions/:subscriptionId", r.getSubscription)
-	// router.DELETE("/eventstreams/:streamId/subscriptions/:subscriptionId", r.deleteSubscription)
-	// router.POST("/eventstreams/:streamId/subscriptions/:subscriptionId/reset", r.resetSubscription)
+	r.httpRouter.POST("/eventstreams", r.createStream)
+	r.httpRouter.PATCH("/eventstreams/:streamId", r.updateStream)
+	r.httpRouter.GET("/eventstreams", r.listStreams)
+	r.httpRouter.GET("/eventstreams/:streamId", r.getStream)
+	r.httpRouter.DELETE("/eventstreams/:streamId", r.deleteStream)
+	r.httpRouter.POST("/eventstreams/:streamId/suspend", r.suspendStream)
+	r.httpRouter.POST("/eventstreams/:streamId/resume", r.resumeStream)
+	r.httpRouter.POST("/subscriptions", r.createSubscription)
+	r.httpRouter.GET("/subscriptions", r.listSubscription)
+	r.httpRouter.GET("/subscriptions/:subscriptionId", r.getSubscription)
+	r.httpRouter.DELETE("/subscriptions/:subscriptionId", r.deleteSubscription)
+	r.httpRouter.POST("/subscriptions/:subscriptionId/reset", r.resetSubscription)
 
 	r.httpRouter.GET("/ws", r.wsHandler)
 	r.httpRouter.GET("/status", r.statusHandler)
@@ -114,31 +121,16 @@ func (r *router) statusHandler(res http.ResponseWriter, req *http.Request, _ htt
 func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 
-	c, err := restutil.ResolveParams(res, req, params)
+	msg, opts, err := restutil.BuildTxMessage(res, req, params)
 	if err != nil {
-		return
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
 	}
-
-	msg := &messages.SendTransaction{}
-	msg.Headers.MsgType = messages.MsgTypeSendTransaction
-	msg.Headers.ChannelID = c["headers"].(map[string]interface{})["channel"].(string)
-	msg.Headers.Signer = c["headers"].(map[string]interface{})["signer"].(string)
-	msg.ChaincodeName = c["chaincode"].(string)
-	msg.Function = c["func"].(string)
-	args := make([]string, len(c["args"].([]interface{})))
-	for i, v := range c["args"].([]interface{}) {
-		args[i] = v.(string)
-	}
-	msg.Args = args
-
-	if strings.ToLower(restutil.GetFlyParam("sync", req, true)) == "true" {
+	if opts.Sync {
 		r.syncDispatcher.DispatchMsgSync(req.Context(), res, req, msg)
 	} else {
-		ack := (restutil.GetFlyParam("noack", req, true) != "true") // turn on ack's by default
-
-		if asyncResponse, err := r.asyncDispatcher.DispatchMsgAsync(req.Context(), msg, ack); err != nil {
+		if asyncResponse, err := r.asyncDispatcher.DispatchMsgAsync(req.Context(), msg, opts.Ack); err != nil {
 			errors.RestErrReply(res, req, err, 500)
-		} else {
+		} else if opts.Ack {
 			restAsyncReply(res, req, asyncResponse)
 		}
 	}
@@ -188,6 +180,178 @@ func (r *router) getUser(res http.ResponseWriter, req *http.Request, params http
 
 func (r *router) handleReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	r.asyncDispatcher.HandleReceipts(res, req, params)
+}
+
+func (r *router) createStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.AddStream(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) updateStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.UpdateStream(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) listStreams(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result := r.subManager.Streams(res, req, params)
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) getStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.StreamByID(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) deleteStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.DeleteStream(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) suspendStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.SuspendStream(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) resumeStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.ResumeStream(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) createSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.AddSubscription(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) listSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result := r.subManager.Subscriptions(res, req, params)
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) getSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.SubscriptionByID(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) deleteSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.DeleteSubscription(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) resetSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	if r.subManager == nil {
+		errors.RestErrReply(res, req, errors.Errorf(errEventSupportMissing), 405)
+		return
+	}
+
+	result, err := r.subManager.ResetSubscription(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
 }
 
 func restAsyncReply(res http.ResponseWriter, req *http.Request, asyncResponse *messages.AsyncSentMsg) {

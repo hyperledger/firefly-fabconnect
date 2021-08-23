@@ -97,7 +97,7 @@ func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
 	rootCmd.RunE = runNothing
 	args := []string{
 		"-f", path.Join(tmpdir, "config.json"),
-		"-x", "1",
+		"-t", "1",
 	}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
@@ -121,7 +121,7 @@ func TestCmdArgsOverride(t *testing.T) {
 	restGateway = nil
 	rootCmd.RunE = runNothing
 	args := []string{
-		"-l", "8001",
+		"-P", "8001",
 	}
 	rootCmd.SetArgs(args)
 	_ = rootCmd.Execute()
@@ -150,7 +150,7 @@ func TestMissingKafkaTopic(t *testing.T) {
 	restGateway = nil
 	rootCmd.RunE = runNothing
 	args := []string{
-		"-l", "8001",
+		"-P", "8001",
 		"-f", path.Join(tmpdir, "config.json"),
 		"-b", "broker1",
 		"-b", "broker2",
@@ -167,7 +167,7 @@ func TestCmdLaunch(t *testing.T) {
 	restGatewayConf.Kafka.Brokers = []string{}
 	rootCmd.RunE = runNothing
 	args := []string{
-		"-l", "8001",
+		"-P", "8001",
 		"-f", path.Join(tmpdir, "config.json"),
 	}
 	rootCmd.SetArgs(args)
@@ -181,10 +181,10 @@ func TestKafkaSuccess(t *testing.T) {
 	restGateway = nil
 	rootCmd.RunE = runNothing
 	args := []string{
-		"-l", "8001",
+		"-P", "8001",
 		"-f", path.Join(tmpdir, "config.json"),
 		"-b", "broker1", "-b", "broker2",
-		"-t", "topic1", "-T", "topic2",
+		"-n", "topic1", "-o", "topic2",
 		"-g", "group1",
 	}
 	rootCmd.SetArgs(args)
