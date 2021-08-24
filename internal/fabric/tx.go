@@ -18,6 +18,7 @@ package fabric
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
@@ -29,8 +30,10 @@ import (
 // Txn wraps a Fabric transaction, along with the logic to send it over
 // JSON/RPC to a node
 type Tx struct {
+	lock          sync.Mutex
 	ChannelID     string
 	ChaincodeName string
+	IsInit        bool
 	Function      string
 	Args          []string
 	Hash          string
@@ -56,39 +59,33 @@ type ChaincodeSpec struct {
 
 // NewSendTxn builds a new ethereum transaction from the supplied
 // SendTranasction message
-func NewSendTx(msg *messages.SendTransaction, signer string) (tx *Tx, err error) {
-	if tx, err = buildTX(signer, msg.Headers.ChannelID, msg.ChaincodeName, msg.Function, msg.Args); err != nil {
-		return
+func NewSendTx(msg *messages.SendTransaction, signer string) *Tx {
+	return &Tx{
+		ChannelID:     msg.Headers.ChannelID,
+		ChaincodeName: msg.Headers.ChaincodeName,
+		IsInit:        msg.IsInit,
+		Function:      msg.Function,
+		Args:          msg.Args,
+		Signer:        msg.Headers.Signer,
 	}
-	return
-}
-
-func buildTX(signer, channelID, chaincodeName, function string, args []string) (tx *Tx, err error) {
-	tx = &Tx{
-		ChannelID:     channelID,
-		ChaincodeName: chaincodeName,
-		Function:      function,
-		Args:          args,
-		Signer:        signer,
-	}
-
-	return
 }
 
 // GetTXReceipt gets the receipt for the transaction
 func (tx *Tx) GetTXReceipt(ctx context.Context, rpc RPCClient) (bool, error) {
+	tx.lock.Lock()
 	isMined := tx.Receipt.BlockNumber > 0
+	tx.lock.Unlock()
 	return isMined, nil
 }
 
-// Send sends an individual transaction, choosing external or internal signing
+// Send sends an individual transaction
 func (tx *Tx) Send(ctx context.Context, rpc RPCClient) (err error) {
 	start := time.Now().UTC()
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	tx.Receipt, err = rpc.Invoke(ctx, tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args)
+	receipt, err := rpc.Invoke(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args)
+	tx.lock.Lock()
+	tx.Receipt = receipt
+	tx.lock.Unlock()
 
 	callTime := time.Now().UTC().Sub(start)
 	if err != nil {
