@@ -79,10 +79,13 @@ func kafkaProducer(ts *testing.T, broker string, topic string) {
 		}
 	}()
 
-	p.Produce(&kafka.Message{
+	err = p.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
 		Value:          []byte("test"),
 	}, nil)
+	if err != nil {
+		ts.Logf("Producer error: %v\n", err)
+	}
 
 	p.Flush(1 * 100)
 }
@@ -99,7 +102,10 @@ func kafkaConsumer(ts *testing.T, broker string, topic string, groupid string) (
 	}
 	defer c.Close()
 
-	c.SubscribeTopics([]string{topic}, nil)
+	err = c.SubscribeTopics([]string{topic}, nil)
+	if err != nil {
+		ts.Logf("Subscription error: %v\n", err)
+	}
 
 	for {
 		msg, err := c.ReadMessage(-1)
