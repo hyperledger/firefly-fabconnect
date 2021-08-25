@@ -37,7 +37,7 @@ func GetEvents(block *cb.Block) []*api.EventEntry {
 				for _, ccAction := range ccActions {
 					event := ccAction.GetChaincodeEvent()
 					eventEntry := api.EventEntry{
-						ChaincodeId:   event.TxId,
+						ChaincodeId:   event.ChaincodeId,
 						BlockNumber:   fb.Number,
 						TransactionId: tx.Txid,
 						EventName:     event.EventName,

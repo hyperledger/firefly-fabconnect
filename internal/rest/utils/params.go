@@ -104,11 +104,16 @@ func BuildTxMessage(res http.ResponseWriter, req *http.Request, params httproute
 	msg.Headers.ChaincodeName = chaincode
 	isInitVal := body["init"]
 	if isInitVal != nil {
-		isInit, err := strconv.ParseBool(isInitVal.(string))
-		if err != nil {
-			return nil, nil, NewRestError(err.Error(), 400)
+		strVal, ok := isInitVal.(string)
+		if ok {
+			isInit, err := strconv.ParseBool(strVal)
+			if err != nil {
+				return nil, nil, NewRestError(err.Error(), 400)
+			}
+			msg.IsInit = isInit
+		} else {
+			msg.IsInit = isInitVal.(bool)
 		}
-		msg.IsInit = isInit
 	}
 	msg.Function = body["func"].(string)
 	if msg.Function == "" {

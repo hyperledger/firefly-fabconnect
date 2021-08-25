@@ -79,10 +79,16 @@ func (tx *Tx) GetTXReceipt(ctx context.Context, rpc RPCClient) (bool, error) {
 }
 
 // Send sends an individual transaction
-func (tx *Tx) Send(ctx context.Context, rpc RPCClient) (err error) {
+func (tx *Tx) Send(ctx context.Context, rpc RPCClient) error {
 	start := time.Now().UTC()
 
-	receipt, err := rpc.Invoke(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args)
+	var receipt *TxReceipt
+	var err error
+	if tx.IsInit {
+		receipt, err = rpc.Init(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args)
+	} else {
+		receipt, err = rpc.Invoke(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args)
+	}
 	tx.lock.Lock()
 	tx.Receipt = receipt
 	tx.lock.Unlock()

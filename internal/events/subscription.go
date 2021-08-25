@@ -22,54 +22,28 @@ import (
 	"strconv"
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	log "github.com/sirupsen/logrus"
 )
 
-// persistedFilter is the part of the filter we record to storage
-// BlockType:   optional. only notify on blocks of a specific type
-//              types are defined in github.com/hyperledger/fabric-protos-go/common:
-//              HeaderType_CONFIG, HeaderType_CONFIG_UPDATE, HeaderType_MESSAGE
-// ChaincodeId: optional, only notify on blocks containing events for chaincode Id
-// Filter:      optional. regexp applied to the event name. can be used independent of Chaincode ID
-// FromBlock:   optional. "newest", "oldest", a number. default is "newest"
-type persistedFilter struct {
-	BlockType   string `json:"blockType,omitempty"`
-	ChaincodeId string `json:"chaincodeId,omitempty"`
-	Filter      string `json:"filter,omitempty"`
-	ToBlock     uint64 `json:"toBlock,omitempty"`
-}
-
-// SubscriptionInfo is the persisted data for the subscription
-type SubscriptionInfo struct {
-	TimeSorted
-	ID        string          `json:"id,omitempty"`
-	ChannelId string          `json:"channel,omitempty"`
-	Path      string          `json:"path"`
-	Summary   string          `json:"-"`      // System generated name for the subscription
-	Name      string          `json:"name"`   // User provided name for the subscription, set to Summary if missing
-	Stream    string          `json:"stream"` // the event stream this subscription is associated under
-	Signer    string          `json:"signer"`
-	FromBlock string          `json:"fromBlock,omitempty"`
-	Filter    persistedFilter `json:"filter"`
-}
-
 // subscription is the runtime that manages the subscription
 type subscription struct {
-	info           *SubscriptionInfo
-	client         fabric.RPCClient
-	ep             *evtProcessor
-	registration   fab.Registration
-	notifier       <-chan *fab.BlockEvent
-	eventClient    *event.Client
-	filterStale    bool
-	deleting       bool
-	resetRequested bool
+	info               *eventsapi.SubscriptionInfo
+	client             fabric.RPCClient
+	ep                 *evtProcessor
+	registration       fab.Registration
+	blockEventNotifier <-chan *fab.BlockEvent
+	ccEventNotifier    <-chan *fab.CCEvent
+	eventClient        *event.Client
+	filterStale        bool
+	deleting           bool
+	resetRequested     bool
 }
 
-func newSubscription(sm subscriptionManager, rpc fabric.RPCClient, i *SubscriptionInfo) (*subscription, error) {
+func newSubscription(sm subscriptionManager, rpc fabric.RPCClient, i *eventsapi.SubscriptionInfo) (*subscription, error) {
 	stream, err := sm.streamByID(i.Stream)
 	if err != nil {
 		return nil, err
@@ -90,12 +64,7 @@ func newSubscription(sm subscriptionManager, rpc fabric.RPCClient, i *Subscripti
 	return s, nil
 }
 
-// GetID returns the ID (for sorting)
-func (info *SubscriptionInfo) GetID() string {
-	return info.ID
-}
-
-func restoreSubscription(sm subscriptionManager, rpc fabric.RPCClient, i *SubscriptionInfo) (*subscription, error) {
+func restoreSubscription(sm subscriptionManager, rpc fabric.RPCClient, i *eventsapi.SubscriptionInfo) (*subscription, error) {
 	if i.GetID() == "" {
 		return nil, errors.Errorf(errors.EventStreamsNoID)
 	}
@@ -138,12 +107,13 @@ func (s *subscription) setCheckpointBlockHeight(i uint64) {
 }
 
 func (s *subscription) restartFilter(ctx context.Context, since uint64) error {
-	reg, notifier, eventClient, err := s.client.SubscribeEvent(s.info.ChannelId, s.info.Signer, since)
+	reg, blockEventNotifier, ccEventNotifier, eventClient, err := s.client.SubscribeEvent(s.info, since)
 	if err != nil {
 		return errors.Errorf(errors.RPCCallReturnedError, "SubscribeEvent", err)
 	}
 	s.registration = reg
-	s.notifier = notifier
+	s.blockEventNotifier = blockEventNotifier
+	s.ccEventNotifier = ccEventNotifier
 	s.eventClient = eventClient
 	s.markFilterStale(false)
 
@@ -156,13 +126,30 @@ func (s *subscription) restartFilter(ctx context.Context, since uint64) error {
 
 func (s *subscription) processNewEvents() {
 	for {
-		blockEvent, ok := <-s.notifier
-		if !ok {
-			log.Infof("%s: Event notifier channel closed", s.info.ID)
-			return
-		}
-		events := fabric.GetEvents(blockEvent.Block)
-		for _, event := range events {
+		select {
+		case blockEvent, ok := <-s.blockEventNotifier:
+			if !ok {
+				log.Infof("%s: Block event notifier channel closed", s.info.ID)
+				return
+			}
+			events := fabric.GetEvents(blockEvent.Block)
+			for _, event := range events {
+				if err := s.ep.processEventEntry(s.info.ID, event); err != nil {
+					log.Errorf("Failed to process event: %s", err)
+				}
+			}
+		case ccEvent, ok := <-s.ccEventNotifier:
+			if !ok {
+				log.Infof("%s: Chaincode event notifier channel closed", s.info.ID)
+				return
+			}
+			event := &eventsapi.EventEntry{
+				ChaincodeId:   ccEvent.ChaincodeID,
+				BlockNumber:   ccEvent.BlockNumber,
+				TransactionId: ccEvent.TxID,
+				EventName:     ccEvent.EventName,
+				Payload:       ccEvent.Payload,
+			}
 			if err := s.ep.processEventEntry(s.info.ID, event); err != nil {
 				log.Errorf("Failed to process event: %s", err)
 			}

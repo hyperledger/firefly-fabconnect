@@ -25,6 +25,7 @@ import (
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/kvstore"
 	restutil "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/utils"
@@ -59,9 +60,9 @@ type SubscriptionManager interface {
 	SuspendStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError)
 	ResumeStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError)
 	DeleteStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError)
-	AddSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*SubscriptionInfo, *restutil.RestError)
-	Subscriptions(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*SubscriptionInfo
-	SubscriptionByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*SubscriptionInfo, *restutil.RestError)
+	AddSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*eventsapi.SubscriptionInfo, *restutil.RestError)
+	Subscriptions(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*eventsapi.SubscriptionInfo
+	SubscriptionByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*eventsapi.SubscriptionInfo, *restutil.RestError)
 	ResetSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError)
 	DeleteSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError)
 	Close()
@@ -102,7 +103,7 @@ func NewSubscriptionManager(config *conf.EventstreamConf, rpc fabric.RPCClient, 
 }
 
 // SubscriptionByID used externally to get serializable details
-func (s *subscriptionMGR) SubscriptionByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*SubscriptionInfo, *restutil.RestError) {
+func (s *subscriptionMGR) SubscriptionByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*eventsapi.SubscriptionInfo, *restutil.RestError) {
 	id := params.ByName("subscriptionId")
 	sub, err := s.subscriptionByID(id)
 	if err != nil {
@@ -112,8 +113,8 @@ func (s *subscriptionMGR) SubscriptionByID(res http.ResponseWriter, req *http.Re
 }
 
 // Subscriptions used externally to get list subscriptions
-func (s *subscriptionMGR) Subscriptions(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*SubscriptionInfo {
-	l := make([]*SubscriptionInfo, 0, len(s.subscriptions))
+func (s *subscriptionMGR) Subscriptions(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*eventsapi.SubscriptionInfo {
+	l := make([]*eventsapi.SubscriptionInfo, 0, len(s.subscriptions))
 	for _, sub := range s.subscriptions {
 		l = append(l, sub.info)
 	}
@@ -121,8 +122,8 @@ func (s *subscriptionMGR) Subscriptions(res http.ResponseWriter, req *http.Reque
 }
 
 // AddSubscription adds a new subscription
-func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*SubscriptionInfo, *restutil.RestError) {
-	var spec SubscriptionInfo
+func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*eventsapi.SubscriptionInfo, *restutil.RestError) {
+	var spec eventsapi.SubscriptionInfo
 	if err := json.NewDecoder(req.Body).Decode(&spec); err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf(errors.RESTGatewaySubscriptionInvalid, err), 400)
 	}
@@ -132,7 +133,7 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 	if spec.Stream == "" {
 		return nil, restutil.NewRestError(`Missing required parameter "stream"`, 400)
 	}
-	spec.TimeSorted = TimeSorted{
+	spec.TimeSorted = eventsapi.TimeSorted{
 		CreatedISO8601: time.Now().UTC().Format(time.RFC3339),
 	}
 	spec.ID = subIDPrefix + utils.UUIDv4()
@@ -141,6 +142,9 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 	if spec.FromBlock == "" {
 		// user did not set an initial block, default to newest
 		spec.FromBlock = FromBlockNewest
+	}
+	if spec.Filter.BlockType == "" {
+		spec.Filter.BlockType = eventsapi.BlockType_TX
 	}
 	// Create it
 	sub, err := newSubscription(s, s.rpc, &spec)
@@ -221,7 +225,7 @@ func (s *subscriptionMGR) deleteSubscription(sub *subscription) error {
 	return nil
 }
 
-func (s *subscriptionMGR) storeSubscription(info *SubscriptionInfo) (*SubscriptionInfo, error) {
+func (s *subscriptionMGR) storeSubscription(info *eventsapi.SubscriptionInfo) (*eventsapi.SubscriptionInfo, error) {
 	infoBytes, _ := json.MarshalIndent(info, "", "  ")
 	if err := s.db.Put(info.ID, infoBytes); err != nil {
 		return nil, errors.Errorf(errors.EventStreamsSubscribeStoreFailed, err)
@@ -472,7 +476,7 @@ func (s *subscriptionMGR) recoverSubscriptions() {
 	for iSub.Next() {
 		k := iSub.Key()
 		if strings.HasPrefix(k, subIDPrefix) {
-			var subInfo SubscriptionInfo
+			var subInfo eventsapi.SubscriptionInfo
 			err := json.Unmarshal(iSub.Value(), &subInfo)
 			if err != nil {
 				log.Errorf("Failed to recover subscription '%s': %s", string(iSub.Value()), err)

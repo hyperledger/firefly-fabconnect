@@ -27,7 +27,7 @@ import (
 
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
+	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/ws"
 
 	log "github.com/sirupsen/logrus"
@@ -59,7 +59,7 @@ const (
 
 // StreamInfo configures the stream to perform an action for each event
 type StreamInfo struct {
-	TimeSorted
+	eventsapi.TimeSorted
 	ID                   string               `json:"id"`
 	Name                 string               `json:"name,omitempty"`
 	Path                 string               `json:"path"`
@@ -111,7 +111,7 @@ type eventStream struct {
 }
 
 type eventStreamAction interface {
-	attemptBatch(batchNumber, attempt uint64, events []*api.EventEntry) error
+	attemptBatch(batchNumber, attempt uint64, events []*eventsapi.EventEntry) error
 }
 
 func validateWebSocket(w *webSocketActionInfo) error {
@@ -570,7 +570,7 @@ func (a *eventStream) processBatch(batchNumber uint64, events []*eventData) {
 		attempt++
 		log.Infof("%s: Batch %d initiated with %d events. FirstBlock=%d LastBlock=%d", a.spec.ID, batchNumber, len(events), events[0].event.BlockNumber, events[len(events)-1].event.BlockNumber)
 		a.updateWG.Add(1)
-		eventEntries := make([]*api.EventEntry, len(events))
+		eventEntries := make([]*eventsapi.EventEntry, len(events))
 		for i, entry := range events {
 			eventEntries[i] = entry.event
 		}
@@ -611,7 +611,7 @@ func (a *eventStream) processBatch(batchNumber uint64, events []*eventData) {
 
 // performActionWithRetry performs an action, with exponential backoff retry up
 // to a given threshold
-func (a *eventStream) performActionWithRetry(batchNumber uint64, events []*api.EventEntry) (err error) {
+func (a *eventStream) performActionWithRetry(batchNumber uint64, events []*eventsapi.EventEntry) (err error) {
 	startTime := time.Now()
 	endTime := startTime.Add(time.Duration(a.spec.RetryTimeoutSec) * time.Second)
 	delay := a.initialRetryDelay
