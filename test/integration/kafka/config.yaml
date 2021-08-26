@@ -1,0 +1,6 @@
+kafka:
+  broker: "localhost:9092"
+  topic: "org1requests,org1replies"
+  groupid: "ff"
+  partitions: 2
+  replfactor: 1
