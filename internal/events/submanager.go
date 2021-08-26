@@ -146,6 +146,9 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 	if spec.Filter.BlockType == "" {
 		spec.Filter.BlockType = eventsapi.BlockType_TX
 	}
+	if spec.Filter.EventFilter == "" && spec.Filter.ChaincodeId != "" {
+		spec.Filter.EventFilter = ".*"
+	}
 	// Create it
 	sub, err := newSubscription(s, s.rpc, &spec)
 	if err != nil {

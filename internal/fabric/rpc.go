@@ -269,9 +269,6 @@ func (w *rpcWrapper) SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since u
 		return nil, nil, nil, nil, errors.Errorf("Failed to create event client. %s", err)
 	}
 	if subInfo.Filter.ChaincodeId != "" {
-		if subInfo.Filter.EventFilter == "" {
-			subInfo.Filter.EventFilter = ".*"
-		}
 		reg, notifier, err := eventClient.RegisterChaincodeEvent(subInfo.Filter.ChaincodeId, subInfo.Filter.EventFilter)
 		if err != nil {
 			return nil, nil, nil, nil, errors.Errorf("Failed to subscribe to chaincode events. %s", err)
