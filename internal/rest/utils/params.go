@@ -84,6 +84,7 @@ func BuildTxMessage(res http.ResponseWriter, req *http.Request, params httproute
 		return nil, nil, NewRestError(err.Error(), 400)
 	}
 
+	msgId := getFlyParam("id", body, req)
 	channel := getFlyParam("channel", body, req)
 	if channel == "" {
 		return nil, nil, NewRestError("Must specify the channel", 400)
@@ -98,6 +99,7 @@ func BuildTxMessage(res http.ResponseWriter, req *http.Request, params httproute
 	}
 
 	msg := messages.SendTransaction{}
+	msg.Headers.ID = msgId // this could be empty
 	msg.Headers.MsgType = messages.MsgTypeSendTransaction
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
