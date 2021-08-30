@@ -163,7 +163,7 @@ func (w *rpcWrapper) getChannelClient(channelId string, signer string) (*clientW
 	}
 	clientOfUser := w.channelClients[channelId][id.Identifier().ID]
 	if clientOfUser == nil {
-		channelProvider := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(id.Identifier().MSPID), fabsdk.WithUser(id.Identifier().ID))
+		channelProvider := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(w.identityConfig.Client().Organization), fabsdk.WithUser(id.Identifier().ID))
 		cClient, err := channel.New(channelProvider)
 		if err != nil {
 			return nil, err
