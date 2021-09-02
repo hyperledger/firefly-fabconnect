@@ -126,15 +126,43 @@ func (w *rpcWrapper) List(res http.ResponseWriter, req *http.Request, params htt
 }
 
 func (w *rpcWrapper) Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Identity, *restutil.RestError) {
-	result, err := w.caClient.GetIdentity(params.ByName("username"), params.ByName("caname"))
+	username := params.ByName("username")
+	result, err := w.caClient.GetIdentity(username, params.ByName("caname"))
 	if err != nil {
 		return nil, restutil.NewRestError(err.Error(), 500)
 	}
+
+	// the SDK identity manager does not persist the certificates
+	// we have to retrieve it from the identity manager
+	si, _ := w.identityMgr.GetSigningIdentity(username)
+	var ecert []byte
+	if si != nil {
+		// the user may have been enrolled by a different client instance
+		ecert = si.EnrollmentCertificate()
+	}
+
+	// the SDK doesn't save the CACert locally, we have to retrieve it from the Fabric CA server
+	cacert, err := w.getCACert()
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error())
+	}
+
 	newId := identity.Identity{}
 	newId.Name = result.ID
 	newId.MaxEnrollments = result.MaxEnrollments
 	newId.CAName = result.CAName
 	newId.Type = result.Type
 	newId.Affiliation = result.Affiliation
+	newId.EnrollmentCert = ecert
+	newId.CACert = cacert
 	return &newId, nil
+}
+
+func (w *rpcWrapper) getCACert() ([]byte, error) {
+	result, err := w.caClient.GetCAInfo()
+	if err != nil {
+		log.Errorf("Failed to retrieve Fabric CA information: %s", err)
+		return nil, err
+	}
+	return result.CAChain, nil
 }

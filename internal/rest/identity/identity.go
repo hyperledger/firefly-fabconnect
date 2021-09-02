@@ -29,6 +29,8 @@ type Identity struct {
 	Type           string `json:"type"`
 	Affiliation    string `json:"affiliation"`
 	CAName         string `json:"caname"`
+	EnrollmentCert []byte `json:"enrollmentCert"`
+	CACert         []byte `json:"caCert"`
 }
 
 type RegisterResponse struct {
