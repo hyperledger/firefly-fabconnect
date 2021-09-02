@@ -19,6 +19,7 @@ package fabric
 import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/identity"
 	cb "github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
@@ -49,7 +50,7 @@ type RPCClient interface {
 	Invoke(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error)
 	Query(channelId, signer, chaincodeName, method string, args []string) (*channel.Response, error)
 	QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error)
-	SubscribeEvent(channelId, signer string, since uint64) (fab.Registration, <-chan *fab.BlockEvent, *event.Client, error)
+	SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (fab.Registration, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, *event.Client, error)
 	Close()
 }
 
@@ -162,7 +163,7 @@ func (w *rpcWrapper) getChannelClient(channelId string, signer string) (*clientW
 	}
 	clientOfUser := w.channelClients[channelId][id.Identifier().ID]
 	if clientOfUser == nil {
-		channelProvider := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(id.Identifier().MSPID), fabsdk.WithUser(id.Identifier().ID))
+		channelProvider := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(w.identityConfig.Client().Organization), fabsdk.WithUser(id.Identifier().ID))
 		cClient, err := channel.New(channelProvider)
 		if err != nil {
 			return nil, err
@@ -249,10 +250,10 @@ func (w *rpcWrapper) QueryChainInfo(channelId, signer string) (*fab.BlockchainIn
 }
 
 // The returned registration must be closed when done
-func (w *rpcWrapper) SubscribeEvent(channelId, signer string, since uint64) (fab.Registration, <-chan *fab.BlockEvent, *event.Client, error) {
-	client, err := w.getChannelClient(channelId, signer)
+func (w *rpcWrapper) SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (fab.Registration, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, *event.Client, error) {
+	client, err := w.getChannelClient(subInfo.ChannelId, subInfo.Signer)
 	if err != nil {
-		return nil, nil, nil, errors.Errorf("Failed to get channel client. %s", err)
+		return nil, nil, nil, nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
 
 	eventOpts := []event.ClientOption{
@@ -262,17 +263,36 @@ func (w *rpcWrapper) SubscribeEvent(channelId, signer string, since uint64) (fab
 		eventOpts = append(eventOpts, event.WithSeekType(seek.FromBlock), event.WithBlockNum(since))
 	}
 	eventClient, err := event.New(client.channelProvider, eventOpts...)
+	log.Debugf("event service used: %+v", eventClient)
 	if err != nil {
 		log.Errorf("Failed to create event client. %s", err)
-		return nil, nil, nil, errors.Errorf("Failed to create event client. %s", err)
+		return nil, nil, nil, nil, errors.Errorf("Failed to create event client. %s", err)
 	}
-	reg, notifier, err := eventClient.RegisterBlockEvent(headertypefilter.New(cb.HeaderType_ENDORSER_TRANSACTION))
-	if err != nil {
-		return nil, nil, nil, errors.Errorf("Failed to subscribe to block events. %s", err)
+	if subInfo.Filter.ChaincodeId != "" {
+		reg, notifier, err := eventClient.RegisterChaincodeEvent(subInfo.Filter.ChaincodeId, subInfo.Filter.EventFilter)
+		if err != nil {
+			return nil, nil, nil, nil, errors.Errorf("Failed to subscribe to chaincode events. %s", err)
+		}
+		log.Infof("Subscribed to events in channel %s from block %d (0 means newest)", subInfo.ChannelId, since)
+		return reg, nil, notifier, eventClient, nil
+	} else {
+		blockType := subInfo.Filter.BlockType
+		var blockfilter fab.BlockFilter
+		if blockType == eventsapi.BlockType_TX {
+			blockfilter = headertypefilter.New(cb.HeaderType_ENDORSER_TRANSACTION)
+		} else if blockType == eventsapi.BlockType_Config {
+			blockfilter = headertypefilter.New(cb.HeaderType_CONFIG, cb.HeaderType_CONFIG_UPDATE)
+		} else {
+			blockfilter = headertypefilter.New(cb.HeaderType_ENDORSER_TRANSACTION)
+		}
+
+		reg, notifier, err := eventClient.RegisterBlockEvent(blockfilter)
+		if err != nil {
+			return nil, nil, nil, nil, errors.Errorf("Failed to subscribe to block events. %s", err)
+		}
+		log.Infof("Subscribed to events in channel %s from block %d (0 means newest)", subInfo.ChannelId, since)
+		return reg, notifier, nil, eventClient, nil
 	}
-	log.Infof("Subscribed to events in channel %s from block %d (0 means newest)", channelId, since)
-	log.Debugf("event service used: %+v", eventClient)
-	return reg, notifier, eventClient, nil
 }
 
 func (w *rpcWrapper) sendTransaction(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*msp.IdentityIdentifier, *channel.Response, *fab.TxStatusEvent, error) {

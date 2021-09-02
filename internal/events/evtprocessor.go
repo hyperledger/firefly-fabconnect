@@ -63,14 +63,15 @@ func (ep *evtProcessor) initBlockHWM(intVal uint64) {
 	ep.hwmSync.Unlock()
 }
 
-func (ep *evtProcessor) processEventEntry(subInfo string, entry *api.EventEntry) (err error) {
+func (ep *evtProcessor) processEventEntry(subID string, entry *api.EventEntry) (err error) {
+	entry.SubID = subID
 	result := eventData{
 		event:         entry,
 		batchComplete: ep.batchComplete,
 	}
 
 	// Ok, now we have the full event in a friendly map output. Pass it down to the stream
-	log.Infof("%s: Dispatching event. BlockNumber=%d TxId=%s", subInfo, result.event.BlockNumber, result.event.TransactionId)
+	log.Infof("%s: Dispatching event. BlockNumber=%d TxId=%s", subID, result.event.BlockNumber, result.event.TransactionId)
 	ep.stream.handleEvent(&result)
 	return nil
 }

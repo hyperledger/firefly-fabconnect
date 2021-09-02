@@ -106,19 +106,21 @@ func (w *asyncDispatcher) processMsg(ctx context.Context, msg *messages.SendTran
 		return nil, 400, errors.Errorf(errors.RequestHandlerInvalidMsgType, msg.Headers.MsgType)
 	}
 
-	// We always generate the ID. It cannot be set by the user
-	msgID := utils.UUIDv4()
-	msg.Headers.ID = msgID
+	// Generate a message ID if not already set
+	if msg.Headers.ID == "" {
+		msgID := utils.UUIDv4()
+		msg.Headers.ID = msgID
+	}
 
 	// Pass to the handler
-	log.Infof("Request handler accepted message. MsgID: %s Type: %s", msgID, msg.Headers.MsgType)
-	msgAck, status, err := w.handler.dispatchMsg(ctx, msg.Headers.ChannelID, msgID, msg, ack)
+	log.Infof("Request handler accepted message. MsgID: %s Type: %s", msg.Headers.ID, msg.Headers.MsgType)
+	msgAck, status, err := w.handler.dispatchMsg(ctx, msg.Headers.ChannelID, msg.Headers.ID, msg, ack)
 	if err != nil {
 		return nil, status, err
 	}
 	return &messages.AsyncSentMsg{
 		Sent:    true,
-		Request: msgID,
+		Request: msg.Headers.ID,
 		Msg:     msgAck,
 	}, 200, nil
 }
