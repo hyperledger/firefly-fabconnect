@@ -136,9 +136,11 @@ func (w *rpcWrapper) Get(res http.ResponseWriter, req *http.Request, params http
 	// we have to retrieve it from the identity manager
 	si, _ := w.identityMgr.GetSigningIdentity(username)
 	var ecert []byte
+	var mspId string
 	if si != nil {
 		// the user may have been enrolled by a different client instance
 		ecert = si.EnrollmentCertificate()
+		mspId = si.Identifier().MSPID
 	}
 
 	// the SDK doesn't save the CACert locally, we have to retrieve it from the Fabric CA server
@@ -153,6 +155,7 @@ func (w *rpcWrapper) Get(res http.ResponseWriter, req *http.Request, params http
 	newId.CAName = result.CAName
 	newId.Type = result.Type
 	newId.Affiliation = result.Affiliation
+	newId.MSPID = mspId
 	newId.EnrollmentCert = ecert
 	newId.CACert = cacert
 	return &newId, nil
