@@ -179,7 +179,7 @@ const (
 	// EventStreamsWebhookInvalidURL attempt to create a Webhook event stream with an invalid URL
 	EventStreamsWebhookInvalidURL = "Invalid URL in webhook action"
 	// EventStreamsWebhookResumeActive resume when already resumed
-	EventStreamsWebhookResumeActive = "Event processor is already active. Suspending:%t"
+	EventStreamsResumeActive = "Event processor is already active. Suspending:%t"
 	// EventStreamsWebhookProhibitedAddress some IP ranges can be restricted
 	EventStreamsWebhookProhibitedAddress = "Cannot send Webhook POST to address: %s"
 	// EventStreamsWebhookFailedHTTPStatus server at the other end of a webhook returned a non-OK response
@@ -216,6 +216,8 @@ const (
 	EventStreamsCannotUpdateType = "The type of an event stream cannot be changed"
 	// EventStreamsInvalidDistributionMode unknown distribution mode
 	EventStreamsInvalidDistributionMode = "Invalid distribution mode '%s'. Valid distribution modes are: 'workloadDistribution' and 'broadcast'."
+	// EventStreamsUpdateAlreadyInProgress update already in progress
+	EventStreamsUpdateAlreadyInProgress = "Update to event stream already in progress"
 )
 
 type RestErrMsg struct {

@@ -46,7 +46,7 @@ type KVStore interface {
 	Delete(key string) error
 	NewIterator() KVIterator
 	NewIteratorWithRange(keyRange interface{}) KVIterator
-	Close()
+	Close() error
 }
 
 type levelDBKeyValueStore struct {
@@ -133,10 +133,11 @@ func (k *levelDBKeyIterator) Release() {
 	k.i.Next()
 }
 
-func (k *levelDBKeyValueStore) Close() {
+func (k *levelDBKeyValueStore) Close() error {
 	if k.db != nil {
-		k.db.Close()
+		return k.db.Close()
 	}
+	return nil
 }
 
 // NewLDBKeyValueStore construct a new LevelDB instance of a KV store

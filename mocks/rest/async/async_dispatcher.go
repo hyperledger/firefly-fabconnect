@@ -24,11 +24,11 @@ func (_m *AsyncDispatcher) Close() {
 }
 
 // DispatchMsgAsync provides a mock function with given fields: ctx, msg, ack
-func (_m *AsyncDispatcher) DispatchMsgAsync(ctx context.Context, msg map[string]interface{}, ack bool) (*messages.AsyncSentMsg, error) {
+func (_m *AsyncDispatcher) DispatchMsgAsync(ctx context.Context, msg *messages.SendTransaction, ack bool) (*messages.AsyncSentMsg, error) {
 	ret := _m.Called(ctx, msg, ack)
 
 	var r0 *messages.AsyncSentMsg
-	if rf, ok := ret.Get(0).(func(context.Context, map[string]interface{}, bool) *messages.AsyncSentMsg); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *messages.SendTransaction, bool) *messages.AsyncSentMsg); ok {
 		r0 = rf(ctx, msg, ack)
 	} else {
 		if ret.Get(0) != nil {
@@ -37,7 +37,7 @@ func (_m *AsyncDispatcher) DispatchMsgAsync(ctx context.Context, msg map[string]
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, map[string]interface{}, bool) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *messages.SendTransaction, bool) error); ok {
 		r1 = rf(ctx, msg, ack)
 	} else {
 		r1 = ret.Error(1)

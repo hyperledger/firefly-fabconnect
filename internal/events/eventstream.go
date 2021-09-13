@@ -73,7 +73,6 @@ type StreamInfo struct {
 	Webhook              *webhookActionInfo   `json:"webhook,omitempty"`
 	WebSocket            *webSocketActionInfo `json:"websocket,omitempty"`
 	Timestamps           bool                 `json:"timestamps,omitempty"` // Include block timestamps in the events generated
-	TimestampCacheSize   int                  `json:"timestampCacheSize,omitempty"`
 }
 
 type webhookActionInfo struct {
@@ -146,9 +145,6 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 	} else {
 		spec.ErrorHandling = ErrorHandlingSkip
 	}
-	if spec.TimestampCacheSize == 0 {
-		spec.TimestampCacheSize = DefaultTimestampCacheSize
-	}
 
 	a = &eventStream{
 		sm:                sm,
@@ -215,11 +211,18 @@ func (spec *StreamInfo) GetID() string {
 }
 
 // preUpdateStream sets a flag to indicate updateInProgress and wakes up goroutines waiting on condition variable
-func (a *eventStream) preUpdateStream() {
+func (a *eventStream) preUpdateStream() error {
 	a.batchCond.L.Lock()
+	if a.updateInProgress {
+		a.batchCond.L.Unlock()
+		return errors.Errorf(errors.EventStreamsUpdateAlreadyInProgress)
+	}
 	a.updateInProgress = true
+	// close the updateInterrupt channel so that the event handler go routines can be woken up
+	close(a.updateInterrupt)
 	a.batchCond.Broadcast()
 	a.batchCond.L.Unlock()
+	return nil
 }
 
 // postUpdateStream resets flags and kicks off a fresh round of handler go routines
@@ -227,9 +230,9 @@ func (a *eventStream) postUpdateStream() {
 	a.batchCond.L.Lock()
 	a.pollerDone = false
 	a.processorDone = false
+	a.startEventHandlers(false)
 	a.updateInProgress = false
 	a.batchCond.L.Unlock()
-	a.startEventHandlers(false)
 }
 
 // update modifies an existing eventStream
@@ -237,9 +240,9 @@ func (a *eventStream) update(newSpec *StreamInfo) (spec *StreamInfo, err error) 
 	log.Infof("%s: Update event stream", a.spec.ID)
 	// set a flag to indicate updateInProgress
 	// For any go routines that are Wait() ing on the eventListener, wake them up
-	a.preUpdateStream()
-	// close the updateInterrupt channel so that the event handler go routines can be woken up
-	close(a.updateInterrupt)
+	if err := a.preUpdateStream(); err != nil {
+		return nil, err
+	}
 	// wait for the poked goroutines to finish up
 	a.updateWG.Wait()
 
@@ -297,7 +300,11 @@ func (a *eventStream) update(newSpec *StreamInfo) (spec *StreamInfo, err error) 
 func (a *eventStream) handleEvent(event *eventData) {
 	// Does nothing more than add it to the batch, to be picked up
 	// by the batchDispatcher
-	a.eventStream <- event
+	if a.stopped {
+		log.Infof("Event stream stopped, skipping event %s for transaction %s", event.event.EventName, event.event.TransactionId)
+	} else {
+		a.eventStream <- event
+	}
 }
 
 // stop is a lazy stop, that marks a flag for the batch goroutine to pick up
@@ -322,7 +329,7 @@ func (a *eventStream) resume() error {
 	a.batchCond.L.Lock()
 	defer a.batchCond.L.Unlock()
 	if !a.processorDone || !a.pollerDone {
-		return errors.Errorf(errors.EventStreamsWebhookResumeActive, a.spec.Suspended)
+		return errors.Errorf(errors.EventStreamsResumeActive, a.spec.Suspended)
 	}
 	a.spec.Suspended = false
 	a.processorDone = false
@@ -368,7 +375,7 @@ func (a *eventStream) eventPoller() {
 	for !a.suspendOrStop() {
 		var err error
 		// Load the checkpoint (should only be first time round)
-		if checkpoint == nil {
+		if len(checkpoint) == 0 {
 			if checkpoint, err = a.sm.loadCheckpoint(a.spec.ID); err != nil {
 				log.Errorf("%s: Failed to load checkpoint: %s", a.spec.ID, err)
 			}
@@ -417,6 +424,7 @@ func (a *eventStream) eventPoller() {
 				}
 			}
 		}
+
 		// the event poller reacts to notification about a stream update, else it starts
 		// another round of polling after completion of the pollingInterval
 		select {
@@ -462,6 +470,7 @@ func (a *eventStream) batchDispatcher() {
 					return
 				}
 				currentBatch = append(currentBatch, event)
+				log.Infof("%s: Updated batch length %d", a.spec.ID, len(currentBatch))
 			case <-a.updateInterrupt:
 				// we were notified by the caller about an ongoing update, cancel the timeout ctx and return
 				log.Infof("%s: Notified of an ongoing stream update, will not dispatch batch", a.spec.ID)

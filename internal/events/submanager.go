@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -102,6 +103,102 @@ func NewSubscriptionManager(config *conf.EventstreamConf, rpc fabric.RPCClient, 
 	return sm
 }
 
+// StreamByID used externally to get serializable details
+func (s *subscriptionMGR) StreamByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*StreamInfo, *restutil.RestError) {
+	streamID := params.ByName("streamId")
+	stream, err := s.streamByID(streamID)
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error(), 404)
+	}
+	return stream.spec, nil
+}
+
+// Streams used externally to get list streams
+func (s *subscriptionMGR) Streams(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*StreamInfo {
+	return s.getStreams()
+}
+
+// AddStream adds a new stream
+func (s *subscriptionMGR) AddStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*StreamInfo, *restutil.RestError) {
+	var spec StreamInfo
+	if err := json.NewDecoder(req.Body).Decode(&spec); err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf(errors.RESTGatewayEventStreamInvalid, err), 400)
+	}
+	if err := s.addStream(&spec); err != nil {
+		return nil, restutil.NewRestError(err.Error(), 500)
+	}
+	return &spec, nil
+}
+
+// UpdateStream updates an existing stream
+func (s *subscriptionMGR) UpdateStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*StreamInfo, *restutil.RestError) {
+	streamID := params.ByName("streamId")
+	stream, err := s.streamByID(streamID)
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error(), 404)
+	}
+	var spec StreamInfo
+	if err := json.NewDecoder(req.Body).Decode(&spec); err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf(errors.RESTGatewayEventStreamInvalid, err), 400)
+	}
+	updatedSpec, err := s.updateStream(stream, &spec)
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error(), 500)
+	}
+	return updatedSpec, nil
+}
+
+// DeleteStream deletes a streamm
+func (s *subscriptionMGR) DeleteStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
+	streamID := params.ByName("streamId")
+	stream, err := s.streamByID(streamID)
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error(), 404)
+	}
+	if err = s.deleteStream(stream); err != nil {
+		return nil, restutil.NewRestError(err.Error(), 500)
+	}
+
+	result := map[string]string{}
+	result["id"] = streamID
+	result["deleted"] = "true"
+	return &result, nil
+}
+
+// SuspendStream suspends a stream from firing
+func (s *subscriptionMGR) SuspendStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
+	streamID := params.ByName("streamId")
+	stream, err := s.streamByID(streamID)
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error(), 404)
+	}
+	if err = s.suspendStream(stream); err != nil {
+		return nil, restutil.NewRestError(err.Error(), 500)
+	}
+
+	result := map[string]string{}
+	result["id"] = streamID
+	result["suspended"] = "true"
+	return &result, nil
+}
+
+// ResumeStream restarts a suspended stream
+func (s *subscriptionMGR) ResumeStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
+	streamID := params.ByName("streamId")
+	stream, err := s.streamByID(streamID)
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error(), 404)
+	}
+	if err = s.resumeStream(stream); err != nil {
+		return nil, restutil.NewRestError(err.Error(), 500)
+	}
+
+	result := map[string]string{}
+	result["id"] = streamID
+	result["resumed"] = "true"
+	return &result, nil
+}
+
 // SubscriptionByID used externally to get serializable details
 func (s *subscriptionMGR) SubscriptionByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*eventsapi.SubscriptionInfo, *restutil.RestError) {
 	id := params.ByName("subscriptionId")
@@ -114,11 +211,7 @@ func (s *subscriptionMGR) SubscriptionByID(res http.ResponseWriter, req *http.Re
 
 // Subscriptions used externally to get list subscriptions
 func (s *subscriptionMGR) Subscriptions(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*eventsapi.SubscriptionInfo {
-	l := make([]*eventsapi.SubscriptionInfo, 0, len(s.subscriptions))
-	for _, sub := range s.subscriptions {
-		l = append(l, sub.info)
-	}
-	return l
+	return s.getSubscriptions()
 }
 
 // AddSubscription adds a new subscription
@@ -133,33 +226,10 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 	if spec.Stream == "" {
 		return nil, restutil.NewRestError(`Missing required parameter "stream"`, 400)
 	}
-	spec.TimeSorted = eventsapi.TimeSorted{
-		CreatedISO8601: time.Now().UTC().Format(time.RFC3339),
-	}
-	spec.ID = subIDPrefix + utils.UUIDv4()
-	spec.Path = SubPathPrefix + "/" + spec.ID
-	// Check initial block number to subscribe from
-	if spec.FromBlock == "" {
-		// user did not set an initial block, default to newest
-		spec.FromBlock = FromBlockNewest
-	}
-	if spec.Filter.BlockType == "" {
-		spec.Filter.BlockType = eventsapi.BlockType_TX
-	}
-	if spec.Filter.EventFilter == "" && spec.Filter.ChaincodeId != "" {
-		spec.Filter.EventFilter = ".*"
-	}
-	// Create it
-	sub, err := newSubscription(s, s.rpc, &spec)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 404)
-	}
-	s.subscriptions[sub.info.ID] = sub
-	subInfo, err := s.storeSubscription(sub.info)
-	if err != nil {
+	if err := s.addSubscription(&spec); err != nil {
 		return nil, restutil.NewRestError(err.Error(), 500)
 	}
-	return subInfo, nil
+	return &spec, nil
 }
 
 func (s *subscriptionMGR) getConfig() *conf.EventstreamConf {
@@ -187,21 +257,6 @@ func (s *subscriptionMGR) ResetSubscription(res http.ResponseWriter, req *http.R
 	return &result, nil
 }
 
-func (s *subscriptionMGR) resetSubscription(sub *subscription, initialBlock string) error {
-	// Re-set the inital block on the subscription and save it
-	if initialBlock == "" || initialBlock == FromBlockNewest {
-		sub.info.FromBlock = FromBlockNewest
-	} else {
-		sub.info.FromBlock = initialBlock
-	}
-	if _, err := s.storeSubscription(sub.info); err != nil {
-		return err
-	}
-	// Request a reset on the next poling cycle
-	sub.requestReset()
-	return nil
-}
-
 // DeleteSubscription deletes a subscription
 func (s *subscriptionMGR) DeleteSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
 	id := params.ByName("subscriptionId")
@@ -219,35 +274,7 @@ func (s *subscriptionMGR) DeleteSubscription(res http.ResponseWriter, req *http.
 	return &result, nil
 }
 
-func (s *subscriptionMGR) deleteSubscription(sub *subscription) error {
-	delete(s.subscriptions, sub.info.ID)
-	sub.unsubscribe(true)
-	if err := s.db.Delete(sub.info.ID); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *subscriptionMGR) storeSubscription(info *eventsapi.SubscriptionInfo) (*eventsapi.SubscriptionInfo, error) {
-	infoBytes, _ := json.MarshalIndent(info, "", "  ")
-	if err := s.db.Put(info.ID, infoBytes); err != nil {
-		return nil, errors.Errorf(errors.EventStreamsSubscribeStoreFailed, err)
-	}
-	return info, nil
-}
-
-// StreamByID used externally to get serializable details
-func (s *subscriptionMGR) StreamByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*StreamInfo, *restutil.RestError) {
-	streamID := params.ByName("streamId")
-	stream, err := s.streamByID(streamID)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 404)
-	}
-	return stream.spec, nil
-}
-
-// Streams used externally to get list streams
-func (s *subscriptionMGR) Streams(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*StreamInfo {
+func (s *subscriptionMGR) getStreams() []*StreamInfo {
 	l := make([]*StreamInfo, 0, len(s.subscriptions))
 	for _, stream := range s.streams {
 		l = append(l, stream.spec)
@@ -255,65 +282,39 @@ func (s *subscriptionMGR) Streams(res http.ResponseWriter, req *http.Request, pa
 	return l
 }
 
-// AddStream adds a new stream
-func (s *subscriptionMGR) AddStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*StreamInfo, *restutil.RestError) {
-	var spec StreamInfo
-	if err := json.NewDecoder(req.Body).Decode(&spec); err != nil {
-		return nil, restutil.NewRestError(fmt.Sprintf(errors.RESTGatewayEventStreamInvalid, err), 400)
+// streamByID used internally to lookup full objects
+func (s *subscriptionMGR) streamByID(id string) (*eventStream, error) {
+	stream, exists := s.streams[id]
+	if !exists {
+		return nil, errors.Errorf(errors.EventStreamsStreamNotFound, id)
 	}
+	return stream, nil
+}
 
+func (s *subscriptionMGR) addStream(spec *StreamInfo) error {
 	spec.ID = streamIDPrefix + utils.UUIDv4()
 	spec.CreatedISO8601 = time.Now().UTC().Format(time.RFC3339)
 	spec.Path = StreamPathPrefix + "/" + spec.ID
-	stream, err := newEventStream(s, &spec, s.wsChannels)
+	stream, err := newEventStream(s, spec, s.wsChannels)
 	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
+		return err
 	}
 	s.streams[stream.spec.ID] = stream
-	streamInfo, err := s.storeStream(stream.spec)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
-	}
-	return streamInfo, nil
+	return s.storeStream(stream.spec)
 }
 
-// UpdateStream updates an existing stream
-func (s *subscriptionMGR) UpdateStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*StreamInfo, *restutil.RestError) {
-	streamID := params.ByName("streamId")
-	stream, err := s.streamByID(streamID)
+func (s *subscriptionMGR) updateStream(stream *eventStream, spec *StreamInfo) (*StreamInfo, error) {
+	updatedSpec, err := stream.update(spec)
 	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 404)
+		return nil, err
 	}
-	var spec StreamInfo
-	if err := json.NewDecoder(req.Body).Decode(&spec); err != nil {
-		return nil, restutil.NewRestError(fmt.Sprintf(errors.RESTGatewayEventStreamInvalid, err), 400)
+	if err := s.storeStream(updatedSpec); err != nil {
+		return nil, err
 	}
-	updatedSpec, err := stream.update(&spec)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
-	}
-	streamInfo, err := s.storeStream(updatedSpec)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
-	}
-	return streamInfo, nil
+	return updatedSpec, nil
 }
 
-func (s *subscriptionMGR) storeStream(spec *StreamInfo) (*StreamInfo, error) {
-	infoBytes, _ := json.MarshalIndent(spec, "", "  ")
-	if err := s.db.Put(spec.ID, infoBytes); err != nil {
-		return nil, errors.Errorf(errors.EventStreamsCreateStreamStoreFailed, err)
-	}
-	return spec, nil
-}
-
-// DeleteStream deletes a streamm
-func (s *subscriptionMGR) DeleteStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
-	streamID := params.ByName("streamId")
-	stream, err := s.streamByID(streamID)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 404)
-	}
+func (s *subscriptionMGR) deleteStream(stream *eventStream) error {
 	// We have to clean up all the associated subs
 	for _, sub := range s.subscriptions {
 		if sub.info.Stream == stream.spec.ID {
@@ -325,15 +326,114 @@ func (s *subscriptionMGR) DeleteStream(res http.ResponseWriter, req *http.Reques
 	}
 	delete(s.streams, stream.spec.ID)
 	stream.stop()
-	if err = s.db.Delete(stream.spec.ID); err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
+	if err := s.db.Delete(stream.spec.ID); err != nil {
+		return err
 	}
 	s.deleteCheckpoint(stream.spec.ID)
+	return nil
+}
 
-	result := map[string]string{}
-	result["id"] = streamID
-	result["deleted"] = "true"
-	return &result, nil
+func (s *subscriptionMGR) suspendStream(stream *eventStream) error {
+	stream.suspend()
+	// Persist the state change
+	if err := s.storeStream(stream.spec); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *subscriptionMGR) resumeStream(stream *eventStream) error {
+	if err := stream.resume(); err != nil {
+		return err
+	}
+	// Persist the state change
+	if err := s.storeStream(stream.spec); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *subscriptionMGR) storeStream(spec *StreamInfo) error {
+	infoBytes, _ := json.MarshalIndent(spec, "", "  ")
+	if err := s.db.Put(spec.ID, infoBytes); err != nil {
+		return errors.Errorf(errors.EventStreamsCreateStreamStoreFailed, err)
+	}
+	return nil
+}
+
+func (s *subscriptionMGR) getSubscriptions() []*eventsapi.SubscriptionInfo {
+	l := make([]*eventsapi.SubscriptionInfo, 0, len(s.subscriptions))
+	for _, sub := range s.subscriptions {
+		l = append(l, sub.info)
+	}
+	return l
+}
+
+func (s *subscriptionMGR) addSubscription(spec *eventsapi.SubscriptionInfo) error {
+	spec.TimeSorted = eventsapi.TimeSorted{
+		CreatedISO8601: time.Now().UTC().Format(time.RFC3339),
+	}
+	spec.ID = subIDPrefix + utils.UUIDv4()
+	spec.Path = SubPathPrefix + "/" + spec.ID
+	// Check initial block number to subscribe from
+	if spec.FromBlock == "" {
+		// user did not set an initial block, default to newest
+		spec.FromBlock = FromBlockNewest
+	}
+	if spec.Filter.BlockType == "" {
+		spec.Filter.BlockType = eventsapi.BlockType_TX
+	}
+	if spec.Filter.EventFilter == "" && spec.Filter.ChaincodeId != "" {
+		spec.Filter.EventFilter = ".*"
+	}
+	// Create it
+	stream, err := s.streamByID(spec.Stream)
+	if err != nil {
+		return err
+	}
+	sub, err := newSubscription(stream, s.rpc, spec)
+	if err != nil {
+		return err
+	}
+	s.subscriptions[sub.info.ID] = sub
+	return s.storeSubscription(spec)
+}
+
+func (s *subscriptionMGR) resetSubscription(sub *subscription, initialBlock string) error {
+	// Re-set the inital block on the subscription and save it
+	if initialBlock == "" || initialBlock == FromBlockNewest {
+		sub.info.FromBlock = FromBlockNewest
+	} else {
+		_, err := strconv.ParseUint(initialBlock, 10, 64)
+		if err != nil {
+			return errors.Errorf(errors.EventStreamsSubscribeBadBlock)
+		}
+
+		sub.info.FromBlock = initialBlock
+	}
+	if err := s.storeSubscription(sub.info); err != nil {
+		return err
+	}
+	// Request a reset on the next poling cycle
+	sub.requestReset()
+	return nil
+}
+
+func (s *subscriptionMGR) deleteSubscription(sub *subscription) error {
+	delete(s.subscriptions, sub.info.ID)
+	sub.unsubscribe(true)
+	if err := s.db.Delete(sub.info.ID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *subscriptionMGR) storeSubscription(info *eventsapi.SubscriptionInfo) error {
+	infoBytes, _ := json.MarshalIndent(info, "", "  ")
+	if err := s.db.Put(info.ID, infoBytes); err != nil {
+		return errors.Errorf(errors.EventStreamsSubscribeStoreFailed, err)
+	}
+	return nil
 }
 
 func (s *subscriptionMGR) subscriptionsForStream(id string) []*subscription {
@@ -346,48 +446,6 @@ func (s *subscriptionMGR) subscriptionsForStream(id string) []*subscription {
 	return subIDs
 }
 
-// SuspendStream suspends a stream from firing
-func (s *subscriptionMGR) SuspendStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
-	streamID := params.ByName("streamId")
-	stream, err := s.streamByID(streamID)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 404)
-	}
-	stream.suspend()
-	// Persist the state change
-	_, err = s.storeStream(stream.spec)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
-	}
-
-	result := map[string]string{}
-	result["id"] = streamID
-	result["suspended"] = "true"
-	return &result, nil
-}
-
-// ResumeStream restarts a suspended stream
-func (s *subscriptionMGR) ResumeStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
-	streamID := params.ByName("streamId")
-	stream, err := s.streamByID(streamID)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 404)
-	}
-	if err = stream.resume(); err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
-	}
-	// Persist the state change
-	_, err = s.storeStream(stream.spec)
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
-	}
-
-	result := map[string]string{}
-	result["id"] = streamID
-	result["resumed"] = "true"
-	return &result, nil
-}
-
 // subscriptionByID used internally to lookup full objects
 func (s *subscriptionMGR) subscriptionByID(id string) (*subscription, error) {
 	sub, exists := s.subscriptions[id]
@@ -395,15 +453,6 @@ func (s *subscriptionMGR) subscriptionByID(id string) (*subscription, error) {
 		return nil, errors.Errorf(errors.EventStreamsSubscriptionNotFound, id)
 	}
 	return sub, nil
-}
-
-// streamByID used internally to lookup full objects
-func (s *subscriptionMGR) streamByID(id string) (*eventStream, error) {
-	stream, exists := s.streams[id]
-	if !exists {
-		return nil, errors.Errorf(errors.EventStreamsStreamNotFound, id)
-	}
-	return stream, nil
 }
 
 func (s *subscriptionMGR) loadCheckpoint(streamID string) (map[string]uint64, error) {
@@ -485,11 +534,14 @@ func (s *subscriptionMGR) recoverSubscriptions() {
 				log.Errorf("Failed to recover subscription '%s': %s", string(iSub.Value()), err)
 				continue
 			}
-			sub, err := restoreSubscription(s, s.rpc, &subInfo)
-			if err != nil {
-				log.Errorf("Failed to recover subscription '%s': %s", subInfo.ID, err)
+			stream, err := s.streamByID(subInfo.Stream)
+			if err == nil {
+				sub, err := restoreSubscription(stream, s.rpc, &subInfo)
+				if err == nil {
+					s.subscriptions[subInfo.ID] = sub
+				}
 			} else {
-				s.subscriptions[subInfo.ID] = sub
+				log.Errorf("Failed to recover subscription '%s': %s", subInfo.ID, err)
 			}
 		}
 	}
