@@ -131,32 +131,34 @@ func (w *rpcWrapper) Get(res http.ResponseWriter, req *http.Request, params http
 	if err != nil {
 		return nil, restutil.NewRestError(err.Error(), 500)
 	}
-
-	// the SDK identity manager does not persist the certificates
-	// we have to retrieve it from the identity manager
-	si, _ := w.identityMgr.GetSigningIdentity(username)
-	var ecert []byte
-	var mspId string
-	if si != nil {
-		// the user may have been enrolled by a different client instance
-		ecert = si.EnrollmentCertificate()
-		mspId = si.Identifier().MSPID
-	}
-
-	// the SDK doesn't save the CACert locally, we have to retrieve it from the Fabric CA server
-	cacert, err := w.getCACert()
-	if err != nil {
-		return nil, restutil.NewRestError(err.Error())
-	}
-
 	newId := identity.Identity{}
 	newId.Name = result.ID
 	newId.MaxEnrollments = result.MaxEnrollments
 	newId.CAName = result.CAName
 	newId.Type = result.Type
 	newId.Affiliation = result.Affiliation
-	newId.MSPID = mspId
-	newId.EnrollmentCert = ecert
+
+	// the SDK identity manager does not persist the certificates
+	// we have to retrieve it from the identity manager
+	si, err := w.identityMgr.GetSigningIdentity(username)
+	if err != nil && err != msp.ErrUserNotFound {
+		return nil, restutil.NewRestError(err.Error(), 500)
+	}
+	if err == nil {
+		// the user may have been enrolled by a different client instance
+		ecert := si.EnrollmentCertificate()
+		mspId := si.Identifier().MSPID
+		newId.MSPID = mspId
+		newId.EnrollmentCert = ecert
+	}
+	newId.Organization = w.identityConfig.Client().Organization
+
+	// the SDK doesn't save the CACert locally, we have to retrieve it from the Fabric CA server
+	cacert, err := w.getCACert()
+	if err != nil {
+		return nil, restutil.NewRestError(err.Error(), 500)
+	}
+
 	newId.CACert = cacert
 	return &newId, nil
 }
