@@ -87,7 +87,13 @@ type EventstreamConf struct {
 }
 
 type RPCConf struct {
-	ConfigPath string `mapstructure:"configPath"`
+	// whether to use the Gateway client in the SDK or
+	// relying on the static network described by CCP only
+	UseGatewayClient bool `mapstructure:"useGatewayClient"`
+	// whether to use the Gateway server with a lightweight SDK
+	// only applicable to Fabric node 2.4 or later
+	UseGatewayServer bool   `mapstructure:"useGatewayServer"`
+	ConfigPath       string `mapstructure:"configPath"`
 }
 
 type HTTPConf struct {

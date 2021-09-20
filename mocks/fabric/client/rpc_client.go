@@ -4,11 +4,9 @@ package mockfabric
 
 import (
 	api "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
-	channel "github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
+	client "github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
 
 	fab "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
-
-	fabric "github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -33,15 +31,15 @@ func (_m *RPCClient) Close() error {
 }
 
 // Init provides a mock function with given fields: channelId, signer, chaincodeName, method, args
-func (_m *RPCClient) Init(channelId string, signer string, chaincodeName string, method string, args []string) (*fabric.TxReceipt, error) {
+func (_m *RPCClient) Init(channelId string, signer string, chaincodeName string, method string, args []string) (*client.TxReceipt, error) {
 	ret := _m.Called(channelId, signer, chaincodeName, method, args)
 
-	var r0 *fabric.TxReceipt
-	if rf, ok := ret.Get(0).(func(string, string, string, string, []string) *fabric.TxReceipt); ok {
+	var r0 *client.TxReceipt
+	if rf, ok := ret.Get(0).(func(string, string, string, string, []string) *client.TxReceipt); ok {
 		r0 = rf(channelId, signer, chaincodeName, method, args)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*fabric.TxReceipt)
+			r0 = ret.Get(0).(*client.TxReceipt)
 		}
 	}
 
@@ -56,15 +54,15 @@ func (_m *RPCClient) Init(channelId string, signer string, chaincodeName string,
 }
 
 // Invoke provides a mock function with given fields: channelId, signer, chaincodeName, method, args
-func (_m *RPCClient) Invoke(channelId string, signer string, chaincodeName string, method string, args []string) (*fabric.TxReceipt, error) {
+func (_m *RPCClient) Invoke(channelId string, signer string, chaincodeName string, method string, args []string) (*client.TxReceipt, error) {
 	ret := _m.Called(channelId, signer, chaincodeName, method, args)
 
-	var r0 *fabric.TxReceipt
-	if rf, ok := ret.Get(0).(func(string, string, string, string, []string) *fabric.TxReceipt); ok {
+	var r0 *client.TxReceipt
+	if rf, ok := ret.Get(0).(func(string, string, string, string, []string) *client.TxReceipt); ok {
 		r0 = rf(channelId, signer, chaincodeName, method, args)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*fabric.TxReceipt)
+			r0 = ret.Get(0).(*client.TxReceipt)
 		}
 	}
 
@@ -79,15 +77,15 @@ func (_m *RPCClient) Invoke(channelId string, signer string, chaincodeName strin
 }
 
 // Query provides a mock function with given fields: channelId, signer, chaincodeName, method, args
-func (_m *RPCClient) Query(channelId string, signer string, chaincodeName string, method string, args []string) (*channel.Response, error) {
+func (_m *RPCClient) Query(channelId string, signer string, chaincodeName string, method string, args []string) ([]byte, error) {
 	ret := _m.Called(channelId, signer, chaincodeName, method, args)
 
-	var r0 *channel.Response
-	if rf, ok := ret.Get(0).(func(string, string, string, string, []string) *channel.Response); ok {
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(string, string, string, string, []string) []byte); ok {
 		r0 = rf(channelId, signer, chaincodeName, method, args)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*channel.Response)
+			r0 = ret.Get(0).([]byte)
 		}
 	}
 
@@ -125,15 +123,15 @@ func (_m *RPCClient) QueryChainInfo(channelId string, signer string) (*fab.Block
 }
 
 // SubscribeEvent provides a mock function with given fields: subInfo, since
-func (_m *RPCClient) SubscribeEvent(subInfo *api.SubscriptionInfo, since uint64) (*fabric.RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
+func (_m *RPCClient) SubscribeEvent(subInfo *api.SubscriptionInfo, since uint64) (*client.RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
 	ret := _m.Called(subInfo, since)
 
-	var r0 *fabric.RegistrationWrapper
-	if rf, ok := ret.Get(0).(func(*api.SubscriptionInfo, uint64) *fabric.RegistrationWrapper); ok {
+	var r0 *client.RegistrationWrapper
+	if rf, ok := ret.Get(0).(func(*api.SubscriptionInfo, uint64) *client.RegistrationWrapper); ok {
 		r0 = rf(subInfo, since)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*fabric.RegistrationWrapper)
+			r0 = ret.Get(0).(*client.RegistrationWrapper)
 		}
 	}
 
@@ -166,6 +164,6 @@ func (_m *RPCClient) SubscribeEvent(subInfo *api.SubscriptionInfo, since uint64)
 }
 
 // Unregister provides a mock function with given fields: _a0
-func (_m *RPCClient) Unregister(_a0 *fabric.RegistrationWrapper) {
+func (_m *RPCClient) Unregister(_a0 *client.RegistrationWrapper) {
 	_m.Called(_a0)
 }

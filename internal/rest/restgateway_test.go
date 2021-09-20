@@ -197,13 +197,13 @@ func TestStartInvalidMongo(t *testing.T) {
 	assert.EqualError(err, "Unable to connect to MongoDB: no reachable servers")
 }
 
-func TestStartWithBadRPCConfigPath(t *testing.T) {
+func TestStartWithMissingUserStorePath(t *testing.T) {
 	assert := assert.New(t)
 
 	testConfig.HTTP.Port = lastPort
 	testConfig.HTTP.LocalAddr = "127.0.0.1"
-	testConfig.RPC.ConfigPath = "/bad/path"
+	testConfig.RPC.ConfigPath = ""
 	g := NewRESTGateway(testConfig)
 	err := g.Init()
-	assert.EqualError(err, "Failed to initialize a new SDK instance. failed to initialize configuration: unable to load config backend: loading config file failed: /bad/path: Unsupported Config Type \"\"")
+	assert.EqualError(err, "User credentials store creation failed. Path: User credentials store path is empty")
 }

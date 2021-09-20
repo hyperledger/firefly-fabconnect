@@ -29,7 +29,7 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/events"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
 	restasync "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/async"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/receipt"
 	restsync "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/sync"
@@ -54,7 +54,7 @@ type RESTGateway struct {
 	asyncDispatcher restasync.AsyncDispatcher
 	sm              events.SubscriptionManager
 	ws              ws.WebSocketServer
-	rpc             fabric.RPCClient
+	rpc             client.RPCClient
 	router          *router
 	srv             *http.Server
 	sendCond        *sync.Cond
@@ -84,7 +84,7 @@ func NewRESTGateway(config *conf.RESTGatewayConf) *RESTGateway {
 }
 
 func (g *RESTGateway) Init() error {
-	rpcClient, identityClient, err := fabric.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime)
+	rpcClient, identityClient, err := client.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime)
 	if err != nil {
 		return err
 	}

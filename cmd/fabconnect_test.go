@@ -86,7 +86,7 @@ func TestStartServerError(t *testing.T) {
 	}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
-	assert.Regexp(regexp.MustCompile(`Failed to initialize a new SDK instance`), err)
+	assert.Regexp(regexp.MustCompile(`User credentials store creation failed. Path: User credentials store path is empty`), err)
 }
 
 func TestMaxWaitTimeTooSmallWarns(t *testing.T) {

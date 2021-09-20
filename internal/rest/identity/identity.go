@@ -32,7 +32,7 @@ type Identity struct {
 	Organization   string `json:"organization,omitempty"`
 	MSPID          string `json:"mspId,omitempty"`
 	EnrollmentCert []byte `json:"enrollmentCert,omitempty"`
-	CACert         []byte `json:"caCert"`
+	CACert         []byte `json:"caCert,omitempty"`
 }
 
 type RegisterResponse struct {

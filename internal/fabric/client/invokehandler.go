@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package fabric
+package client
 
 import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
