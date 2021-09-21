@@ -41,7 +41,8 @@ var testConfigJSON = `{
     }
   },
   "http": {
-    "port": 3000
+    "port": 3000,
+    "localAddr": "192.168.0.100"
   },
   "rpc": {
     "configPath": "/test-config-path"

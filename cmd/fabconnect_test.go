@@ -98,11 +98,19 @@ func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
 	args := []string{
 		"-f", path.Join(tmpdir, "config.json"),
 		"-t", "1",
+		"--events-polling-int", "100",
 	}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	assert.NoError(err)
 	assert.Equal(10, restGatewayConf.MaxTXWaitTime)
+
+	// test that the environment variable FC_HTTP_PORT overrides the port setting in the config file
+	assert.Equal(8002, restGatewayConf.HTTP.Port)
+	// test that settings in the config file that are not overriden
+	assert.Equal("192.168.0.100", restGatewayConf.HTTP.LocalAddr)
+	// test that the environment variable FC_EVENTS_POLLINGINTERVAL gets overriden by inline parameters
+	assert.Equal(uint64(100), restGatewayConf.Events.PollingIntervalSec)
 }
 
 func TestEnvVarOverride(t *testing.T) {
