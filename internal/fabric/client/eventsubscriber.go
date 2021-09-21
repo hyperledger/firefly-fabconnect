@@ -21,6 +21,7 @@ import (
 	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/deliverclient/seek"
@@ -29,18 +30,23 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// defined to allow mocking in tests
+type eventClientCreator func(channelProvider context.ChannelProvider, opts ...event.ClientOption) (*event.Client, error)
+
 type eventClientWrapper struct {
 	// event client per channel per signer
-	eventClients map[string]map[string]*event.Client
-	sdk          *fabsdk.FabricSDK
-	idClient     IdentityClient
+	eventClients       map[string]map[string]*event.Client
+	sdk                *fabsdk.FabricSDK
+	idClient           IdentityClient
+	eventClientCreator eventClientCreator
 }
 
 func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *eventClientWrapper {
 	return &eventClientWrapper{
-		sdk:          sdk,
-		idClient:     idClient,
-		eventClients: make(map[string]map[string]*event.Client),
+		sdk:                sdk,
+		idClient:           idClient,
+		eventClients:       make(map[string]map[string]*event.Client),
+		eventClientCreator: createEventClient,
 	}
 }
 
@@ -100,11 +106,15 @@ func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint
 			eventOpts = append(eventOpts, event.WithSeekType(seek.FromBlock), event.WithBlockNum(since))
 		}
 		channelProvider := e.sdk.ChannelContext(channelId, fabsdk.WithOrg(e.idClient.GetClientOrg()), fabsdk.WithUser(signer))
-		eventClient, err = event.New(channelProvider, eventOpts...)
+		eventClient, err = e.eventClientCreator(channelProvider, eventOpts...)
 		if err != nil {
 			return nil, err
 		}
 		eventClientsForSigner[channelId] = eventClient
 	}
 	return eventClient, nil
+}
+
+func createEventClient(channelProvider context.ChannelProvider, eventOpts ...event.ClientOption) (*event.Client, error) {
+	return event.New(channelProvider, eventOpts...)
 }

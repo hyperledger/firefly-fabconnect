@@ -40,6 +40,9 @@ type ccpClientWrapper struct {
 	signer          *msp.IdentityIdentifier
 }
 
+// defined to allow mocking in tests
+type channelCreator func(context.ChannelProvider) (*channel.Client, error)
+
 type ccpRPCWrapper struct {
 	txTimeout           int
 	sdk                 *fabsdk.FabricSDK
@@ -48,6 +51,7 @@ type ccpRPCWrapper struct {
 	idClient            IdentityClient
 	ledgerClientWrapper *ledgerClientWrapper
 	eventClientWrapper  *eventClientWrapper
+	channelCreator      channelCreator
 	// one channel client per channel ID, per signer ID
 	channelClients map[string](map[string]*ccpClientWrapper)
 }
@@ -73,6 +77,7 @@ func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, user
 		ledgerClientWrapper: ledgerClientWrapper,
 		eventClientWrapper:  eventClientWrapper,
 		channelClients:      make(map[string]map[string]*ccpClientWrapper),
+		channelCreator:      createChannelClient,
 		txTimeout:           txTimeout,
 	}
 	return w, nil
@@ -163,7 +168,7 @@ func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpC
 	clientOfUser := w.channelClients[channelId][id.Identifier().ID]
 	if clientOfUser == nil {
 		channelProvider := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(w.idClient.GetClientOrg()), fabsdk.WithUser(id.Identifier().ID))
-		cClient, err := channel.New(channelProvider)
+		cClient, err := w.channelCreator(channelProvider)
 		if err != nil {
 			return nil, err
 		}
@@ -181,6 +186,10 @@ func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpC
 func (w *ccpRPCWrapper) Close() error {
 	w.sdk.Close()
 	return nil
+}
+
+func createChannelClient(channelProvider context.ChannelProvider) (*channel.Client, error) {
+	return channel.New(channelProvider)
 }
 
 func (w *ccpRPCWrapper) sendTransaction(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*msp.IdentityIdentifier, []byte, *fab.TxStatusEvent, error) {

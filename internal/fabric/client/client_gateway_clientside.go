@@ -28,12 +28,19 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// defined to allow mocking in tests
+type gatewayCreator func(core.ConfigProvider, string, int) (*gateway.Gateway, error)
+type networkCreator func(*gateway.Gateway, string) (*gateway.Network, error)
+
 type gwRPCWrapper struct {
 	txTimeout           int
 	configProvider      core.ConfigProvider
 	idClient            IdentityClient
 	ledgerClientWrapper *ledgerClientWrapper
 	eventClientWrapper  *eventClientWrapper
+	gatewayCreator      gatewayCreator
+	networkCreator      networkCreator
+	// networkCreator networkC
 	// one gateway client per signer
 	gwClients map[string]*gateway.Gateway
 	// one gateway network per signer per channel
@@ -47,6 +54,8 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 		idClient:            idClient,
 		ledgerClientWrapper: ledgerClientWrapper,
 		eventClientWrapper:  eventClientWrapper,
+		gatewayCreator:      createGateway,
+		networkCreator:      getNetwork,
 		gwClients:           make(map[string]*gateway.Gateway),
 		gwChannelClients:    make(map[string]map[string]*gateway.Network),
 	}, nil
@@ -162,7 +171,7 @@ func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient
 	if channelClientsForSigner == nil {
 		// no channel clients have been created for this signer at all
 		// we will not have created a gateway client for this user either
-		gatewayClient, err := gateway.Connect(gateway.WithConfig(w.configProvider), gateway.WithUser(signer), gateway.WithTimeout(time.Duration(w.txTimeout)*time.Second))
+		gatewayClient, err := w.gatewayCreator(w.configProvider, signer, w.txTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -174,11 +183,19 @@ func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient
 	channelClient = channelClientsForSigner[channelId]
 	if channelClient == nil {
 		client := w.gwClients[signer]
-		channelClient, err = client.GetNetwork(channelId)
+		channelClient, err = w.networkCreator(client, channelId)
 		if err != nil {
 			return nil, err
 		}
 		channelClientsForSigner[channelId] = channelClient
 	}
 	return channelClient, nil
+}
+
+func createGateway(configProvider core.ConfigProvider, signer string, txTimeout int) (*gateway.Gateway, error) {
+	return gateway.Connect(gateway.WithConfig(configProvider), gateway.WithUser(signer), gateway.WithTimeout(time.Duration(txTimeout)*time.Second))
+}
+
+func getNetwork(gateway *gateway.Gateway, channelId string) (*gateway.Network, error) {
+	return gateway.GetNetwork(channelId)
 }

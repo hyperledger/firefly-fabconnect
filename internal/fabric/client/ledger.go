@@ -19,23 +19,29 @@ package client
 import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 )
 
+// defined to allow mocking in tests
+type ledgerClientCreator func(channelProvider context.ChannelProvider, opts ...ledger.ClientOption) (*ledger.Client, error)
+
 type ledgerClientWrapper struct {
 	// ledger client per channel per signer
-	ledgerClients map[string]map[string]*ledger.Client
-	sdk           *fabsdk.FabricSDK
-	idClient      IdentityClient
+	ledgerClients       map[string]map[string]*ledger.Client
+	sdk                 *fabsdk.FabricSDK
+	idClient            IdentityClient
+	ledgerClientCreator ledgerClientCreator
 }
 
 func newLedgerClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *ledgerClientWrapper {
 	return &ledgerClientWrapper{
-		sdk:           sdk,
-		idClient:      idClient,
-		ledgerClients: make(map[string]map[string]*ledger.Client),
+		sdk:                 sdk,
+		idClient:            idClient,
+		ledgerClients:       make(map[string]map[string]*ledger.Client),
+		ledgerClientCreator: createLedgerClient,
 	}
 }
 
@@ -60,11 +66,15 @@ func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerC
 	ledgerClient = ledgerClientsForSigner[channelId]
 	if ledgerClient == nil {
 		channelProvider := l.sdk.ChannelContext(channelId, fabsdk.WithOrg(l.idClient.GetClientOrg()), fabsdk.WithUser(signer))
-		ledgerClient, err = ledger.New(channelProvider)
+		ledgerClient, err = l.ledgerClientCreator(channelProvider)
 		if err != nil {
 			return nil, err
 		}
 		ledgerClientsForSigner[channelId] = ledgerClient
 	}
 	return ledgerClient, nil
+}
+
+func createLedgerClient(channelProvider context.ChannelProvider, opts ...ledger.ClientOption) (*ledger.Client, error) {
+	return ledger.New(channelProvider, opts...)
 }

@@ -1,0 +1,65 @@
+certificateAuthorities:
+  org1CA:
+    tlsCACerts:
+      path: {{ROOT_DIR}}/org1/ca.pem
+    url: https://ca.org1.com
+    registrar:
+      enrollId: admin
+      enrollSecret: pwd
+channels:
+  default-channel:
+    orderers:
+    - orderer1.org1.com
+    peers:
+      peer1.org1.com:
+        chaincodeQuery: true
+        endorsingPeer: true
+        eventSource: true
+        ledgerQuery: true
+client:
+  BCCSP:
+    security:
+      default:
+        provider: SW
+      enabled: true
+      hashAlgorithm: SHA2
+      level: 256
+      softVerify: true
+  credentialStore:
+    cryptoStore:
+      path: {{ROOT_DIR}}/org1/msp
+    path: {{ROOT_DIR}}/org1/msp
+  cryptoconfig:
+    path: {{ROOT_DIR}}/org1/msp
+  logging:
+    level: info
+  organization: org1
+  tlsCerts:
+    client:
+      cert:
+        path: {{ROOT_DIR}}/org1/msp/user1@org1MSP-cert.pem
+      key:
+        path: {{ROOT_DIR}}/org1/msp/keystore/e0f84a4e1c4b692b0175a73127a2e5ef8661b09be964b32544e87ebf7c1e4f9b_sk
+orderers:
+  orderer1.org1.com:
+    tlsCACerts:
+      path: {{ROOT_DIR}}/nodeMSPs/org1/orderer1-ca.pem
+    url: orderer1.org1.com:443
+organizations:
+  org1:
+    certificateAuthorities:
+    - org1CA
+    mspid: org1MSP
+    cryptoPath: {{ROOT_DIR}}/org1/msp
+    peers:
+    - peer1.org1.com
+  org2:
+    mspid: org2MSP
+    cryptoPath: /tmp/msp
+peers:
+  peer1.org1.com:
+    tlsCACerts:
+      path: {{ROOT_DIR}}/nodeMSPs/org1/peer1-ca.pem
+    url: peer1.org1.com:443
+version: 1.1.0
+
