@@ -70,6 +70,13 @@ Every configuration parameter can be specified in one of the following ways:
   - given "prop1.prop2"
   - the command line parameter should be `--prop1-prop2` or a shorthand variation
 
+### Support for both Static and Dynamic Network Topology
+There is support for using a full connection profile that describes the entire network, without relying on the peer's discovery service to discover the list of peers to send transaction proposals to. A sample connection profile can be seen in the folder [test/fixture/ccp.yml](/test/fixture/ccp.yml). This mode will be running if both `rpc.useGatewayClient` and `rpc.useGatewayServer` are missing or set to `false`.
+
+There is also support for using the dynamic gateway client by relying on the peer's discovery service with a minimal connection profile. A sample connection profile can be seen in the folder [test/fixture/ccp-short.yml](/test/fixture/ccp-short.yml). This mode will be running if `rpc.useGatewayClient` is set to `true`.
+
+Support for server-based gateway support, available in Fabric 2.4, is coming soon.
+
 ### Fixes Needed for multiple subscriptions under the same event stream
 The current `fabric-sdk-go` uses an internal cache for event services, which builds keys only using the channel ID. This means if there are multiple subscriptions targeting the same channel, but specify different `fromBlock` parameters, only the first instance will be effective. All subsequent subscriptions will share the same event service, rendering their own `fromBlock` configuration ineffective.
 
