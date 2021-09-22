@@ -68,11 +68,7 @@ func (tx *Tx) Send(ctx context.Context, rpc client.RPCClient) error {
 
 	var receipt *client.TxReceipt
 	var err error
-	if tx.IsInit {
-		receipt, err = rpc.Init(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args)
-	} else {
-		receipt, err = rpc.Invoke(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args)
-	}
+	receipt, err = rpc.Invoke(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args, tx.IsInit)
 	tx.lock.Lock()
 	tx.Receipt = receipt
 	tx.lock.Unlock()

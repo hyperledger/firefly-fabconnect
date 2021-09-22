@@ -22,6 +22,7 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/identity"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
+	log "github.com/sirupsen/logrus"
 )
 
 //
@@ -53,11 +54,13 @@ func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClie
 		if err != nil {
 			return nil, nil, err
 		}
+		log.Info("Using static connection profile mode of the RPC client")
 	} else if c.UseGatewayClient {
 		rpcClient, err = newRPCClientWithClientSideGateway(configProvider, txTimeout, identityClient, ledgerClient, eventClient)
 		if err != nil {
 			return nil, nil, err
 		}
+		log.Info("Using client-side gateway mode of the RPC client")
 	}
 	return rpcClient, identityClient, nil
 }

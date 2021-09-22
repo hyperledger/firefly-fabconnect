@@ -83,27 +83,16 @@ func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, user
 	return w, nil
 }
 
-func (w *ccpRPCWrapper) Init(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error) {
-	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
+func (w *ccpRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error) {
+	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelId, chaincodeName, method, isInit, args)
 
-	signerID, result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, true)
+	signerID, result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, isInit)
 	if err != nil {
+		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelId, chaincodeName, method, isInit, err)
 		return nil, err
 	}
 
-	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
-	return newReceipt(result, txStatus, signerID), err
-}
-
-func (w *ccpRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error) {
-	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
-
-	signerID, result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, false)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
+	log.Tracef("RPC [%s:%s:%s:isInit=%t] <-- %+v", channelId, chaincodeName, method, isInit, result)
 	return newReceipt(result, txStatus, signerID), err
 }
 
@@ -112,6 +101,7 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 
 	client, err := w.getChannelClient(channelId, signer)
 	if err != nil {
+		log.Errorf("Failed to get channel client. %s", err)
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
 
@@ -124,6 +114,7 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 		channel.WithRetry(retry.DefaultChannelOpts),
 	)
 	if err != nil {
+		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
 		return nil, err
 	}
 
@@ -136,6 +127,7 @@ func (w *ccpRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.Blockchai
 
 	result, err := w.ledgerClientWrapper.queryChainInfo(channelId, signer)
 	if err != nil {
+		log.Errorf("Failed to query chain info on channel %s. %s", channelId, err)
 		return nil, err
 	}
 
@@ -145,7 +137,12 @@ func (w *ccpRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.Blockchai
 
 // The returned registration must be closed when done
 func (w *ccpRPCWrapper) SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
-	return w.eventClientWrapper.subscribeEvent(subInfo, since)
+	reg, blockEventCh, ccEventCh, err := w.eventClientWrapper.subscribeEvent(subInfo, since)
+	if err != nil {
+		log.Errorf("Failed to subscribe to event [%s:%s:%s]. %s", subInfo.Stream, subInfo.ChannelId, subInfo.Filter.ChaincodeId, err)
+		return nil, nil, nil, err
+	}
+	return reg, blockEventCh, ccEventCh, nil
 }
 
 func (w *ccpRPCWrapper) Unregister(regWrapper *RegistrationWrapper) {

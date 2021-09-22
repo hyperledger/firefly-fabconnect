@@ -51,8 +51,7 @@ type RegistrationWrapper struct {
 }
 
 type RPCClient interface {
-	Init(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error)
-	Invoke(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error)
+	Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error)
 	Query(channelId, signer, chaincodeName, method string, args []string) ([]byte, error)
 	QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error)
 	SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error)

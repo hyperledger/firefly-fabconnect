@@ -59,9 +59,9 @@ func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo,
 	if subInfo.Filter.ChaincodeId != "" {
 		reg, notifier, err := eventClient.RegisterChaincodeEvent(subInfo.Filter.ChaincodeId, subInfo.Filter.EventFilter)
 		if err != nil {
-			return nil, nil, nil, errors.Errorf("Failed to subscribe to chaincode events. %s", err)
+			return nil, nil, nil, errors.Errorf("Failed to subscribe to chaincode %s events. %s", subInfo.Filter.ChaincodeId, err)
 		}
-		log.Infof("Subscribed to events in channel %s from block %d (0 means newest)", subInfo.ChannelId, since)
+		log.Infof("Subscribed to events in channel %s chaincode %s from block %d (0 means newest)", subInfo.ChannelId, subInfo.Filter.ChaincodeId, since)
 		regWrapper := &RegistrationWrapper{
 			registration: reg,
 			eventClient:  eventClient,

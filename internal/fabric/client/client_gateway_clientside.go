@@ -61,27 +61,12 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 	}, nil
 }
 
-func (w *gwRPCWrapper) Init(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error) {
-	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
-
-	result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, true)
-	if err != nil {
-		return nil, err
-	}
-	signingId, err := w.idClient.GetSigningIdentity(signer)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
-	return newReceipt(result, txStatus, signingId.Identifier()), nil
-}
-
-func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string) (*TxReceipt, error) {
-	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
+func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error) {
+	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelId, chaincodeName, method, isInit, args)
 
 	result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, false)
 	if err != nil {
+		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelId, chaincodeName, method, isInit, err)
 		return nil, err
 	}
 	signingId, err := w.idClient.GetSigningIdentity(signer)
@@ -89,7 +74,7 @@ func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, a
 		return nil, err
 	}
 
-	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
+	log.Tracef("RPC [%s:%s:%s:isInit=%t] <-- %+v", channelId, chaincodeName, method, isInit, result)
 	return newReceipt(result, txStatus, signingId.Identifier()), err
 }
 
@@ -104,6 +89,7 @@ func (w *gwRPCWrapper) Query(channelId, signer, chaincodeName, method string, ar
 	contractClient := client.GetContract(chaincodeName)
 	result, err := contractClient.EvaluateTransaction(method, args...)
 	if err != nil {
+		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
 		return nil, err
 	}
 
@@ -116,6 +102,7 @@ func (w *gwRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.Blockchain
 
 	result, err := w.ledgerClientWrapper.queryChainInfo(channelId, signer)
 	if err != nil {
+		log.Errorf("Failed to query chain info on channel %s. %s", channelId, err)
 		return nil, err
 	}
 
@@ -125,7 +112,12 @@ func (w *gwRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.Blockchain
 
 // The returned registration must be closed when done
 func (w *gwRPCWrapper) SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
-	return w.eventClientWrapper.subscribeEvent(subInfo, since)
+	reg, blockEventCh, ccEventCh, err := w.eventClientWrapper.subscribeEvent(subInfo, since)
+	if err != nil {
+		log.Errorf("Failed to subscribe to event [%s:%s:%s]. %s", subInfo.Stream, subInfo.ChannelId, subInfo.Filter.ChaincodeId, err)
+		return nil, nil, nil, err
+	}
+	return reg, blockEventCh, ccEventCh, nil
 }
 
 func (w *gwRPCWrapper) Unregister(regWrapper *RegistrationWrapper) {
