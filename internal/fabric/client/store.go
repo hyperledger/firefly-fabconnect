@@ -17,11 +17,11 @@
 package client
 
 import (
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/keyvaluestore"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 )
 
 func newUserstore(configProvider core.ConfigProvider) (msp.UserStore, error) {

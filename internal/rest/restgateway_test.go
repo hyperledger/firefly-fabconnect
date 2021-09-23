@@ -28,11 +28,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth/authtest"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/test"
+	"github.com/hyperledger/firefly-fabconnect/internal/auth"
+	"github.com/hyperledger/firefly-fabconnect/internal/auth/authtest"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/rest/test"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
 )

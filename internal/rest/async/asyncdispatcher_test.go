@@ -20,10 +20,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
-	mockreceipt "github.com/hyperledger-labs/firefly-fabconnect/mocks/rest/receipt"
-	mocktx "github.com/hyperledger-labs/firefly-fabconnect/mocks/tx"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger/firefly-fabconnect/internal/messages"
+	mockreceipt "github.com/hyperledger/firefly-fabconnect/mocks/rest/receipt"
+	mocktx "github.com/hyperledger/firefly-fabconnect/mocks/tx"
 	"github.com/stretchr/testify/assert"
 )
 

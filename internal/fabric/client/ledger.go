@@ -17,12 +17,12 @@
 package client
 
 import (
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 )
 
 // defined to allow mocking in tests

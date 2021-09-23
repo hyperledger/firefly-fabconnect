@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
-	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/kvstore"
-	mockkvstore "github.com/hyperledger-labs/firefly-fabconnect/mocks/kvstore"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
+	mockkvstore "github.com/hyperledger/firefly-fabconnect/mocks/kvstore"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
 )

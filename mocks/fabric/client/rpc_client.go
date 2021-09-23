@@ -3,8 +3,8 @@
 package mockfabric
 
 import (
-	api "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
-	client "github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
+	api "github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	client "github.com/hyperledger/firefly-fabconnect/internal/fabric/client"
 
 	fab "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 

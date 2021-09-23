@@ -25,13 +25,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
 )

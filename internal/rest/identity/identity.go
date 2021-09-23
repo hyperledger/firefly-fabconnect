@@ -19,7 +19,7 @@ package identity
 import (
 	"net/http"
 
-	restutil "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/utils"
+	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
 	"github.com/julienschmidt/httprouter"
 )
 

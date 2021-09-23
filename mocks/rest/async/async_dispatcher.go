@@ -8,7 +8,7 @@ import (
 
 	httprouter "github.com/julienschmidt/httprouter"
 
-	messages "github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
+	messages "github.com/hyperledger/firefly-fabconnect/internal/messages"
 
 	mock "github.com/stretchr/testify/mock"
 )

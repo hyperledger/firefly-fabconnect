@@ -25,8 +25,8 @@ import (
 	ws "github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/utils"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/utils"
 )
 
 type webSocketConnection struct {

@@ -21,11 +21,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/client"
+	"github.com/hyperledger/firefly-fabconnect/internal/messages"
 	log "github.com/sirupsen/logrus"
 )
 

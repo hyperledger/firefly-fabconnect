@@ -25,10 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/ws"
+	"github.com/hyperledger/firefly-fabconnect/internal/auth"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/ws"
 
 	log "github.com/sirupsen/logrus"
 )

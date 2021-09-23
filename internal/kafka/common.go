@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/utils"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/utils"
 	log "github.com/sirupsen/logrus"
 )
 

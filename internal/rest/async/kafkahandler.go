@@ -23,12 +23,12 @@ import (
 	"sync"
 
 	"github.com/Shopify/sarama"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/kafka"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/receipt"
+	"github.com/hyperledger/firefly-fabconnect/internal/auth"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/kafka"
+	"github.com/hyperledger/firefly-fabconnect/internal/messages"
+	"github.com/hyperledger/firefly-fabconnect/internal/rest/receipt"
 	log "github.com/sirupsen/logrus"
 )
 

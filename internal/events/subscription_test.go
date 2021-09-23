@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	"github.com/stretchr/testify/assert"
 )
 

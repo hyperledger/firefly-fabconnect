@@ -23,12 +23,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/utils"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/ws"
+	"github.com/hyperledger/firefly-fabconnect/internal/auth"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/messages"
+	"github.com/hyperledger/firefly-fabconnect/internal/utils"
+	"github.com/hyperledger/firefly-fabconnect/internal/ws"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 )

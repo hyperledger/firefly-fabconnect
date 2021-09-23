@@ -17,7 +17,7 @@ package events
 import (
 	"sync"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	log "github.com/sirupsen/logrus"
 )
 

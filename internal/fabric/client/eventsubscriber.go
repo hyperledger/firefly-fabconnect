@@ -17,8 +17,6 @@
 package client
 
 import (
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
@@ -27,6 +25,8 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/deliverclient/seek"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fab/events/service/blockfilter/headertypefilter"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	log "github.com/sirupsen/logrus"
 )
 

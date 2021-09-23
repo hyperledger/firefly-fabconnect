@@ -17,7 +17,7 @@
 package kvstore
 
 import (
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
