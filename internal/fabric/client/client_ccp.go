@@ -17,8 +17,6 @@
 package client
 
 import (
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel/invoke"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/errors/retry"
@@ -29,6 +27,8 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	log "github.com/sirupsen/logrus"
 )
 

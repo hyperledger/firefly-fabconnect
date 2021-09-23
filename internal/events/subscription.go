@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/client"
 	log "github.com/sirupsen/logrus"
 )
 

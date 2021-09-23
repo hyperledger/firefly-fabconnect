@@ -20,11 +20,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	log "github.com/sirupsen/logrus"
 )
 

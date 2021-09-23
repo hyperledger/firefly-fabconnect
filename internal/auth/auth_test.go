@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/auth/authtest"
+	"github.com/hyperledger/firefly-fabconnect/internal/auth/authtest"
 	"github.com/stretchr/testify/assert"
 )
 

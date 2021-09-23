@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	uuid "github.com/nu7hatch/gouuid"
 	"gopkg.in/yaml.v2"
 )

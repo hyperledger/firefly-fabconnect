@@ -17,11 +17,11 @@
 package client
 
 import (
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	pb "github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel/invoke"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/errors/status"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 )
 
 // adapted from the CommitHandler in https://github.com/hyperledger/fabric-sdk-go

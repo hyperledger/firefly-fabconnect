@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/cmd"
+	"github.com/hyperledger/firefly-fabconnect/cmd"
 )
 
 var buildDate, buildVersion string // Set by ldflags

@@ -26,8 +26,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
 
 	log "github.com/sirupsen/logrus"
 )

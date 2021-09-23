@@ -17,11 +17,11 @@
 package client
 
 import (
-	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	pb "github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
+	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 )
 
 type ChaincodeSpec struct {

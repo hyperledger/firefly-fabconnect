@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/utils"
+	"github.com/hyperledger/firefly-fabconnect/internal/messages"
+	"github.com/hyperledger/firefly-fabconnect/internal/utils"
 	"github.com/julienschmidt/httprouter"
 )
 

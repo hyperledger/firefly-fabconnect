@@ -3,7 +3,7 @@
 package mockkvstore
 
 import (
-	kvstore "github.com/hyperledger-labs/firefly-fabconnect/internal/kvstore"
+	kvstore "github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	mock "github.com/stretchr/testify/mock"
 )
 

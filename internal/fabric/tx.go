@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/client"
+	"github.com/hyperledger/firefly-fabconnect/internal/messages"
 
 	log "github.com/sirupsen/logrus"
 )

@@ -24,7 +24,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
+	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 )
 
 var testConfigJSON = `{
