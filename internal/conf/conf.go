@@ -87,7 +87,13 @@ type EventstreamConf struct {
 }
 
 type RPCConf struct {
-	ConfigPath string `mapstructure:"configPath"`
+	// whether to use the Gateway client in the SDK or
+	// relying on the static network described by CCP only
+	UseGatewayClient bool `mapstructure:"useGatewayClient"`
+	// whether to use the Gateway server with a lightweight SDK
+	// only applicable to Fabric node 2.4 or later
+	UseGatewayServer bool   `mapstructure:"useGatewayServer"`
+	ConfigPath       string `mapstructure:"configPath"`
 }
 
 type HTTPConf struct {
@@ -133,8 +139,8 @@ func CobraInit(cmd *cobra.Command, conf *RESTGatewayConf) {
 	_ = viper.BindPFlag("events.leveldb.path", cmd.Flags().Lookup("events-db"))
 	cmd.Flags().Uint64VarP(&conf.Events.PollingIntervalSec, "events-polling-int", "", 10, "Event polling interval (ms)")
 	_ = viper.BindPFlag("events.pollingInterval", cmd.Flags().Lookup("events-polling-int"))
-	cmd.Flags().BoolVarP(&conf.Events.WebhooksAllowPrivateIPs, "events-privips", "", false, "Allow private IPs in Webhooks")
-	_ = viper.BindPFlag("events.webhooksAllowPrivateIPs", cmd.Flags().Lookup("events-privips"))
+	cmd.Flags().BoolVarP(&conf.Events.WebhooksAllowPrivateIPs, "events-priv-ips", "", false, "Allow private IPs in Webhooks")
+	_ = viper.BindPFlag("events.webhooksAllowPrivateIPs", cmd.Flags().Lookup("events-priv-ips"))
 
 	defBrokerList := strings.Split(os.Getenv("KAFKA_BROKERS"), ",")
 	if len(defBrokerList) == 1 && defBrokerList[0] == "" {
@@ -169,4 +175,8 @@ func CobraInit(cmd *cobra.Command, conf *RESTGatewayConf) {
 
 	cmd.Flags().StringVarP(&conf.RPC.ConfigPath, "rpc-config", "r", "", "Path to the common connection profile YAML for the target Fabric node")
 	_ = viper.BindPFlag("rpc.configPath", cmd.Flags().Lookup("rpc-config"))
+	cmd.Flags().BoolVarP(&conf.RPC.UseGatewayClient, "gateway-client", "", false, "Whether to use the client-side gateway support when sending transactions")
+	_ = viper.BindPFlag("rpc.useGatewayClient", cmd.Flags().Lookup("gateway-client"))
+	cmd.Flags().BoolVarP(&conf.RPC.UseGatewayServer, "gateway-server", "", false, "Whether to use the server-side gateway support when sending transactions (Fabric 2.4 or later only)")
+	_ = viper.BindPFlag("rpc.useGatewayServer", cmd.Flags().Lookup("gateway-server"))
 }

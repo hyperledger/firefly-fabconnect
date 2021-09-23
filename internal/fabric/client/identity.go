@@ -14,15 +14,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package fabric
+package client
 
 import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/rest/identity"
 	restutil "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/utils"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
+	fabcontext "github.com/hyperledger/fabric-sdk-go/pkg/context"
+	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite"
+	"github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite/bccsp/sw"
+	fabImpl "github.com/hyperledger/fabric-sdk-go/pkg/fab"
+	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
 	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
@@ -37,8 +44,72 @@ func (p *identityManagerProvider) IdentityManager(orgName string) (msp.IdentityM
 	return p.identityManager, true
 }
 
+type idClientWrapper struct {
+	identityConfig msp.IdentityConfig
+	identityMgr    msp.IdentityManager
+	caClient       mspApi.CAClient
+}
+
+func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore) (*idClientWrapper, error) {
+	configBackend, _ := configProvider()
+	cryptoConfig := cryptosuite.ConfigFromBackend(configBackend...)
+	cs, err := sw.GetSuiteByConfig(cryptoConfig)
+	if err != nil {
+		return nil, errors.Errorf("Failed to get suite by config: %s", err)
+	}
+	endpointConfig, err := fabImpl.ConfigFromBackend(configBackend...)
+	if err != nil {
+		return nil, errors.Errorf("Failed to read config: %s", err)
+	}
+	identityConfig, err := mspImpl.ConfigFromBackend(configBackend...)
+	if err != nil {
+		return nil, errors.Errorf("Failed to load identity configurations: %s", err)
+	}
+	clientConfig := identityConfig.Client()
+	if clientConfig.CredentialStore.Path == "" {
+		return nil, errors.Errorf("User credentials store path is empty")
+	}
+	mgr, err := mspImpl.NewIdentityManager(clientConfig.Organization, userStore, cs, endpointConfig)
+	if err != nil {
+		return nil, errors.Errorf("Identity manager creation failed. %s", err)
+	}
+
+	identityManagerProvider := &identityManagerProvider{
+		identityManager: mgr,
+	}
+	ctxProvider := fabcontext.NewProvider(
+		fabcontext.WithIdentityManagerProvider(identityManagerProvider),
+		fabcontext.WithUserStore(userStore),
+		fabcontext.WithCryptoSuite(cs),
+		fabcontext.WithCryptoSuiteConfig(cryptoConfig),
+		fabcontext.WithEndpointConfig(endpointConfig),
+		fabcontext.WithIdentityConfig(identityConfig),
+	)
+	ctx := &fabcontext.Client{
+		Providers: ctxProvider,
+	}
+	caClient, err := mspImpl.NewCAClient(clientConfig.Organization, ctx)
+	if err != nil {
+		return nil, errors.Errorf("CA Client creation failed. %s", err)
+	}
+	idc := &idClientWrapper{
+		identityConfig: identityConfig,
+		identityMgr:    mgr,
+		caClient:       caClient,
+	}
+	return idc, nil
+}
+
+func (w *idClientWrapper) GetSigningIdentity(name string) (msp.SigningIdentity, error) {
+	return w.identityMgr.GetSigningIdentity(name)
+}
+
+func (w *idClientWrapper) GetClientOrg() string {
+	return w.identityConfig.Client().Organization
+}
+
 // the rpcWrapper is also an implementation of the interface internal/rest/idenity/IdentityClient
-func (w *rpcWrapper) Register(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RegisterResponse, *restutil.RestError) {
+func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RegisterResponse, *restutil.RestError) {
 	regreq := identity.Identity{}
 	decoder := json.NewDecoder(req.Body)
 	decoder.DisallowUnknownFields()
@@ -74,7 +145,7 @@ func (w *rpcWrapper) Register(res http.ResponseWriter, req *http.Request, params
 	return &result, nil
 }
 
-func (w *rpcWrapper) Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.IdentityResponse, *restutil.RestError) {
+func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.IdentityResponse, *restutil.RestError) {
 	username := params.ByName("username")
 	enreq := identity.EnrollRequest{}
 	decoder := json.NewDecoder(req.Body)
@@ -107,7 +178,7 @@ func (w *rpcWrapper) Enroll(res http.ResponseWriter, req *http.Request, params h
 	return &result, nil
 }
 
-func (w *rpcWrapper) List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*identity.Identity, *restutil.RestError) {
+func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*identity.Identity, *restutil.RestError) {
 	result, err := w.caClient.GetAllIdentities(params.ByName("caname"))
 	if err != nil {
 		return nil, restutil.NewRestError(err.Error(), 500)
@@ -125,7 +196,7 @@ func (w *rpcWrapper) List(res http.ResponseWriter, req *http.Request, params htt
 	return ret, nil
 }
 
-func (w *rpcWrapper) Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Identity, *restutil.RestError) {
+func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Identity, *restutil.RestError) {
 	username := params.ByName("username")
 	result, err := w.caClient.GetIdentity(username, params.ByName("caname"))
 	if err != nil {
@@ -163,7 +234,7 @@ func (w *rpcWrapper) Get(res http.ResponseWriter, req *http.Request, params http
 	return &newId, nil
 }
 
-func (w *rpcWrapper) getCACert() ([]byte, error) {
+func (w *idClientWrapper) getCACert() ([]byte, error) {
 	result, err := w.caClient.GetCAInfo()
 	if err != nil {
 		log.Errorf("Failed to retrieve Fabric CA information: %s", err)

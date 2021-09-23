@@ -45,12 +45,37 @@ To launch, first prepare the 2 configurations files:
     "port": 3000
   },
   "rpc": {
+    "useGatewayClient": true,
     "configPath": "/Users/me/Documents/ff-test/ccp.yml"
   }
 }
 ```
 
 - the standard Fabric common connection profile (CCP) file that describes the target Fabric network, at the location specified in the main config file above under `rpc.configPath`. For details on the CCP file, see [Fabric SDK documentation](https://hyperledger.github.io/fabric-sdk-node/release-1.4/tutorial-network-config.html). Note that the CCP file must contain the `client` section, which is required for the fabconnect to act as a client to Fabric networks.
+
+Use the following command to launch the connector:
+```
+./fabconnect -f "/Users/me/Documents/ff-test/config.json"
+```
+
+### Hierarchical Configurations
+Every configuration parameter can be specified in one of the following ways:
+- configuration file that is specified with the `-f` command line parameter. this is overriden by...
+- environment variables that follows the naming convention:
+  - given a configuration property in the configuration JSON "prop1.prop2"
+  - capitalized, exchanging `.` with `_`, then add the `FC_` prefix
+  - becoming: `FC_PROP1_PROP2`
+  - this is overriden by...
+- command line parameter with a naming convention that follows the same dot-notaion of the property:
+  - given "prop1.prop2"
+  - the command line parameter should be `--prop1-prop2` or a shorthand variation
+
+### Support for both Static and Dynamic Network Topology
+There is support for using a full connection profile that describes the entire network, without relying on the peer's discovery service to discover the list of peers to send transaction proposals to. A sample connection profile can be seen in the folder [test/fixture/ccp.yml](/test/fixture/ccp.yml). This mode will be running if both `rpc.useGatewayClient` and `rpc.useGatewayServer` are missing or set to `false`.
+
+There is also support for using the dynamic gateway client by relying on the peer's discovery service with a minimal connection profile. A sample connection profile can be seen in the folder [test/fixture/ccp-short.yml](/test/fixture/ccp-short.yml). This mode will be running if `rpc.useGatewayClient` is set to `true`.
+
+Support for server-based gateway support, available in Fabric 2.4, is coming soon.
 
 ### Fixes Needed for multiple subscriptions under the same event stream
 The current `fabric-sdk-go` uses an internal cache for event services, which builds keys only using the channel ID. This means if there are multiple subscriptions targeting the same channel, but specify different `fromBlock` parameters, only the first instance will be effective. All subsequent subscriptions will share the same event service, rendering their own `fromBlock` configuration ineffective.

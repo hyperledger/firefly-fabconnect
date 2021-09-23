@@ -3,7 +3,7 @@
 package mocktx
 
 import (
-	fabric "github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
+	client "github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
 	mock "github.com/stretchr/testify/mock"
 
 	tx "github.com/hyperledger-labs/firefly-fabconnect/internal/tx"
@@ -15,7 +15,7 @@ type TxProcessor struct {
 }
 
 // Init provides a mock function with given fields: _a0
-func (_m *TxProcessor) Init(_a0 fabric.RPCClient) {
+func (_m *TxProcessor) Init(_a0 client.RPCClient) {
 	_m.Called(_a0)
 }
 

@@ -27,7 +27,7 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
-	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/kvstore"
 	restutil "github.com/hyperledger-labs/firefly-fabconnect/internal/rest/utils"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/utils"
@@ -81,7 +81,7 @@ type subscriptionManager interface {
 type subscriptionMGR struct {
 	config        *conf.EventstreamConf
 	db            kvstore.KVStore
-	rpc           fabric.RPCClient
+	rpc           client.RPCClient
 	subscriptions map[string]*subscription
 	streams       map[string]*eventStream
 	closed        bool
@@ -89,7 +89,7 @@ type subscriptionMGR struct {
 }
 
 // NewSubscriptionManager constructor
-func NewSubscriptionManager(config *conf.EventstreamConf, rpc fabric.RPCClient, wsChannels ws.WebSocketChannels) SubscriptionManager {
+func NewSubscriptionManager(config *conf.EventstreamConf, rpc client.RPCClient, wsChannels ws.WebSocketChannels) SubscriptionManager {
 	sm := &subscriptionMGR{
 		config:        config,
 		rpc:           rpc,

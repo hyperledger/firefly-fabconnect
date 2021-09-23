@@ -1,0 +1,27 @@
+{
+  "maxInFlight": 10,
+  "maxTXWaitTime": 60,
+  "sendConcurrency": 25,
+  "receipts": {
+    "maxDocs": 1000,
+    "queryLimit": 100,
+    "retryInitialDelay": 5,
+    "retryTimeout": 30,
+    "leveldb": {
+      "path": "receipts"
+    }
+  },
+  "events": {
+    "webhooksAllowPrivateIPs": true,
+    "leveldb": {
+      "path": "events"
+    }
+  },
+  "http": {
+    "port": 3000
+  },
+  "rpc": {
+    "useGatewayClient": true,
+    "configPath": "ccp-short.yml"
+  }
+}

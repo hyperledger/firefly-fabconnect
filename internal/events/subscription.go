@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	log "github.com/sirupsen/logrus"
 )
@@ -31,9 +32,9 @@ import (
 // subscription is the runtime that manages the subscription
 type subscription struct {
 	info               *eventsapi.SubscriptionInfo
-	client             fabric.RPCClient
+	client             client.RPCClient
 	ep                 *evtProcessor
-	registration       *fabric.RegistrationWrapper
+	registration       *client.RegistrationWrapper
 	blockEventNotifier <-chan *fab.BlockEvent
 	ccEventNotifier    <-chan *fab.CCEvent
 	filterStale        bool
@@ -41,7 +42,7 @@ type subscription struct {
 	resetRequested     bool
 }
 
-func newSubscription(stream *eventStream, rpc fabric.RPCClient, i *eventsapi.SubscriptionInfo) (*subscription, error) {
+func newSubscription(stream *eventStream, rpc client.RPCClient, i *eventsapi.SubscriptionInfo) (*subscription, error) {
 	s := &subscription{
 		info:        i,
 		client:      rpc,
@@ -58,7 +59,7 @@ func newSubscription(stream *eventStream, rpc fabric.RPCClient, i *eventsapi.Sub
 	return s, nil
 }
 
-func restoreSubscription(stream *eventStream, rpc fabric.RPCClient, i *eventsapi.SubscriptionInfo) (*subscription, error) {
+func restoreSubscription(stream *eventStream, rpc client.RPCClient, i *eventsapi.SubscriptionInfo) (*subscription, error) {
 	if i.GetID() == "" {
 		return nil, errors.Errorf(errors.EventStreamsNoID)
 	}

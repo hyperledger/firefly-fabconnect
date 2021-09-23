@@ -86,7 +86,7 @@ func TestStartServerError(t *testing.T) {
 	}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
-	assert.Regexp(regexp.MustCompile(`Failed to initialize a new SDK instance`), err)
+	assert.Regexp(regexp.MustCompile(`User credentials store creation failed. Path: User credentials store path is empty`), err)
 }
 
 func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
@@ -103,6 +103,11 @@ func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
 	err := rootCmd.Execute()
 	assert.NoError(err)
 	assert.Equal(10, restGatewayConf.MaxTXWaitTime)
+
+	// test that the environment variable FC_HTTP_PORT overrides the port setting in the config file
+	assert.Equal(8002, restGatewayConf.HTTP.Port)
+	// test that settings in the config file that are not overriden
+	assert.Equal("192.168.0.100", restGatewayConf.HTTP.LocalAddr)
 }
 
 func TestEnvVarOverride(t *testing.T) {

@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric"
+	"github.com/hyperledger-labs/firefly-fabconnect/internal/fabric/client"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/messages"
 	log "github.com/sirupsen/logrus"
 )
@@ -36,7 +37,7 @@ const (
 // for tracking all in-flight messages
 type TxProcessor interface {
 	OnMessage(TxContext)
-	Init(fabric.RPCClient)
+	Init(client.RPCClient)
 }
 
 var highestID = 1000000
@@ -48,7 +49,7 @@ type inflightTx struct {
 	txContext        TxContext
 	tx               *fabric.Tx
 	wg               sync.WaitGroup
-	rpc              fabric.RPCClient
+	rpc              client.RPCClient
 }
 
 func (i *inflightTx) String() string {
@@ -64,7 +65,7 @@ type txProcessor struct {
 	inflightTxsLock   *sync.Mutex
 	inflightTxs       []*inflightTx
 	inflightTxDelayer TxDelayTracker
-	rpc               fabric.RPCClient
+	rpc               client.RPCClient
 	config            *conf.RESTGatewayConf
 	concurrencySlots  chan bool
 }
@@ -84,7 +85,7 @@ func NewTxProcessor(conf *conf.RESTGatewayConf) TxProcessor {
 	return p
 }
 
-func (p *txProcessor) Init(rpc fabric.RPCClient) {
+func (p *txProcessor) Init(rpc client.RPCClient) {
 	p.rpc = rpc
 	p.maxTXWaitTime = time.Duration(p.config.MaxTXWaitTime) * time.Second
 }

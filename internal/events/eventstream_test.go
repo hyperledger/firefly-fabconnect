@@ -30,7 +30,7 @@ import (
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/errors"
 	eventsapi "github.com/hyperledger-labs/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger-labs/firefly-fabconnect/internal/kvstore"
-	mockfabric "github.com/hyperledger-labs/firefly-fabconnect/mocks/fabric"
+	mockfabric "github.com/hyperledger-labs/firefly-fabconnect/mocks/fabric/client"
 	mockkvstore "github.com/hyperledger-labs/firefly-fabconnect/mocks/kvstore"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/peer"
