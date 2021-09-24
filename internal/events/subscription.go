@@ -124,7 +124,7 @@ func (s *subscription) processNewEvents() {
 			}
 			events := fabric.GetEvents(blockEvent.Block)
 			for _, event := range events {
-				if err := s.ep.processEventEntry(s.info.ID, event); err != nil {
+				if err := s.ep.processEventEntry(s.info, event); err != nil {
 					log.Errorf("Failed to process event: %s", err)
 				}
 			}
@@ -140,7 +140,7 @@ func (s *subscription) processNewEvents() {
 				EventName:     ccEvent.EventName,
 				Payload:       ccEvent.Payload,
 			}
-			if err := s.ep.processEventEntry(s.info.ID, event); err != nil {
+			if err := s.ep.processEventEntry(s.info, event); err != nil {
 				log.Errorf("Failed to process event: %s", err)
 			}
 		}
