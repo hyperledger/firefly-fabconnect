@@ -52,6 +52,7 @@ type CommonHeaders struct {
 	Signer        string                 `json:"signer,omitempty"`
 	ChannelID     string                 `json:"channel,omitempty"`
 	ChaincodeName string                 `json:"chaincode,omitempty"`
+	PayloadSchema interface{}            `json:"payloadSchema,omitempty"` // can be stringified JSON or map for JSON
 	Context       map[string]interface{} `json:"ctx,omitempty"`
 }
 

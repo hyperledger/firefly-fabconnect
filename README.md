@@ -77,6 +77,171 @@ There is also support for using the dynamic gateway client by relying on the pee
 
 Support for server-based gateway support, available in Fabric 2.4, is coming soon.
 
+### Structured Data Support for Transaction Input with Schema Validation
+When calling the `POST /transactions` endpoint, input data can be provided in any of the following formats:
+- in the "traditional" array of strings corresponding to the target function's list of input parameters:
+```json
+POST http://localhost:3000/transactions?fly-sync=true&fly-signer=user001&fly-channel=default-channel&fly-chaincode=asset_transfer
+{
+    "headers": {
+        "type": "SendTransaction"
+    },
+    "func": "CreateAsset",
+    "args": ["asset204", "red", "10", "Tom", "123000"]
+}
+```
+- provide a `payloadSchema` property in the input payload `headers`, using [JSON Schema](https://json-schema.org/) to define the list of parameters. The root type must be an `array`, with `prefixItems` to define the sequence of parameters:
+```json
+POST http://localhost:3000/transactions?fly-sync=true&fly-signer=user001&fly-channel=default-channel&fly-chaincode=asset_transfer
+{
+    "headers": {
+        "type": "SendTransaction",
+        "payloadSchema": {
+            "type": "array",
+            "prefixItems": [{
+                "name": "id", "type": "string"
+            }, {
+                "name": "color", "type": "string"
+            }, {
+                "name": "size", "type": "string"
+            }, {
+                "name": "owner", "type": "string"
+            }, {
+                "name": "value", "type": "string"
+            }]
+        }
+    },
+    "func": "CreateAsset",
+    "args": {
+        "owner": "Tom",
+        "value": "123000",
+        "size": "10",
+        "id": "asset203",
+        "color": "red"
+    }
+}
+```
+- when using `payloadSchema`, complex parameter structures are supported. Suppose the `CreateAsset` function has the following signature:
+```golang
+type Asset struct {
+	ID             string `json:"ID"`
+	Color          string `json:"color"`
+	Size           int    `json:"size"`
+	Owner          string `json:"owner"`
+	Appraisal *Appraisal `json:"appraisal"`
+}
+
+type Appraisal struct {
+	AppraisedValue int  `json:"appraisedValue"`
+	Inspected      bool `json:"inspected"`
+}
+
+// CreateAsset issues a new asset to the world state with given details.
+func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface, id string, color string, size int, owner string, appraisal Appraisal) error {
+  // implementation...
+}
+```
+Note that the `appraisal` parameter is a complex type, the transaction input data can be specified as follows:
+```json
+POST http://localhost:3000/transactions?fly-sync=true&fly-signer=user001&fly-channel=default-channel&fly-chaincode=asset_transfer
+{
+    "headers": {
+        "type": "SendTransaction",
+        "payloadSchema": {
+            "type": "array",
+            "prefixItems": [{
+                "name": "id", "type": "string"
+            }, {
+                "name": "color", "type": "string"
+            }, {
+                "name": "size", "type": "string"
+            }, {
+                "name": "owner", "type": "string"
+            }, {
+                "name": "appraisal", "type": "object",
+                "properties": {
+                    "appraisedValue": {
+                        "type": "integer"
+                    },
+                    "inspected": {
+                        "type": "boolean"
+                    }
+                }
+            }]
+        }
+    },
+    "func": "CreateAsset",
+    "args": {
+        "owner": "Tom",
+        "appraisal": {
+            "appraisedValue": 123000,
+            "inspected": true
+        },
+        "size": "10",
+        "id": "asset205",
+        "color": "red"
+    }
+}
+```
+
+### JSON Data Support in Events
+If a chaincode publishes events with string or JSON data, fabconnect can be instructed to decode them from the byte array before sending the event to the listening client application. The decoding instructions can be provided during subscription.
+
+For example, the following chaincode publishes an event containing a JSON structure in the payload:
+```golang
+	asset := Asset{
+		ID:             id,
+		Color:          color,
+		Size:           size,
+		Owner:          owner,
+		Appraisal: &Appraisal{
+			AppraisedValue: appraisal.AppraisedValue,
+			Inspected: appraisal.inspected,
+		},
+	}
+	assetJSON, _ := json.Marshal(asset)
+	ctx.GetStub().SetEvent("AssetCreated", assetJSON)
+```
+An event subscription can be created as follows which contains instructions to decode the payload bytes:
+```json
+{
+    "stream": "es-31e85b01-6440-4cc3-63e9-2aafc0d06466",
+    "channel": "default-channel",
+    "name": "sub-1",
+    "signer": "user001",
+    "fromBlock": "100",
+    "filter": {
+        "chaincodeId": "assettransfercomplex"
+    },
+    "payloadType": "stringifiedJSON"
+}
+```
+
+Notice the `payloadType` property, which instructs fabconnect to decode the payload bytes into a JSON structure. As a result the client will receive the event JSON as follows:
+```json
+[
+  {
+    "chaincodeId": "assettransfercomplex",
+    "blockNumber": 151,
+    "transactionId": "8692254ea13e9f5cb021b613e722ce4610daa5c4529e1a9161497308b0278ca0",
+    "eventName": "AssetCreated",
+    "payload": {
+      "ID": "asset204",
+      "appraisal": {
+        "appraisedValue": 123000,
+        "inspected": true
+      },
+      "color": "red",
+      "owner": "Tom",
+      "size": 10
+    },
+    "subId": "sb-6859f687-61dd-44e8-6e8b-ddcf3b95b840"
+  }
+]
+```
+
+Besides `stringifiedJSON`, `string` is also supported as the payload type which represents UTF-8 encoded strings.
+
 ### Fixes Needed for multiple subscriptions under the same event stream
 The current `fabric-sdk-go` uses an internal cache for event services, which builds keys only using the channel ID. This means if there are multiple subscriptions targeting the same channel, but specify different `fromBlock` parameters, only the first instance will be effective. All subsequent subscriptions will share the same event service, rendering their own `fromBlock` configuration ineffective.
 
