@@ -103,7 +103,7 @@ POST http://localhost:3000/transactions?fly-sync=true&fly-signer=user001&fly-cha
             }, {
                 "name": "color", "type": "string"
             }, {
-                "name": "size", "type": "string"
+                "name": "size", "type": "integer"
             }, {
                 "name": "owner", "type": "string"
             }, {
@@ -115,7 +115,7 @@ POST http://localhost:3000/transactions?fly-sync=true&fly-signer=user001&fly-cha
     "args": {
         "owner": "Tom",
         "value": "123000",
-        "size": "10",
+        "size": 10,
         "id": "asset203",
         "color": "red"
     }
@@ -154,7 +154,7 @@ POST http://localhost:3000/transactions?fly-sync=true&fly-signer=user001&fly-cha
             }, {
                 "name": "color", "type": "string"
             }, {
-                "name": "size", "type": "string"
+                "name": "size", "type": "integer"
             }, {
                 "name": "owner", "type": "string"
             }, {
@@ -177,7 +177,7 @@ POST http://localhost:3000/transactions?fly-sync=true&fly-signer=user001&fly-cha
             "appraisedValue": 123000,
             "inspected": true
         },
-        "size": "10",
+        "size": 10,
         "id": "asset205",
         "color": "red"
     }
