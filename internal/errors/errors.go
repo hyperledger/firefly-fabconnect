@@ -225,7 +225,7 @@ type RestErrMsg struct {
 }
 
 func RestErrReply(res http.ResponseWriter, req *http.Request, err error, status int) {
-	log.Errorf("<-- %s %s [%d]: %s", req.Method, req.URL, status, err)
+	log.Errorf("<-- %s %s [%d]: \n%s", req.Method, req.URL, status, err)
 	reply, _ := json.Marshal(&RestErrMsg{Message: err.Error()})
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(status)

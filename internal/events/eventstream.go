@@ -87,11 +87,15 @@ type webSocketActionInfo struct {
 	DistributionMode DistributionMode `json:"distributionMode,omitempty"`
 }
 
+// defined to allow mocking in tests
+type eventHandler func(*eventData)
+
 type eventStream struct {
 	sm                subscriptionManager
 	allowPrivateIPs   bool
 	spec              *StreamInfo
 	eventStream       chan *eventData
+	eventHandler      eventHandler
 	stopped           bool
 	processorDone     bool
 	pollingInterval   time.Duration
@@ -158,6 +162,7 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 		pollingInterval:   time.Duration(sm.getConfig().PollingIntervalSec) * time.Second,
 		wsChannels:        wsChannels,
 	}
+	a.eventHandler = a.handleEvent
 
 	if a.pollingInterval == 0 {
 		// Let's us do this from UTs, without exposing it

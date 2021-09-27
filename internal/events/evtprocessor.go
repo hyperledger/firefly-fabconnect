@@ -15,6 +15,7 @@
 package events
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
@@ -63,15 +64,31 @@ func (ep *evtProcessor) initBlockHWM(intVal uint64) {
 	ep.hwmSync.Unlock()
 }
 
-func (ep *evtProcessor) processEventEntry(subID string, entry *api.EventEntry) (err error) {
-	entry.SubID = subID
+func (ep *evtProcessor) processEventEntry(subInfo *api.SubscriptionInfo, entry *api.EventEntry) (err error) {
+	entry.SubID = subInfo.ID
+	payloadType := subInfo.PayloadType
+	if payloadType == "" {
+		payloadType = api.EventPayloadType_Bytes
+	}
+	switch payloadType {
+	case api.EventPayloadType_String:
+		entry.Payload = string(entry.Payload.([]byte))
+	case api.EventPayloadType_StringifiedJSON:
+		structuredMap := make(map[string]interface{})
+		err := json.Unmarshal(entry.Payload.([]byte), &structuredMap)
+		if err != nil {
+			log.Errorf("Failed to unmarshal event payload for [sub:%s,name:%s,block=%d]", entry.SubID, entry.EventName, entry.BlockNumber)
+		} else {
+			entry.Payload = structuredMap
+		}
+	}
 	result := eventData{
 		event:         entry,
 		batchComplete: ep.batchComplete,
 	}
 
 	// Ok, now we have the full event in a friendly map output. Pass it down to the stream
-	log.Infof("%s: Dispatching event. BlockNumber=%d TxId=%s", subID, result.event.BlockNumber, result.event.TransactionId)
-	ep.stream.handleEvent(&result)
+	log.Infof("%s: Dispatching event. BlockNumber=%d TxId=%s", subInfo.ID, result.event.BlockNumber, result.event.TransactionId)
+	ep.stream.eventHandler(&result)
 	return nil
 }

@@ -36,6 +36,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
 	github.com/urfave/cli v1.22.2 // indirect
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
+	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.5 // indirect
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489 // indirect
 	golang.org/x/sys v0.0.0-20210823070655-63515b42dcdf // indirect

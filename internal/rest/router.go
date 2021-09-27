@@ -124,6 +124,7 @@ func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, par
 	msg, opts, err := restutil.BuildTxMessage(res, req, params)
 	if err != nil {
 		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
 	}
 	if opts.Sync {
 		r.syncDispatcher.DispatchMsgSync(req.Context(), res, req, msg)
