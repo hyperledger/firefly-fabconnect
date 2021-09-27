@@ -52,7 +52,7 @@ type SubscriptionInfo struct {
 	Signer      string          `json:"signer"`
 	FromBlock   string          `json:"fromBlock,omitempty"`
 	Filter      persistedFilter `json:"filter"`
-	PayloadType string          `json:"payloadType,omitempty"` // optinal. data type of the payload bytes; "bytes", "string" or "stringifiedJSON". Default to "bytes"
+	PayloadType string          `json:"payloadType,omitempty"` // optional. data type of the payload bytes; "bytes", "string" or "stringifiedJSON". Default to "bytes"
 }
 
 // GetID returns the ID (for sorting)
