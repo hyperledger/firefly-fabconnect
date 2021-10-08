@@ -121,7 +121,6 @@ func (s *webSocketServer) Close() {
 
 func (s *webSocketServer) getTopic(topic string) *webSocketTopic {
 	s.mux.Lock()
-	defer s.mux.Unlock()
 	t, exists := s.topics[topic]
 	if !exists {
 		t = &webSocketTopic{
@@ -133,6 +132,9 @@ func (s *webSocketServer) getTopic(topic string) *webSocketTopic {
 		}
 		s.topics[topic] = t
 		s.topicMap[topic] = make(map[string]*webSocketConnection)
+	}
+	s.mux.Unlock()
+	if !exists {
 		// Signal to the broadcaster that a new topic has been added
 		s.newTopic <- true
 	}
@@ -158,10 +160,11 @@ func (s *webSocketServer) SendReply(message interface{}) {
 }
 
 func (s *webSocketServer) processBroadcasts() {
-	s.mux.Lock()
-
 	var topics []string
 	buildCases := func() []reflect.SelectCase {
+		// only hold the lock while we're building the list of cases (not while doing the select)
+		s.mux.Lock()
+		defer s.mux.Unlock()
 		topics = make([]string, len(s.topics))
 		cases := make([]reflect.SelectCase, len(s.topics)+1)
 		i := 0
@@ -175,7 +178,6 @@ func (s *webSocketServer) processBroadcasts() {
 		return cases
 	}
 	cases := buildCases()
-	s.mux.Unlock()
 
 	for {
 		chosen, value, ok := reflect.Select(cases)
@@ -190,21 +192,36 @@ func (s *webSocketServer) processBroadcasts() {
 		} else {
 			// Message on one of the existing topics
 			// Gather all connections interested in this topic and send to them
+			s.mux.Lock()
 			topic := topics[chosen]
+			wsconns := getConnListFromMap(s.topicMap[topic])
 			log.Debugf("Broadcasting %v to connections for topic %s", value.Interface(), topic)
-			s.broadcastToConnections(s.topicMap[topic], value.Interface())
+			s.mux.Unlock()
+			s.broadcastToConnections(wsconns, value.Interface())
 		}
 	}
+}
+
+// getConnListFromMap is a simple helper to snapshot a map into a list, which can be called with a short-lived lock
+func getConnListFromMap(tm map[string]*webSocketConnection) []*webSocketConnection {
+	wsconns := make([]*webSocketConnection, 0, len(tm))
+	for _, c := range tm {
+		wsconns = append(wsconns, c)
+	}
+	return wsconns
 }
 
 func (s *webSocketServer) processReplies() {
 	for {
 		message := <-s.replyChannel
-		s.broadcastToConnections(s.replyMap, message)
+		s.mux.Lock()
+		wsconns := getConnListFromMap(s.replyMap)
+		s.mux.Unlock()
+		s.broadcastToConnections(wsconns, message)
 	}
 }
 
-func (s *webSocketServer) broadcastToConnections(connections map[string]*webSocketConnection, message interface{}) {
+func (s *webSocketServer) broadcastToConnections(connections []*webSocketConnection, message interface{}) {
 	for _, c := range connections {
 		c.broadcast <- message
 	}
