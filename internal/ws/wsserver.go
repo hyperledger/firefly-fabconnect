@@ -158,6 +158,8 @@ func (s *webSocketServer) SendReply(message interface{}) {
 }
 
 func (s *webSocketServer) processBroadcasts() {
+	s.mux.Lock()
+
 	var topics []string
 	buildCases := func() []reflect.SelectCase {
 		topics = make([]string, len(s.topics))
@@ -173,6 +175,8 @@ func (s *webSocketServer) processBroadcasts() {
 		return cases
 	}
 	cases := buildCases()
+	s.mux.Unlock()
+
 	for {
 		chosen, value, ok := reflect.Select(cases)
 		if !ok {
