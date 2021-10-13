@@ -29,7 +29,6 @@ func TestEventPayloadUnmarshaling(t *testing.T) {
 			Name:    "testStream",
 			Webhook: &webhookActionInfo{},
 		}, nil, 200)
-	defer close(eventStream)
 	defer svr.Close()
 	defer stream.stop()
 
@@ -62,4 +61,7 @@ func TestEventPayloadUnmarshaling(t *testing.T) {
 	_, ok = entry.Payload.([]byte)
 	assert.True(ok)
 	assert.Equal([]byte(jsonstring), entry.Payload)
+
+	// explicitly close the channel so that the test server can always close without getting blocked
+	close(eventStream)
 }
