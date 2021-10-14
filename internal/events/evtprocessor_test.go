@@ -29,9 +29,10 @@ func TestEventPayloadUnmarshaling(t *testing.T) {
 			Name:    "testStream",
 			Webhook: &webhookActionInfo{},
 		}, nil, 200)
-	defer close(eventStream)
 	defer svr.Close()
 	defer stream.stop()
+	// close the channel before stopping the server
+	defer close(eventStream)
 
 	p := newEvtProcessor("abc", stream)
 	subInfo := &api.SubscriptionInfo{
