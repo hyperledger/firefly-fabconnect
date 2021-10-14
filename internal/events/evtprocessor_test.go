@@ -31,6 +31,8 @@ func TestEventPayloadUnmarshaling(t *testing.T) {
 		}, nil, 200)
 	defer svr.Close()
 	defer stream.stop()
+	// close the channel before stopping the server
+	defer close(eventStream)
 
 	p := newEvtProcessor("abc", stream)
 	subInfo := &api.SubscriptionInfo{
@@ -61,7 +63,4 @@ func TestEventPayloadUnmarshaling(t *testing.T) {
 	_, ok = entry.Payload.([]byte)
 	assert.True(ok)
 	assert.Equal([]byte(jsonstring), entry.Payload)
-
-	// explicitly close the channel so that the test server can always close without getting blocked
-	close(eventStream)
 }
