@@ -18,6 +18,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
@@ -115,7 +116,7 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&regreq)
 	if err != nil {
-		return nil, restutil.NewRestError("failed to decode JSON payload", 400)
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to decode JSON payload: %s", err), 400)
 	}
 	if regreq.Name == "" {
 		return nil, restutil.NewRestError(`missing required parameter "name"`, 400)
@@ -139,7 +140,7 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 	}
 
 	result := identity.RegisterResponse{
-		Name:   regreq.Name,
+		Name:   rr.Name,
 		Secret: secret,
 	}
 	return &result, nil
@@ -152,7 +153,7 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&enreq)
 	if err != nil {
-		return nil, restutil.NewRestError("failed to decode JSON payload", 400)
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to decode JSON payload: %s", err), 400)
 	}
 	if enreq.Secret == "" {
 		return nil, restutil.NewRestError(`missing required parameter "secret"`, 400)
