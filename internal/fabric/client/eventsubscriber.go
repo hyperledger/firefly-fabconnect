@@ -61,7 +61,7 @@ func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo,
 		if err != nil {
 			return nil, nil, nil, errors.Errorf("Failed to subscribe to chaincode %s events. %s", subInfo.Filter.ChaincodeId, err)
 		}
-		log.Infof("Subscribed to events in channel %s chaincode %s from block %d (0 means newest)", subInfo.ChannelId, subInfo.Filter.ChaincodeId, since)
+		log.Infof("Subscribed to events in channel %s chaincode %s from block %d", subInfo.ChannelId, subInfo.Filter.ChaincodeId, since)
 		regWrapper := &RegistrationWrapper{
 			registration: reg,
 			eventClient:  eventClient,
@@ -82,7 +82,7 @@ func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo,
 		if err != nil {
 			return nil, nil, nil, errors.Errorf("Failed to subscribe to block events. %s", err)
 		}
-		log.Infof("Subscribed to events in channel %s from block %d (0 means newest)", subInfo.ChannelId, since)
+		log.Infof("Subscribed to events in channel %s from block %d", subInfo.ChannelId, since)
 		regWrapper := &RegistrationWrapper{
 			registration: reg,
 			eventClient:  eventClient,
@@ -101,9 +101,8 @@ func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint
 	if eventClient == nil {
 		eventOpts := []event.ClientOption{
 			event.WithBlockEvents(),
-		}
-		if since != 0 {
-			eventOpts = append(eventOpts, event.WithSeekType(seek.FromBlock), event.WithBlockNum(since))
+			event.WithSeekType(seek.FromBlock),
+			event.WithBlockNum(since),
 		}
 		channelProvider := e.sdk.ChannelContext(channelId, fabsdk.WithOrg(e.idClient.GetClientOrg()), fabsdk.WithUser(signer))
 		eventClient, err = e.eventClientCreator(channelProvider, eventOpts...)
