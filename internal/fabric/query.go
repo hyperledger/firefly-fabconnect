@@ -18,7 +18,6 @@ package fabric
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/client"
@@ -27,55 +26,37 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Txn wraps a Fabric transaction, along with the logic to send it over
+// Query wraps a Fabric transaction, along with the logic to send it over
 // JSON/RPC to a node
-type Tx struct {
-	lock          sync.Mutex
+type Query struct {
 	ChannelID     string
 	ChaincodeName string
-	IsInit        bool
 	Function      string
 	Args          []string
-	Hash          string
-	Receipt       *client.TxReceipt
 	Signer        string
 }
 
-func NewSendTx(msg *messages.SendTransaction, signer string) *Tx {
-	return &Tx{
+func NewQuery(msg *messages.QueryChaincode, signer string) *Query {
+	return &Query{
 		ChannelID:     msg.Headers.ChannelID,
 		ChaincodeName: msg.Headers.ChaincodeName,
-		IsInit:        msg.IsInit,
 		Function:      msg.Function,
 		Args:          msg.Args,
 		Signer:        msg.Headers.Signer,
 	}
 }
 
-// GetTXReceipt gets the receipt for the transaction
-func (tx *Tx) GetTXReceipt(ctx context.Context, rpc client.RPCClient) (bool, error) {
-	tx.lock.Lock()
-	isMined := tx.Receipt.BlockNumber > 0
-	tx.lock.Unlock()
-	return isMined, nil
-}
-
-// Send sends an individual transaction
-func (tx *Tx) Send(ctx context.Context, rpc client.RPCClient) error {
+// Send sends an individual query
+func (tx *Query) Send(ctx context.Context, rpc client.RPCClient) ([]byte, error) {
 	start := time.Now().UTC()
 
-	var receipt *client.TxReceipt
 	var err error
-	receipt, err = rpc.Invoke(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args, tx.IsInit)
-	tx.lock.Lock()
-	tx.Receipt = receipt
-	tx.lock.Unlock()
-
+	result, err := rpc.Query(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args)
 	callTime := time.Now().UTC().Sub(start)
 	if err != nil {
-		log.Warnf("TX:%s Failed to send: %s [%.2fs]", tx.Hash, err, callTime.Seconds())
+		log.Warnf("Query [chaincode=%s, func=%s] failed to send: %s [%.2fs]", tx.ChaincodeName, tx.Function, err, callTime.Seconds())
 	} else {
-		log.Infof("TX:%s Sent OK [%.2fs]", tx.Hash, callTime.Seconds())
+		log.Infof("Query [chaincode=%s, func=%s] [%.2fs]", tx.ChaincodeName, tx.Function, callTime.Seconds())
 	}
-	return err
+	return result, err
 }

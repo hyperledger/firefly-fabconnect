@@ -26,14 +26,17 @@ import (
 const (
 	// MsgTypeError - an error
 	MsgTypeError = "Error"
-	// MsgTypeDeployContract - deploy a contract
+
+	// MsgTypeDeployContract - deploy a contract (NOT USED YET)
 	MsgTypeDeployContract = "DeployContract"
 	// MsgTypeSendTransaction - send a transaction
 	MsgTypeSendTransaction = "SendTransaction"
-	// MsgTypeTransactionSuccess - a transaction receipt where status is 1
+	// MsgTypeQueryChaincode - query a chaincode metho
+	MsgTypeQueryChaincode = "QueryChaincode"
+
 	MsgTypeTransactionSuccess = "TransactionSuccess"
-	// MsgTypeTransactionFailure - a transaction receipt where status is 0
 	MsgTypeTransactionFailure = "TransactionFailure"
+	MsgTypeQuerySuccess       = "QuerySuccess"
 	// RecordHeaderAccessToken - record header name for passing JWT token over messaging
 	RecordHeaderAccessToken = "fly-accesstoken"
 )
@@ -90,6 +93,13 @@ func (r *ReplyCommon) ReplyHeaders() *ReplyHeaders {
 	return &r.Headers
 }
 
+// QueryChaincode message instructs the bridge to install a contract
+type QueryChaincode struct {
+	RequestCommon
+	Function string   `json:"func"`
+	Args     []string `json:"args,omitempty"`
+}
+
 // SendTransaction message instructs the bridge to install a contract
 type SendTransaction struct {
 	RequestCommon
@@ -103,6 +113,11 @@ type DeployChaincode struct {
 	RequestCommon
 	Version     string `json:"version,omitempty"`
 	Description string `json:"description,omitempty"`
+}
+
+type QueryResult struct {
+	ReplyCommon
+	Result interface{} `json:"result"`
 }
 
 // TransactionReceipt is sent when a transaction has been successfully mined
