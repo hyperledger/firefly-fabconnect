@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package fabric
+package utils
 
 import (
 	"github.com/golang/protobuf/proto" //nolint
@@ -57,7 +57,7 @@ func toFilteredBlock(block *common.Block) *peer.FilteredBlock {
 	txFilter := []byte(block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER])
 
 	for i, data := range block.Data.Data {
-		filteredTx, chID, err := getFilteredTx(data, peer.TxValidationCode(txFilter[i]))
+		filteredTx, chID, err := GetFilteredTxFromBlockData(data, peer.TxValidationCode(txFilter[i]))
 		if err != nil {
 			log.Warnf("error extracting Envelope from block: %s", err)
 			continue
@@ -73,7 +73,7 @@ func toFilteredBlock(block *common.Block) *peer.FilteredBlock {
 	}
 }
 
-func getFilteredTx(data []byte, txValidationCode peer.TxValidationCode) (*peer.FilteredTransaction, string, error) {
+func GetFilteredTxFromBlockData(data []byte, txValidationCode peer.TxValidationCode) (*peer.FilteredTransaction, string, error) {
 	env, err := GetEnvelopeFromBlock(data)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "error extracting Envelope from block")
@@ -81,7 +81,10 @@ func getFilteredTx(data []byte, txValidationCode peer.TxValidationCode) (*peer.F
 	if env == nil {
 		return nil, "", errors.New("nil envelope")
 	}
+	return GetFilteredTxFromEnvelope(env, txValidationCode)
+}
 
+func GetFilteredTxFromEnvelope(env *common.Envelope, txValidationCode peer.TxValidationCode) (*peer.FilteredTransaction, string, error) {
 	payload, err := UnmarshalPayload(env.Payload)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "error extracting Payload from envelope")

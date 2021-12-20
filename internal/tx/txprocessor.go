@@ -113,6 +113,12 @@ func (p *txProcessor) OnMessage(txContext TxContext) {
 			break
 		}
 		p.OnQueryChaincodeMessage(txContext, &queryChaincodeMsg)
+	case messages.MsgTypeGetTxById:
+		var getTxByIdMsg messages.GetTxById
+		if unmarshalErr = txContext.Unmarshal(&getTxByIdMsg); unmarshalErr != nil {
+			break
+		}
+		p.OnGetTxByIdMessage(txContext, &getTxByIdMsg)
 	default:
 		unmarshalErr = errors.Errorf(errors.TransactionSendMsgTypeUnknown, headers.MsgType)
 	}
@@ -298,6 +304,21 @@ func (p *txProcessor) OnQueryChaincodeMessage(txContext TxContext, msg *messages
 	} else {
 		reply.Result = structuredArray
 	}
+
+	txContext.Reply(&reply)
+}
+
+func (p *txProcessor) OnGetTxByIdMessage(txContext TxContext, msg *messages.GetTxById) {
+
+	query := fabric.NewLedgerQuery(msg, txContext.Headers().Signer)
+	result, err := query.Send(txContext.Context(), p.rpc)
+	if err != nil {
+		txContext.SendErrorReply(500, err)
+		return
+	}
+	var reply messages.LedgerQueryResult
+	reply.Headers.MsgType = messages.MsgTypeQuerySuccess
+	reply.Result = result
 
 	txContext.Reply(&reply)
 }

@@ -31,8 +31,10 @@ const (
 	MsgTypeDeployContract = "DeployContract"
 	// MsgTypeSendTransaction - send a transaction
 	MsgTypeSendTransaction = "SendTransaction"
-	// MsgTypeQueryChaincode - query a chaincode metho
+	// MsgTypeQueryChaincode - query a chaincode method
 	MsgTypeQueryChaincode = "QueryChaincode"
+	// MsgTypeTxById - get transaction by Id
+	MsgTypeGetTxById = "GetTxById"
 
 	MsgTypeTransactionSuccess = "TransactionSuccess"
 	MsgTypeTransactionFailure = "TransactionFailure"
@@ -100,6 +102,11 @@ type QueryChaincode struct {
 	Args     []string `json:"args,omitempty"`
 }
 
+type GetTxById struct {
+	RequestCommon
+	TxId string `json:"txId"`
+}
+
 // SendTransaction message instructs the bridge to install a contract
 type SendTransaction struct {
 	RequestCommon
@@ -116,6 +123,11 @@ type DeployChaincode struct {
 }
 
 type QueryResult struct {
+	ReplyCommon
+	Result interface{} `json:"result"`
+}
+
+type LedgerQueryResult struct {
 	ReplyCommon
 	Result interface{} `json:"result"`
 }

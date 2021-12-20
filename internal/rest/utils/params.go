@@ -120,6 +120,32 @@ func BuildQueryMessage(res http.ResponseWriter, req *http.Request, params httpro
 	return &msg, nil
 }
 
+func BuildTxByIdMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetTxById, *RestError) {
+	var body map[string]interface{}
+	err := req.ParseForm()
+	if err != nil {
+		return nil, NewRestError(err.Error(), 400)
+	}
+	msgId := getFlyParam("id", body, req)
+	channel := getFlyParam("channel", body, req)
+	if channel == "" {
+		return nil, NewRestError("Must specify the channel", 400)
+	}
+	signer := getFlyParam("signer", body, req)
+	if signer == "" {
+		return nil, NewRestError("Must specify the signer", 400)
+	}
+
+	msg := messages.GetTxById{}
+	msg.Headers.ID = msgId // this could be empty
+	msg.Headers.MsgType = messages.MsgTypeGetTxById
+	msg.Headers.ChannelID = channel
+	msg.Headers.Signer = signer
+	msg.TxId = params.ByName("txId")
+
+	return &msg, nil
+}
+
 func BuildTxMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.SendTransaction, *TxOpts, *RestError) {
 	body, err := utils.ParseJSONPayload(req)
 	if err != nil {

@@ -63,7 +63,12 @@ func (t *syncTxInflight) Context() context.Context {
 func (t *syncTxInflight) Headers() *messages.CommonHeaders {
 	query, ok := t.msg.(*messages.QueryChaincode)
 	if !ok {
-		return &t.msg.(*messages.SendTransaction).Headers.CommonHeaders
+		byId, ok := t.msg.(*messages.GetTxById)
+		if !ok {
+			return &t.msg.(*messages.SendTransaction).Headers.CommonHeaders
+		} else {
+			return &byId.Headers.CommonHeaders
+		}
 	}
 	return &query.Headers.CommonHeaders
 }

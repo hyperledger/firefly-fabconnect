@@ -17,12 +17,16 @@
 package client
 
 import (
+	//nolint
+
+	pb "github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/utils"
 )
 
 // defined to allow mocking in tests
@@ -55,6 +59,24 @@ func (l *ledgerClientWrapper) queryChainInfo(channelId, signer string) (*fab.Blo
 		return nil, err
 	}
 	return result, nil
+}
+
+func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (*pb.FilteredTransaction, error) {
+	client, err := l.getLedgerClient(channelId, signer)
+	if err != nil {
+		return nil, errors.Errorf("Failed to get channel client. %s", err)
+	}
+	txID := fab.TransactionID(txId)
+	result, err := client.QueryTransaction(txID)
+	if err != nil {
+		return nil, err
+	}
+	tx, _, err := utils.GetFilteredTxFromEnvelope(result.TransactionEnvelope, pb.TxValidationCode(result.ValidationCode))
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }
 
 func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerClient *ledger.Client, err error) {

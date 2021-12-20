@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	pb "github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
@@ -103,6 +104,19 @@ func (w *gwRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.Blockchain
 	result, err := w.ledgerClientWrapper.queryChainInfo(channelId, signer)
 	if err != nil {
 		log.Errorf("Failed to query chain info on channel %s. %s", channelId, err)
+		return nil, err
+	}
+
+	log.Tracef("RPC [%s] <-- %+v", channelId, result)
+	return result, nil
+}
+
+func (w *gwRPCWrapper) QueryTransaction(channelId, signer, txId string) (*pb.FilteredTransaction, error) {
+	log.Tracef("RPC [%s] --> QueryTransaction %s", channelId, txId)
+
+	result, err := w.ledgerClientWrapper.queryTransaction(channelId, signer, txId)
+	if err != nil {
+		log.Errorf("Failed to query transaction on channel %s. %s", channelId, err)
 		return nil, err
 	}
 

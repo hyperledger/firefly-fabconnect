@@ -17,6 +17,7 @@
 package client
 
 import (
+	pb "github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel/invoke"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/errors/retry"
@@ -120,6 +121,19 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 
 	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
 	return result.Payload, nil
+}
+
+func (w *ccpRPCWrapper) QueryTransaction(channelId, signer, txId string) (*pb.FilteredTransaction, error) {
+	log.Tracef("RPC [%s] --> QueryTransaction %s", channelId, txId)
+
+	result, err := w.ledgerClientWrapper.queryTransaction(channelId, signer, txId)
+	if err != nil {
+		log.Errorf("Failed to query transaction on channel %s. %s", channelId, err)
+		return nil, err
+	}
+
+	log.Tracef("RPC [%s] <-- %+v", channelId, result)
+	return result, nil
 }
 
 func (w *ccpRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error) {
