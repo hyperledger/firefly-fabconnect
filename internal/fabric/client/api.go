@@ -54,7 +54,7 @@ type RPCClient interface {
 	Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error)
 	Query(channelId, signer, chaincodeName, method string, args []string) ([]byte, error)
 	QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error)
-	QueryTransaction(channelId, signer, txId string) (*pb.FilteredTransaction, error)
+	QueryTransaction(channelId, signer, txId string) (map[string]interface{}, error)
 	SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error)
 	Unregister(*RegistrationWrapper)
 	Close() error

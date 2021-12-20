@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	pb "github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/client"
 	"github.com/hyperledger/firefly-fabconnect/internal/messages"
 
@@ -42,7 +41,7 @@ func NewLedgerQuery(msg *messages.GetTxById, signer string) *LedgerQuery {
 }
 
 // Send sends an individual query
-func (q *LedgerQuery) Send(ctx context.Context, rpc client.RPCClient) (*pb.FilteredTransaction, error) {
+func (q *LedgerQuery) Send(ctx context.Context, rpc client.RPCClient) (map[string]interface{}, error) {
 	start := time.Now().UTC()
 
 	var err error

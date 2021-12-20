@@ -19,7 +19,6 @@ package client
 import (
 	//nolint
 
-	pb "github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
@@ -61,7 +60,7 @@ func (l *ledgerClientWrapper) queryChainInfo(channelId, signer string) (*fab.Blo
 	return result, nil
 }
 
-func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (*pb.FilteredTransaction, error) {
+func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (map[string]interface{}, error) {
 	client, err := l.getLedgerClient(channelId, signer)
 	if err != nil {
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
@@ -71,7 +70,7 @@ func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (
 	if err != nil {
 		return nil, err
 	}
-	tx, _, err := utils.GetFilteredTxFromEnvelope(result.TransactionEnvelope, pb.TxValidationCode(result.ValidationCode))
+	tx, err := utils.DecodeBlockDataEnvelope(result.TransactionEnvelope)
 	if err != nil {
 		return nil, err
 	}
