@@ -17,6 +17,8 @@
 package utils
 
 import (
+	"encoding/hex"
+
 	"github.com/golang/protobuf/proto" //nolint
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/peer"
@@ -186,7 +188,7 @@ func DecodeBlockDataEnvelope(env *common.Envelope) (map[string]interface{}, erro
 				return nil, errors.Wrap(err, "error decoding chaincode proposal response payload")
 			}
 
-			proposalResponsePayload["proposalHash"] = prp.ProposalHash
+			proposalResponsePayload["proposalHash"] = hex.EncodeToString(prp.ProposalHash)
 
 			extension := make(map[string]interface{})
 			proposalResponsePayload["extension"] = extension
