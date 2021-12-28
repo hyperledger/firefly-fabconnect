@@ -1,0 +1,483 @@
+---
+openapi: 3.0.0
+info:
+  version: "1.0"
+  title: "API Reference for Hyperledger FireFly FabConnect"
+  description: |
+    Hyperledger FireFly FabConnect is a connector that provides a RESTful API to submit requests to Fabric networks and an event stream to listen for Fabric events over websocket or webhook based channels.
+servers:
+  - url: "/"
+security:
+  - basic_auth: []
+paths:
+  /identities:
+    get:
+      summary: "List all signing identities registered with the Fabric CA"
+      parameters: []
+      responses:
+        200:
+          description: "Signing identities returned"
+          content:
+            application/json:
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/identity_summary"
+    post:
+      summary: "Registers a new signing account with the Fabric CA"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/identity_register_input"
+      responses:
+        201:
+          description: "Signing identity registered"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/identity_register_output"
+  /identities/{username}:
+    get:
+      summary: "Get the signing identity registered with the Fabric CA"
+      parameters:
+        - $ref: "#/components/parameters/username"
+      responses:
+        200:
+          description: "Signing identity returned"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/identity"
+  /identities/{username}/enroll:
+    post:
+      summary: "Enroll the registered signing identity with the Fabric CA"
+      parameters:
+        - $ref: "#/components/parameters/username"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/identity_enroll_input"
+      responses:
+        200:
+          description: "Signing identity enrolled"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/identity_enroll_output"
+  /transactions:
+    post:
+      summary: "Send proposal to peers then send the transaction with the endorsements to the orderer"
+      parameters:
+        - $ref: "#/components/parameters/sync"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/tx_input_unstructured"
+                - $ref: "#/components/schemas/tx_input_structured"
+      responses:
+        200:
+          description: "Transaction submitted (fly-sync=false) or committed (fly-sync-true)"
+  /transactions/{txId}:
+    get:
+      summary: "Query the channel for a transaction by ID (hash)"
+      parameters:
+        - $ref: "#/components/parameters/txId"
+        - $ref: "#/components/parameters/channel"
+        - $ref: "#/components/parameters/signer"
+      responses:
+        200:
+          description: "Transaction retrieved"
+  /query:
+    post:
+      summary: "Send query request to the target chaincode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/query_input_unstructured"
+                - $ref: "#/components/schemas/query_input_structured"
+      responses:
+        200:
+          description: "Transaction submitted (fly-sync=false) or committed (fly-sync-true)"
+  /receipts:
+    get:
+      summary: "Retrieve transaction receipts from the receipts store. Only applicable to transactions submitted with 'fly-sync=false'"
+      responses:
+        200:
+          description: "Receipts returned"
+  /receipts/{receiptId}:
+    get:
+      summary: "Retrieve transaction receipt by the receipt Id. Only applicable to transactions submitted with 'fly-sync=false'"
+      parameters:
+        - $ref: "#/components/parameters/receiptId"
+      responses:
+        200:
+          description: "Receipt returned"
+  /eventstreams:
+    get:
+      summary: "List all event streams"
+      responses:
+        200:
+          description: "Event streams returned"
+    post:
+      summary: "Create a new event stream"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/eventstream_input"
+      responses:
+        200:
+          description: "Event stream created"
+  /eventstreams/{evenstreamId}:
+    get:
+      summary: "Get event stream by id"
+      parameters:
+        - $ref: "#/components/parameters/eventstreamId"
+      responses:
+        200:
+          description: "Event stream retrieved"
+    delete:
+      summary: "Delete the event stream by id"
+      parameters:
+        - $ref: "#/components/parameters/eventstreamId"
+      responses:
+        200:
+          description: "Event stream deleted"
+  /subscriptions:
+    get:
+      summary: "List all subscriptions under the specified event stream"
+      responses:
+        200:
+          description: "Subscriptions returned"
+    post:
+      summary: "Create a new subscription under the specified event stream"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/subscription_input"
+      responses:
+        200:
+          description: "Subscription created"
+  /subscriptions/{subscriptionId}:
+    get:
+      summary: "Get subscription by id"
+      parameters:
+        - $ref: "#/components/parameters/subscriptionId"
+      responses:
+        200:
+          description: "Subscription retrieved"
+    delete:
+      summary: "Delete the subscription by id"
+      parameters:
+        - $ref: "#/components/parameters/subscriptionId"
+      responses:
+        200:
+          description: "Subscription deleted"
+components:
+  securitySchemes:
+    basic_auth:
+      type: http
+      scheme: basic
+  schemas:
+    identity_prop_name:
+      type: "string"
+      description: "unique name/id of the signing identity"
+    identity_register_input:
+      type: "object"
+      properties:
+        name:
+          $ref: "#/components/schemas/identity_prop_name"
+        type:
+          type: "string"
+          description: "Type of identity. Default is 'client' if not specified in the request"
+          default: "client"
+          enum:
+            - client
+            - peer
+            - orderer
+            - user
+    identity_register_output:
+      type: "object"
+      properties:
+        name:
+          $ref: "#/components/schemas/identity_prop_name"
+        secret:
+          type: "string"
+    identity_enroll_input:
+      type: "object"
+      properties:
+        secret:
+          type: "string"
+          description: "Must be the enrollment secret returned in the response of the identity registration call"
+    identity_enroll_output:
+      type: "object"
+      properties:
+        success:
+          type: boolean
+    identity_summary:
+      allOf:
+        - $ref: "#/components/schemas/identity_register_input"
+        - properties:
+            maxEnrollments:
+              type: "integer"
+              description: "Maximum number of enrollments allowed for this identity. -1 means no limits"
+            affiliation:
+              type: "string"
+            caname:
+              type: "string"
+              description: "Name of the Certificate Authority used to register the identity. Fabric CA suppors multiple Certificate Authorities. An empty string means the default authority"
+    identity:
+      allOf:
+        - $ref: "#/components/schemas/identity_summary"
+        - properties:
+            organization:
+              type: "string"
+            mspId:
+              type: "string"
+            enrollmentCert:
+              type: "string"
+              description: "base64 encoded enrollment certificate for the signing identity. If missing, then the identity was only registered but not enrolled"
+            caCert:
+              type: "string"
+              description: "base64 encoded certificate of the issuing CA"
+    input_headers:
+      type: "object"
+      properties:
+        signer:
+          type: "string"
+          description: "Name of the signing identity"
+        channel:
+          type: "string"
+          description: "Target channel to send the transaction to"
+        chaincode:
+          type: "string"
+          description: "Name of the chaincode to invoke"
+    tx_input_headers:
+      allOf:
+        - properties:
+            type:
+              type: "string"
+              enum:
+                - SendTransaction
+        - $ref: "#/components/schemas/input_headers"
+    schema_header:
+      type: "object"
+      properties:
+        payloadSchema:
+          type: "object"
+          properties:
+            type:
+              type: "string"
+              enum:
+                - array
+            prefixItems:
+              type: "array"
+              items:
+                oneOf:
+                  - type: "string"
+                  - type: "object"
+    tx_input_headers_with_schema:
+      allOf:
+        - $ref: "#/components/schemas/tx_input_headers"
+        - $ref: "#/components/schemas/schema_header"
+    tx_input_unstructured:
+      description: "Use a flat list of string arguments for the 'args' property"
+      type: "object"
+      properties:
+        headers:
+          $ref: "#/components/schemas/tx_input_headers"
+        func:
+          type: "string"
+          description: "Target function name to invoke"
+        args:
+          type: "array"
+          items:
+            type: "string"
+            description: "Parameters to pass to the chaincode function"
+        init:
+          type: "boolean"
+          default: false
+    tx_input_structured:
+      description: "Specify a JSON schema in the headers, so that the 'args' property can be specified as a JSON object"
+      type: "object"
+      properties:
+        headers:
+          $ref: "#/components/schemas/tx_input_headers_with_schema"
+        func:
+          type: "string"
+          description: "Target function name to invoke"
+        args:
+          type: "object"
+          description: "JSON structure for the parameters to pass to the chaincode function"
+        init:
+          type: "boolean"
+          default: false
+    input_headers_with_schema:
+      allOf:
+        - $ref: "#/components/schemas/input_headers"
+        - $ref: "#/components/schemas/schema_header"
+    query_input_unstructured:
+      description: "Use a flat list of string arguments for the 'args' property"
+      type: "object"
+      properties:
+        headers:
+          $ref: "#/components/schemas/input_headers"
+        func:
+          type: "string"
+          description: "Target function name to invoke"
+        args:
+          type: "array"
+          items:
+            type: "string"
+            description: "Parameters to pass to the chaincode function"
+    query_input_structured:
+      description: "Specify a JSON schema in the headers, so that the 'args' property can be specified as a JSON object"
+      type: "object"
+      properties:
+        headers:
+          $ref: "#/components/schemas/input_headers_with_schema"
+        func:
+          type: "string"
+          description: "Target function name to invoke"
+        args:
+          type: "object"
+          description: "JSON structure for the parameters to pass to the chaincode function"
+    webhook_info:
+      type: "object"
+      properties:
+        url:
+          type: "string"
+        headers:
+          type: "object"
+          description: "Use this to specify security headers for authentication with the webhook endpoint"
+        tlsSkipHostVerify:
+          type: "boolean"
+          description: "Whether to disable server TLS certificate verification"
+        requestTimeoutSec:
+          type: "integer"
+          description: "Request timeout (seconds)"
+    websocket_info:
+      type: "object"
+      properties:
+        topic:
+          type: "string"
+          description: "Specify the topic for websocket clients to use in order to listen for events"
+        distributionMode:
+          type: "string"
+          description: "Specify 'broadcast' to send events to all clients listening on the topic; otherwise only one of the listening clients gets the event"
+          default: ""
+          enum:
+            - broadcast
+            - workloadDistribution
+    eventstream_input:
+      type: "object"
+      properties:
+        name:
+          type: "string"
+        type:
+          type: "string"
+          enum:
+            - websocket
+            - webhook
+        websocket:
+          oneOf:
+            - $ref: "#/components/schemas/websocket_info"
+            - $ref: "#/components/schemas/webhook_info"
+    subscription_input:
+      type: "object"
+      properties:
+        name:
+          type: string
+        stream:
+          type: string
+          description: "The id of the event stream the subscription belongs to"
+        channel:
+          type: string
+        signer:
+          type: string
+        fromBlock:
+          type: string
+          description: "The block number to subscribe from, ignoring any blocks earlier. If left empty, the subscription will be on the newest block"
+        payloadType:
+          type: string
+          default: string
+          enum:
+            - stringifiedJSON
+            - string
+        filter:
+          type: object
+          properties:
+            blockType:
+              type: string
+              description: "Specify 'tx' for endorser blocks; specify 'config' for config or config update blocks"
+              default: "tx"
+              enum:
+                - tx
+                - config
+            chaincodeId:
+              type: string
+              default: ""
+              description: "Optionally specify a particular chaincode name to subscribe to"
+            eventFilter:
+              type: string
+              default: ""
+              description: "Optionally specify a regular expression for the event names"
+  parameters:
+    username:
+      required: true
+      name: "username"
+      in: "path"
+      schema:
+        type: "string"
+    txId:
+      required: true
+      name: "txId"
+      in: "path"
+      schema:
+        type: "string"
+    receiptId:
+      required: true
+      name: "receiptId"
+      in: "path"
+      schema:
+        type: "string"
+    eventstreamId:
+      required: true
+      name: "eventstreamId"
+      in: "path"
+      schema:
+        type: "string"
+    subscriptionId:
+      required: true
+      name: "subscriptionId"
+      in: "path"
+      schema:
+        type: "string"
+    sync:
+      name: "fly-sync"
+      in: "query"
+      schema:
+        type: "boolean"
+    channel:
+      name: "fly-channel"
+      in: "query"
+      schema:
+        type: "string"
+    signer:
+      name: "fly-signer"
+      in: "query"
+      schema:
+        type: "string"

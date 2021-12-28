@@ -30,9 +30,11 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
 	restsync "github.com/hyperledger/firefly-fabconnect/internal/rest/sync"
 	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
+	"github.com/hyperledger/firefly-fabconnect/internal/utils"
 	"github.com/hyperledger/firefly-fabconnect/internal/ws"
 	"github.com/julienschmidt/httprouter"
 
+	"github.com/rs/cors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -50,17 +52,22 @@ type router struct {
 }
 
 func newRouter(syncDispatcher restsync.SyncDispatcher, asyncDispatcher restasync.AsyncDispatcher, idClient identity.IdentityClient, sm events.SubscriptionManager, ws ws.WebSocketServer) *router {
+	r := httprouter.New()
+	cors.Default().Handler(r)
 	return &router{
 		syncDispatcher:  syncDispatcher,
 		asyncDispatcher: asyncDispatcher,
 		identityClient:  idClient,
 		subManager:      sm,
 		ws:              ws,
-		httpRouter:      httprouter.New(),
+		httpRouter:      r,
 	}
 }
 
 func (r *router) addRoutes() {
+	r.httpRouter.GET("/api", r.serveSwaggerUI)
+	r.httpRouter.GET("/spec.yaml", r.serveSwagger)
+
 	r.httpRouter.POST("/identities", r.registerUser)
 	r.httpRouter.POST("/identities/:username/enroll", r.enrollUser)
 	r.httpRouter.GET("/identities", r.listUsers)
@@ -118,6 +125,18 @@ func (r *router) statusHandler(res http.ResponseWriter, req *http.Request, _ htt
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(200)
 	_, _ = res.Write(reply)
+}
+
+func (r *router) serveSwagger(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	fs := http.FileServer(http.Dir("./openapi"))
+	fs.ServeHTTP(res, req)
+}
+
+func (r *router) serveSwaggerUI(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	res.Header().Add("Content-Type", "text/html")
+	_, _ = res.Write(utils.SwaggerUIHTML(req.Context()))
 }
 
 func (r *router) queryChaincode(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
