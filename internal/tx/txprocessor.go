@@ -241,6 +241,12 @@ func (p *txProcessor) waitForCompletion(inflight *inflightTx, initialWaitDelay t
 			reply.Headers.MsgType = messages.MsgTypeTransactionFailure
 		}
 
+		reply.Status = receipt.Status.String()
+		reply.BlockNumber = receipt.BlockNumber
+		reply.Signer = receipt.Signer
+		reply.SignerMSP = receipt.SignerMSP
+		reply.TransactionID = receipt.TransactionID
+
 		inflight.txContext.Reply(&reply)
 	}
 
