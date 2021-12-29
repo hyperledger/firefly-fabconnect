@@ -61,11 +61,12 @@ func (info *SubscriptionInfo) GetID() string {
 }
 
 type EventEntry struct {
-	ChaincodeId   string      `json:"chaincodeId"`
-	BlockNumber   uint64      `json:"blockNumber"`
-	TransactionId string      `json:"transactionId"`
-	EventName     string      `json:"eventName"`
-	Payload       interface{} `json:"payload"`
-	Timestamp     uint64      `json:"timestamp,omitempty"`
-	SubID         string      `json:"subId"`
+	ChaincodeId      string      `json:"chaincodeId"`
+	BlockNumber      uint64      `json:"blockNumber"`
+	TransactionId    string      `json:"transactionId"`
+	TransactionIndex int         `json:"transactionIndex"`
+	EventName        string      `json:"eventName"`
+	Payload          interface{} `json:"payload"`
+	Timestamp        uint64      `json:"timestamp,omitempty"`
+	SubID            string      `json:"subId"`
 }
