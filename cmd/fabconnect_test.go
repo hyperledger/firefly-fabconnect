@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 func setup() {
 	tmpdir, testConfig = test.Setup()
 	os.Setenv("FC_HTTP_PORT", "8002")
-	os.Setenv("FC_EVENTS_POLLINGINTERVAL", "60")
+	os.Setenv("FC_MAXINFLIGHT", "60")
 }
 
 func teardown() {
@@ -72,7 +72,7 @@ func TestBadConfigFile(t *testing.T) {
 	}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
-	assert.Regexp(regexp.MustCompile(`cannot parse 'maxInFlight' as int`), err)
+	assert.Regexp(regexp.MustCompile(`User credentials store creation failed`), err)
 }
 
 func TestStartServerError(t *testing.T) {
@@ -103,6 +103,7 @@ func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
 	err := rootCmd.Execute()
 	assert.NoError(err)
 	assert.Equal(10, restGatewayConf.MaxTXWaitTime)
+	assert.Equal(1, restGatewayConf.Events.PollingIntervalSec)
 
 	// test that the environment variable FC_HTTP_PORT overrides the port setting in the config file
 	assert.Equal(8002, restGatewayConf.HTTP.Port)
@@ -117,20 +118,23 @@ func TestEnvVarOverride(t *testing.T) {
 	rootCmd.RunE = runNothing
 	_ = rootCmd.Execute()
 	assert.Equal(8002, restGatewayConf.HTTP.Port)
-	assert.Equal(uint64(60), restGatewayConf.Events.PollingIntervalSec)
+	assert.Equal(60, restGatewayConf.MaxInFlight)
 }
 
 func TestCmdArgsOverride(t *testing.T) {
 	assert := assert.New(t)
 
 	restGateway = nil
+	restGatewayConf.Events.PollingIntervalSec = 0
 	rootCmd.RunE = runNothing
 	args := []string{
 		"-P", "8001",
+		"--events-polling-int", "10",
 	}
 	rootCmd.SetArgs(args)
 	_ = rootCmd.Execute()
 	assert.Equal(8001, restGatewayConf.HTTP.Port)
+	assert.Equal(10, restGatewayConf.Events.PollingIntervalSec)
 }
 
 func TestDefaultsInConfigFile(t *testing.T) {

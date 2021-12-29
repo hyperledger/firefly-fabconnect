@@ -81,7 +81,7 @@ type LevelDBReceiptsConf struct {
 }
 
 type EventstreamConf struct {
-	PollingIntervalSec      uint64              `mapstructure:"pollingInterval"`
+	PollingIntervalSec      int                 `mapstructure:"pollingInterval"`
 	WebhooksAllowPrivateIPs bool                `json:"webhooksAllowPrivateIPs,omitempty"`
 	LevelDB                 LevelDBReceiptsConf `mapstructure:"leveldb"`
 }
@@ -137,7 +137,7 @@ func CobraInit(cmd *cobra.Command, conf *RESTGatewayConf) {
 
 	cmd.Flags().StringVarP(&conf.Events.LevelDB.Path, "events-db", "E", "", "Level DB location for subscription management")
 	_ = viper.BindPFlag("events.leveldb.path", cmd.Flags().Lookup("events-db"))
-	cmd.Flags().Uint64VarP(&conf.Events.PollingIntervalSec, "events-polling-int", "", 10, "Event polling interval (ms)")
+	cmd.Flags().IntVarP(&conf.Events.PollingIntervalSec, "events-polling-int", "", 1, "Event polling interval (seconds)")
 	_ = viper.BindPFlag("events.pollingInterval", cmd.Flags().Lookup("events-polling-int"))
 	cmd.Flags().BoolVarP(&conf.Events.WebhooksAllowPrivateIPs, "events-priv-ips", "", false, "Allow private IPs in Webhooks")
 	_ = viper.BindPFlag("events.webhooksAllowPrivateIPs", cmd.Flags().Lookup("events-priv-ips"))
