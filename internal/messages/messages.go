@@ -135,6 +135,11 @@ type LedgerQueryResult struct {
 // TransactionReceipt is sent when a transaction has been successfully mined
 type TransactionReceipt struct {
 	ReplyCommon
+	BlockNumber   uint64 `json:"blockNumber"`
+	SignerMSP     string `json:"signerMSP"`
+	Signer        string `json:"signer"`
+	TransactionID string `json:"transactionID"`
+	Status        string `json:"status"`
 }
 
 type ErrorReply struct {
