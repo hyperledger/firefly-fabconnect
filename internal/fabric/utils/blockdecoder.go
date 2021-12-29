@@ -30,7 +30,7 @@ import (
 func GetEvents(block *common.Block) []*api.EventEntry {
 	events := []*api.EventEntry{}
 	fb := toFilteredBlock(block)
-	for _, tx := range fb.GetFilteredTransactions() {
+	for idx, tx := range fb.GetFilteredTransactions() {
 		actions := tx.GetTransactionActions()
 		if actions != nil {
 			ccActions := actions.GetChaincodeActions()
@@ -38,11 +38,12 @@ func GetEvents(block *common.Block) []*api.EventEntry {
 				for _, ccAction := range ccActions {
 					event := ccAction.GetChaincodeEvent()
 					eventEntry := api.EventEntry{
-						ChaincodeId:   event.ChaincodeId,
-						BlockNumber:   fb.Number,
-						TransactionId: tx.Txid,
-						EventName:     event.EventName,
-						Payload:       event.Payload,
+						ChaincodeId:      event.ChaincodeId,
+						BlockNumber:      fb.Number,
+						TransactionId:    tx.Txid,
+						TransactionIndex: idx,
+						EventName:        event.EventName,
+						Payload:          event.Payload,
 					}
 					events = append(events, &eventEntry)
 				}
