@@ -66,7 +66,9 @@ func (r *router) addRoutes() {
 	r.httpRouter.GET("/identities", r.listUsers)
 	r.httpRouter.GET("/identities/:username", r.getUser)
 
+	r.httpRouter.POST("/query", r.queryChaincode)
 	r.httpRouter.POST("/transactions", r.sendTransaction)
+	r.httpRouter.GET("/transactions/:txId", r.getTransaction)
 	r.httpRouter.GET("/receipts", r.handleReceipts)
 	r.httpRouter.GET("/receipts/:id", r.handleReceipts)
 
@@ -116,6 +118,30 @@ func (r *router) statusHandler(res http.ResponseWriter, req *http.Request, _ htt
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(200)
 	_, _ = res.Write(reply)
+}
+
+func (r *router) queryChaincode(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+
+	msg, err := restutil.BuildQueryMessage(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	// query requests are always synchronous
+	r.syncDispatcher.DispatchMsgSync(req.Context(), res, req, msg)
+}
+
+func (r *router) getTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+
+	msg, err := restutil.BuildTxByIdMessage(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	// query requests are always synchronous
+	r.syncDispatcher.DispatchMsgSync(req.Context(), res, req, msg)
 }
 
 func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {

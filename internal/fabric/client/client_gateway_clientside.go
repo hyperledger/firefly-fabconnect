@@ -110,6 +110,19 @@ func (w *gwRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.Blockchain
 	return result, nil
 }
 
+func (w *gwRPCWrapper) QueryTransaction(channelId, signer, txId string) (map[string]interface{}, error) {
+	log.Tracef("RPC [%s] --> QueryTransaction %s", channelId, txId)
+
+	result, err := w.ledgerClientWrapper.queryTransaction(channelId, signer, txId)
+	if err != nil {
+		log.Errorf("Failed to query transaction on channel %s. %s", channelId, err)
+		return nil, err
+	}
+
+	log.Tracef("RPC [%s] <-- %+v", channelId, result)
+	return result, nil
+}
+
 // The returned registration must be closed when done
 func (w *gwRPCWrapper) SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
 	reg, blockEventCh, ccEventCh, err := w.eventClientWrapper.subscribeEvent(subInfo, since)

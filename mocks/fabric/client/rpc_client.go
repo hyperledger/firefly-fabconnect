@@ -99,6 +99,29 @@ func (_m *RPCClient) QueryChainInfo(channelId string, signer string) (*fab.Block
 	return r0, r1
 }
 
+// QueryTransaction provides a mock function with given fields: channelId, signer, txId
+func (_m *RPCClient) QueryTransaction(channelId string, signer string, txId string) (map[string]interface{}, error) {
+	ret := _m.Called(channelId, signer, txId)
+
+	var r0 map[string]interface{}
+	if rf, ok := ret.Get(0).(func(string, string, string) map[string]interface{}); ok {
+		r0 = rf(channelId, signer, txId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]interface{})
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(channelId, signer, txId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SubscribeEvent provides a mock function with given fields: subInfo, since
 func (_m *RPCClient) SubscribeEvent(subInfo *api.SubscriptionInfo, since uint64) (*client.RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
 	ret := _m.Called(subInfo, since)

@@ -122,6 +122,19 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 	return result.Payload, nil
 }
 
+func (w *ccpRPCWrapper) QueryTransaction(channelId, signer, txId string) (map[string]interface{}, error) {
+	log.Tracef("RPC [%s] --> QueryTransaction %s", channelId, txId)
+
+	result, err := w.ledgerClientWrapper.queryTransaction(channelId, signer, txId)
+	if err != nil {
+		log.Errorf("Failed to query transaction on channel %s. %s", channelId, err)
+		return nil, err
+	}
+
+	log.Tracef("RPC [%s] <-- %+v", channelId, result)
+	return result, nil
+}
+
 func (w *ccpRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error) {
 	log.Tracef("RPC [%s] --> ChainInfo", channelId)
 

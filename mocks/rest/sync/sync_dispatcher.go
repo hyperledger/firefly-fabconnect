@@ -6,7 +6,6 @@ import (
 	context "context"
 	http "net/http"
 
-	messages "github.com/hyperledger/firefly-fabconnect/internal/messages"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -16,6 +15,6 @@ type SyncDispatcher struct {
 }
 
 // DispatchMsgSync provides a mock function with given fields: ctx, res, req, msg
-func (_m *SyncDispatcher) DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg *messages.SendTransaction) {
+func (_m *SyncDispatcher) DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg interface{}) {
 	_m.Called(ctx, res, req, msg)
 }

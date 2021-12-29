@@ -14,9 +14,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package fabric
+package utils
 
 import (
+	"encoding/hex"
+
 	"github.com/golang/protobuf/proto" //nolint
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/peer"
@@ -50,6 +52,32 @@ func GetEvents(block *common.Block) []*api.EventEntry {
 	return events
 }
 
+func DecodeBlock(block *common.Block) ([]map[string]interface{}, error) {
+	// this array in the block header's metadata contains each transaction's status code
+	txFilter := []byte(block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER])
+
+	result := make([]map[string]interface{}, len(block.Data.Data))
+	for i, data := range block.Data.Data {
+		env, err := getEnvelopeFromBlock(data)
+		if err != nil {
+			return nil, errors.Wrap(err, "error decoding Envelope from block")
+		}
+		if env == nil {
+			return nil, errors.New("nil envelope")
+		}
+
+		tx, err := DecodeBlockDataEnvelope(env)
+		if err != nil {
+			return nil, errors.Wrap(err, "error decoding block data envelope")
+		}
+		entry := make(map[string]interface{})
+		entry["validationCode"] = peer.TxValidationCode(txFilter[i])
+		entry["transaction"] = tx
+	}
+
+	return result, nil
+}
+
 func toFilteredBlock(block *common.Block) *peer.FilteredBlock {
 	var channelID string
 	var filteredTxs []*peer.FilteredTransaction
@@ -57,9 +85,9 @@ func toFilteredBlock(block *common.Block) *peer.FilteredBlock {
 	txFilter := []byte(block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER])
 
 	for i, data := range block.Data.Data {
-		filteredTx, chID, err := getFilteredTx(data, peer.TxValidationCode(txFilter[i]))
+		filteredTx, chID, err := GetFilteredTxFromBlockData(data, peer.TxValidationCode(txFilter[i]))
 		if err != nil {
-			log.Warnf("error extracting Envelope from block: %s", err)
+			log.Warnf("error decoding Envelope from block: %s", err)
 			continue
 		}
 		channelID = chID
@@ -73,24 +101,130 @@ func toFilteredBlock(block *common.Block) *peer.FilteredBlock {
 	}
 }
 
-func getFilteredTx(data []byte, txValidationCode peer.TxValidationCode) (*peer.FilteredTransaction, string, error) {
-	env, err := GetEnvelopeFromBlock(data)
+func GetFilteredTxFromBlockData(data []byte, txValidationCode peer.TxValidationCode) (*peer.FilteredTransaction, string, error) {
+	env, err := getEnvelopeFromBlock(data)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "error extracting Envelope from block")
+		return nil, "", errors.Wrap(err, "error decoding Envelope from block")
 	}
 	if env == nil {
 		return nil, "", errors.New("nil envelope")
 	}
+	return GetFilteredTxFromEnvelope(env, txValidationCode)
+}
 
+func DecodeBlockDataEnvelope(env *common.Envelope) (map[string]interface{}, error) {
 	payload, err := UnmarshalPayload(env.Payload)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "error extracting Payload from envelope")
+		return nil, errors.Wrap(err, "error decoding Payload from envelope")
+	}
+
+	result := make(map[string]interface{})
+
+	channelHeader := &common.ChannelHeader{}
+	if err := proto.Unmarshal(payload.Header.ChannelHeader, channelHeader); err != nil {
+		return nil, errors.Wrap(err, "error decoding ChannelHeader from payload")
+	}
+
+	// TODO: support other block types (1=ConfigEvelope, 2=ConfigUpdateEnvelope)
+	if channelHeader.Type == 3 {
+		result["type"] = "EndorserTransaction"
+
+		tx := &peer.Transaction{}
+		if err := proto.Unmarshal(payload.Data, tx); err != nil {
+			return nil, errors.Wrap(err, "error decoding transaction payload data")
+		}
+
+		transactions := make([]map[string]interface{}, len(tx.Actions))
+		result["transactions"] = transactions
+
+		for i, action := range tx.Actions {
+			transaction := make(map[string]interface{})
+			transactions[i] = transaction
+
+			chaincodeActionPayload := make(map[string]interface{})
+			transaction["payload"] = chaincodeActionPayload
+			cap := &peer.ChaincodeActionPayload{}
+			if err := proto.Unmarshal(action.Payload, cap); err != nil {
+				return nil, errors.Wrap(err, "error decoding chaincode action payload")
+			}
+			// proposal payload part of the chaincode action
+			chaincodeProposalPayload := make(map[string]interface{})
+			chaincodeActionPayload["chaincodeProposalPayload"] = chaincodeProposalPayload
+			cpp := &peer.ChaincodeProposalPayload{}
+			if err = proto.Unmarshal(cap.ChaincodeProposalPayload, cpp); err != nil {
+				return nil, errors.Wrap(err, "error decoding chaincode proposal payload")
+			}
+			chaincodeInvocationSpec := make(map[string]interface{})
+			chaincodeProposalPayload["input"] = chaincodeInvocationSpec
+			ccSpec := &peer.ChaincodeInvocationSpec{}
+			if err := proto.Unmarshal(cpp.Input, ccSpec); err != nil {
+				return nil, errors.Wrap(err, "error decoding chaincode invocation spec")
+			}
+
+			chaincodeInvocationSpec["type"] = ccSpec.ChaincodeSpec.Type
+			chaincodeInvocationSpec["chaincodeId"] = ccSpec.ChaincodeSpec.ChaincodeId
+
+			chaincodeInput := make(map[string]interface{})
+			chaincodeInputArgs := make([]string, len(ccSpec.ChaincodeSpec.Input.Args))
+			for j, arg := range ccSpec.ChaincodeSpec.Input.Args {
+				chaincodeInputArgs[j] = string(arg)
+			}
+			chaincodeInput["args"] = chaincodeInputArgs
+			chaincodeInput["isInit"] = ccSpec.ChaincodeSpec.Input.IsInit
+			chaincodeInvocationSpec["input"] = chaincodeInput
+
+			chaincodeProposal := make(map[string]interface{})
+			chaincodeProposal["input"] = chaincodeInput
+			transaction["chaincodeProposal"] = chaincodeProposal
+
+			// endorsed action part of the chaincode action
+			chaincodeEndorsedAction := make(map[string]interface{})
+			chaincodeActionPayload["action"] = chaincodeEndorsedAction
+
+			proposalResponsePayload := make(map[string]interface{})
+			chaincodeEndorsedAction["proposalResponsePayload"] = proposalResponsePayload
+			prp := &peer.ProposalResponsePayload{}
+			if err = proto.Unmarshal(cap.Action.ProposalResponsePayload, prp); err != nil {
+				return nil, errors.Wrap(err, "error decoding chaincode proposal response payload")
+			}
+
+			proposalResponsePayload["proposalHash"] = hex.EncodeToString(prp.ProposalHash)
+
+			extension := make(map[string]interface{})
+			proposalResponsePayload["extension"] = extension
+			cca := &peer.ChaincodeAction{}
+			if err = proto.Unmarshal(prp.Extension, cca); err != nil {
+				return nil, errors.Wrap(err, "error decoding chaincode action")
+			}
+
+			// skipping read/write sets in the action
+			// decode events
+			chaincodeEvent := make(map[string]interface{})
+			extension["events"] = chaincodeEvent
+			ccevt := &peer.ChaincodeEvent{}
+			if err = proto.Unmarshal(cca.Events, ccevt); err != nil {
+				return nil, errors.Wrap(err, "error decoding chaincode event")
+			}
+			chaincodeEvent["chaincodeId"] = ccevt.ChaincodeId
+			chaincodeEvent["txId"] = ccevt.TxId
+			chaincodeEvent["eventName"] = ccevt.EventName
+			chaincodeEvent["payload"] = string(ccevt.Payload)
+		}
+	}
+
+	return result, nil
+}
+
+func GetFilteredTxFromEnvelope(env *common.Envelope, txValidationCode peer.TxValidationCode) (*peer.FilteredTransaction, string, error) {
+	payload, err := UnmarshalPayload(env.Payload)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "error decoding Payload from envelope")
 	}
 
 	channelHeaderBytes := payload.Header.ChannelHeader
 	channelHeader := &common.ChannelHeader{}
 	if err := proto.Unmarshal(channelHeaderBytes, channelHeader); err != nil {
-		return nil, "", errors.Wrap(err, "error extracting ChannelHeader from payload")
+		return nil, "", errors.Wrap(err, "error decoding ChannelHeader from payload")
 	}
 
 	filteredTx := &peer.FilteredTransaction{
@@ -139,8 +273,7 @@ func getFilteredTransactionActions(data []byte) (*peer.FilteredTransaction_Trans
 	return actions, nil
 }
 
-// GetEnvelopeFromBlock gets an envelope from a block's Data field.
-func GetEnvelopeFromBlock(data []byte) (*common.Envelope, error) {
+func getEnvelopeFromBlock(data []byte) (*common.Envelope, error) {
 	// Block always begins with an envelope
 	var err error
 	env := &common.Envelope{}

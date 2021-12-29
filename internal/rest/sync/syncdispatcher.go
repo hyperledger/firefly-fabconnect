@@ -36,7 +36,7 @@ import (
 // SyncDispatcher abstracts the processing of the transactions and queries
 // synchronously. We perform those within this package.
 type SyncDispatcher interface {
-	DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg *messages.SendTransaction)
+	DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg interface{})
 }
 
 type syncDispatcher struct {
@@ -53,7 +53,7 @@ type syncTxInflight struct {
 	ctx            context.Context
 	replyProcessor *syncResponder
 	timeReceived   time.Time
-	msg            *messages.SendTransaction
+	msg            interface{}
 }
 
 func (t *syncTxInflight) Context() context.Context {
@@ -61,7 +61,16 @@ func (t *syncTxInflight) Context() context.Context {
 }
 
 func (t *syncTxInflight) Headers() *messages.CommonHeaders {
-	return &t.msg.Headers.CommonHeaders
+	query, ok := t.msg.(*messages.QueryChaincode)
+	if !ok {
+		byId, ok := t.msg.(*messages.GetTxById)
+		if !ok {
+			return &t.msg.(*messages.SendTransaction).Headers.CommonHeaders
+		} else {
+			return &byId.Headers.CommonHeaders
+		}
+	}
+	return &query.Headers.CommonHeaders
 }
 
 func (t *syncTxInflight) Unmarshal(msg interface{}) error {
@@ -126,7 +135,7 @@ func (i *syncResponder) ReplyWithReceiptAndError(receipt messages.ReplyWithHeade
 
 func (i *syncResponder) ReplyWithReceipt(receipt messages.ReplyWithHeaders) {
 	status := 200
-	if receipt.ReplyHeaders().MsgType != messages.MsgTypeTransactionSuccess {
+	if receipt.ReplyHeaders().MsgType != messages.MsgTypeTransactionSuccess && receipt.ReplyHeaders().MsgType != messages.MsgTypeQuerySuccess {
 		status = 500
 	}
 	reply, _ := json.MarshalIndent(receipt, "", "  ")
@@ -139,7 +148,7 @@ func (i *syncResponder) ReplyWithReceipt(receipt messages.ReplyWithHeaders) {
 	i.waiter.Broadcast()
 }
 
-func (d *syncDispatcher) DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg *messages.SendTransaction) {
+func (d *syncDispatcher) DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg interface{}) {
 	responder := &syncResponder{
 		res:    res,
 		req:    req,

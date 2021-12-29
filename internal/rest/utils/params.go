@@ -77,6 +77,75 @@ func getQueryParamNoCase(name string, req *http.Request) []string {
 	return nil
 }
 
+func BuildQueryMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.QueryChaincode, *RestError) {
+	body, err := utils.ParseJSONPayload(req)
+	if err != nil {
+		return nil, NewRestError(err.Error(), 400)
+	}
+	err = req.ParseForm()
+	if err != nil {
+		return nil, NewRestError(err.Error(), 400)
+	}
+
+	msgId := getFlyParam("id", body, req)
+	channel := getFlyParam("channel", body, req)
+	if channel == "" {
+		return nil, NewRestError("Must specify the channel", 400)
+	}
+	signer := getFlyParam("signer", body, req)
+	if signer == "" {
+		return nil, NewRestError("Must specify the signer", 400)
+	}
+	chaincode := getFlyParam("chaincode", body, req)
+	if chaincode == "" {
+		return nil, NewRestError("Must specify the chaincode name", 400)
+	}
+
+	msg := messages.QueryChaincode{}
+	msg.Headers.ID = msgId // this could be empty
+	msg.Headers.MsgType = messages.MsgTypeQueryChaincode
+	msg.Headers.ChannelID = channel
+	msg.Headers.Signer = signer
+	msg.Headers.ChaincodeName = chaincode
+	msg.Function = body["func"].(string)
+	if msg.Function == "" {
+		return nil, NewRestError("Must specify target chaincode function", 400)
+	}
+	argsVal, err := processArgs(body)
+	if err != nil {
+		return nil, NewRestError(err.Error(), 400)
+	}
+	msg.Args = argsVal
+
+	return &msg, nil
+}
+
+func BuildTxByIdMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetTxById, *RestError) {
+	var body map[string]interface{}
+	err := req.ParseForm()
+	if err != nil {
+		return nil, NewRestError(err.Error(), 400)
+	}
+	msgId := getFlyParam("id", body, req)
+	channel := getFlyParam("channel", body, req)
+	if channel == "" {
+		return nil, NewRestError("Must specify the channel", 400)
+	}
+	signer := getFlyParam("signer", body, req)
+	if signer == "" {
+		return nil, NewRestError("Must specify the signer", 400)
+	}
+
+	msg := messages.GetTxById{}
+	msg.Headers.ID = msgId // this could be empty
+	msg.Headers.MsgType = messages.MsgTypeGetTxById
+	msg.Headers.ChannelID = channel
+	msg.Headers.Signer = signer
+	msg.TxId = params.ByName("txId")
+
+	return &msg, nil
+}
+
 func BuildTxMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.SendTransaction, *TxOpts, *RestError) {
 	body, err := utils.ParseJSONPayload(req)
 	if err != nil {
