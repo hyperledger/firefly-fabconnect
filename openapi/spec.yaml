@@ -139,7 +139,7 @@ paths:
       responses:
         200:
           description: "Event stream created"
-  /eventstreams/{evenstreamId}:
+  /eventstreams/{eventstreamId}:
     get:
       summary: "Get event stream by id"
       parameters:
@@ -380,6 +380,7 @@ components:
           description: "Specify 'broadcast' to send events to all clients listening on the topic; otherwise only one of the listening clients gets the event"
           default: ""
           enum:
+            - ""
             - broadcast
             - workloadDistribution
     eventstream_input:
