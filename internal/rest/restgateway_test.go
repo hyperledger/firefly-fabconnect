@@ -207,3 +207,52 @@ func TestStartWithMissingUserStorePath(t *testing.T) {
 	err := g.Init()
 	assert.EqualError(err, "User credentials store creation failed. Path: User credentials store path is empty")
 }
+
+func TestEventstreamAPIErrors(t *testing.T) {
+	assert := assert.New(t)
+
+	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
+	testConfig.HTTP.Port = lastPort
+	testConfig.HTTP.LocalAddr = "127.0.0.1"
+	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
+	g := NewRESTGateway(testConfig)
+	err := g.Init()
+	assert.NoError(err)
+
+	lastPort++
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err = g.Start()
+		wg.Done()
+	}()
+
+	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/status", g.config.HTTP.Port))
+	var resp *http.Response
+	header := http.Header{
+		"AUTHORIZATION": []string{"BeaRER testat"},
+	}
+	for i := 0; i < 5; i++ {
+		time.Sleep(200 * time.Millisecond)
+		req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
+		resp, err = http.DefaultClient.Do(req)
+		if err == nil && resp.StatusCode == 200 {
+			break
+		}
+	}
+	assert.NoError(err)
+	assert.Equal(200, resp.StatusCode)
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/badId", g.config.HTTP.Port))
+	req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
+	resp, err = http.DefaultClient.Do(req)
+	var errorResp errors.RestErrMsg
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(404, resp.StatusCode)
+	assert.Equal("", errorResp.Message)
+
+	g.srv.Close()
+	wg.Wait()
+	assert.EqualError(err, "http: Server closed")
+	auth.RegisterSecurityModule(nil)
+}
