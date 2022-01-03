@@ -8,8 +8,7 @@ RUN make build
 
 FROM alpine:latest
 WORKDIR /fabconnect
-COPY --from=fabconnect-builder /fabconnect/fabconnect \
-  /fabconnect/openapi/ \
-  ./
+COPY --from=fabconnect-builder /fabconnect/fabconnect ./
+ADD ./openapi ./openapi/
 RUN ln -s /fabconnect/fabconnect /usr/bin/fabconnect
 ENTRYPOINT [ "fabconnect" ]
