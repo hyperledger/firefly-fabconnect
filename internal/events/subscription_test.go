@@ -18,52 +18,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/conf"
-	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	"github.com/stretchr/testify/assert"
 )
-
-type mockSubMgr struct {
-	stream        *eventStream
-	subscription  *subscription
-	err           error
-	subscriptions []*subscription
-}
-
-func (m *mockSubMgr) getConfig() *conf.EventstreamConf {
-	return &conf.EventstreamConf{}
-}
-
-func (m *mockSubMgr) streamByID(string) (*eventStream, error) {
-	return m.stream, m.err
-}
-
-func (m *mockSubMgr) subscriptionByID(string) (*subscription, error) {
-	return m.subscription, m.err
-}
-
-func (m *mockSubMgr) subscriptionsForStream(string) []*subscription {
-	return m.subscriptions
-}
-
-func (m *mockSubMgr) loadCheckpoint(string) (map[string]uint64, error) { return nil, nil }
-
-func (m *mockSubMgr) storeCheckpoint(string, map[string]uint64) error { return nil }
-
-func testSubInfo(name string) *eventsapi.SubscriptionInfo {
-	return &eventsapi.SubscriptionInfo{ID: "test", Stream: "streamID", Name: name}
-}
-
-func newTestStream(submgr subscriptionManager) *eventStream {
-	a, _ := newEventStream(submgr, &StreamInfo{
-		ID:   "123",
-		Type: "WebHook",
-		Webhook: &webhookActionInfo{
-			URL: "http://hello.example.com/world",
-		},
-	}, nil)
-	return a
-}
 
 func TestCreateWebhookSub(t *testing.T) {
 	assert := assert.New(t)

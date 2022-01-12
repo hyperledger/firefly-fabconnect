@@ -70,12 +70,16 @@ func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (
 	if err != nil {
 		return nil, err
 	}
-	tx, err := utils.DecodeBlockDataEnvelope(result.TransactionEnvelope)
+	bloc := &utils.RawBlock{}
+	envelope, tx, err := bloc.DecodeBlockDataEnvelope(result.TransactionEnvelope)
 	if err != nil {
 		return nil, err
 	}
 
-	return tx, nil
+	ret := make(map[string]interface{})
+	ret["tx"] = tx
+	ret["raw"] = envelope
+	return ret, nil
 }
 
 func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerClient *ledger.Client, err error) {
