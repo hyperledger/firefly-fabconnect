@@ -60,6 +60,19 @@ func (l *ledgerClientWrapper) queryChainInfo(channelId, signer string) (*fab.Blo
 	return result, nil
 }
 
+func (l *ledgerClientWrapper) queryBlock(channelId string, blockNumber uint64, signer string) (*utils.RawBlock, *utils.Block, error) {
+	client, err := l.getLedgerClient(channelId, signer)
+	if err != nil {
+		return nil, nil, errors.Errorf("Failed to get channel client. %s", err)
+	}
+	result, err := client.QueryBlock(blockNumber)
+	if err != nil {
+		return nil, nil, err
+	}
+	rawblock, block, err := utils.DecodeBlock(result)
+	return rawblock, block, err
+}
+
 func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (map[string]interface{}, error) {
 	client, err := l.getLedgerClient(channelId, signer)
 	if err != nil {

@@ -29,6 +29,7 @@ import (
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/utils"
 	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	mockfabric "github.com/hyperledger/firefly-fabconnect/mocks/fabric/client"
 	mockkvstore "github.com/hyperledger/firefly-fabconnect/mocks/kvstore"
@@ -190,8 +191,18 @@ func mockRPCClient(fromBlock string, withReset ...bool) *mockfabric.RPCClient {
 			Height: 10,
 		},
 	}
+	rawBlock := &utils.RawBlock{
+		Header: &common.BlockHeader{
+			Number: uint64(20),
+		},
+	}
+	block := &utils.Block{
+		Number:    uint64(20),
+		Timestamp: int64(1000000),
+	}
 	rpc.On("SubscribeEvent", mock.Anything, mock.Anything).Return(nil, roBlockEventChan, roCCEventChan, nil)
 	rpc.On("QueryChainInfo", mock.Anything, mock.Anything).Return(res, nil)
+	rpc.On("QueryBlock", mock.Anything, mock.Anything, mock.Anything).Return(rawBlock, block, nil)
 	rpc.On("Unregister", mock.Anything).Return()
 
 	go func() {
@@ -202,6 +213,11 @@ func mockRPCClient(fromBlock string, withReset ...bool) *mockfabric.RPCClient {
 		}
 		blockEventChan <- &fab.BlockEvent{
 			Block: constructBlock(11),
+		}
+		ccEventChan <- &fab.CCEvent{
+			BlockNumber: uint64(10),
+			TxID:        "3144a3ad43dcc11374832bbb71561320de81fd80d69cc8e26a9ea7d3240a5e84",
+			ChaincodeID: "asset_transfer",
 		}
 		if len(withReset) > 0 {
 			blockEventChan <- &fab.BlockEvent{

@@ -25,6 +25,7 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -108,6 +109,19 @@ func (w *gwRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.Blockchain
 
 	log.Tracef("RPC [%s] <-- %+v", channelId, result)
 	return result, nil
+}
+
+func (w *gwRPCWrapper) QueryBlock(channelId string, blockNumber uint64, signer string) (*utils.RawBlock, *utils.Block, error) {
+	log.Tracef("RPC [%s] --> QueryBlock %v", channelId, blockNumber)
+
+	rawblock, block, err := w.ledgerClientWrapper.queryBlock(channelId, blockNumber, signer)
+	if err != nil {
+		log.Errorf("Failed to query block %v on channel %s. %s", blockNumber, channelId, err)
+		return nil, nil, err
+	}
+
+	log.Tracef("RPC [%s] <-- success", channelId)
+	return rawblock, block, nil
 }
 
 func (w *gwRPCWrapper) QueryTransaction(channelId, signer, txId string) (map[string]interface{}, error) {

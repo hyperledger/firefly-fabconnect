@@ -380,7 +380,7 @@ func TestProcessEventsEnd2EndWebhook(t *testing.T) {
 		&StreamInfo{
 			BatchSize:  1,
 			Webhook:    &webhookActionInfo{},
-			Timestamps: false,
+			Timestamps: true,
 		}, db, 200)
 	defer svr.Close()
 
@@ -392,9 +392,15 @@ func TestProcessEventsEnd2EndWebhook(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
+		// the block event
 		e1s := <-eventStream
 		assert.Equal(1, len(e1s))
 		assert.Equal(uint64(11), e1s[0].BlockNumber)
+		// the chaincode event
+		e2s := <-eventStream
+		assert.Equal(1, len(e2s))
+		assert.Equal(uint64(10), e2s[0].BlockNumber)
+		assert.Equal(int64(1000000), e2s[0].Timestamp)
 		wg.Done()
 	}()
 	wg.Wait()
@@ -417,7 +423,7 @@ func TestProcessEventsEnd2EndCatchupWebhook(t *testing.T) {
 	_ = db.Init()
 	sm, stream, svr, eventStream := newTestStreamForBatching(
 		&StreamInfo{
-			BatchSize:  1,
+			BatchSize:  2,
 			Webhook:    &webhookActionInfo{},
 			Timestamps: false,
 		}, db, 200)
@@ -432,11 +438,9 @@ func TestProcessEventsEnd2EndCatchupWebhook(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		e1s := <-eventStream
-		assert.Equal(1, len(e1s))
+		assert.Equal(2, len(e1s))
 		assert.Equal(uint64(1), e1s[0].BlockNumber)
-		e2s := <-eventStream
-		assert.Equal(1, len(e2s))
-		assert.Equal(uint64(11), e2s[0].BlockNumber)
+		assert.Equal(uint64(11), e1s[1].BlockNumber)
 		wg.Done()
 	}()
 	wg.Wait()
@@ -516,6 +520,10 @@ func TestProcessEventsEnd2EndWithReset(t *testing.T) {
 		e1s := <-eventStream
 		assert.Equal(1, len(e1s))
 		assert.Equal(uint64(11), e1s[0].BlockNumber)
+		// the chaincode event
+		e2s := <-eventStream
+		assert.Equal(1, len(e2s))
+		assert.Equal(uint64(10), e2s[0].BlockNumber)
 		wg.Done()
 	}()
 	wg.Wait()
@@ -625,7 +633,7 @@ func TestPauseResumeAfterCheckpoint(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		for i := 0; i < 1; i++ {
+		for i := 0; i < 2; i++ {
 			<-eventStream
 		}
 		wg.Done()
@@ -691,7 +699,7 @@ func TestPauseResumeBeforeCheckpoint(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		for i := 0; i < 1; i++ {
+		for i := 0; i < 2; i++ {
 			<-eventStream
 		}
 		wg.Done()
@@ -731,7 +739,7 @@ func TestMarkStaleOnError(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		for i := 0; i < 1; i++ {
+		for i := 0; i < 2; i++ {
 			<-eventStream
 		}
 		wg.Done()
@@ -809,7 +817,7 @@ func TestStoreCheckpointStoreError(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		for i := 0; i < 1; i++ {
+		for i := 0; i < 2; i++ {
 			<-eventStream
 		}
 		wg.Done()
@@ -1080,6 +1088,7 @@ func TestUpdateStreamMissingWebhookURL(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		<-eventStream
+		<-eventStream
 		wg.Done()
 	}()
 	wg.Wait()
@@ -1122,6 +1131,7 @@ func TestUpdateStreamInvalidWebhookURL(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
+		<-eventStream
 		<-eventStream
 		wg.Done()
 	}()
