@@ -30,6 +30,7 @@ import (
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/ws"
 
+	lru "github.com/hashicorp/golang-lru"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -73,6 +74,7 @@ type StreamInfo struct {
 	Webhook              *webhookActionInfo   `json:"webhook,omitempty"`
 	WebSocket            *webSocketActionInfo `json:"websocket,omitempty"`
 	Timestamps           bool                 `json:"timestamps,omitempty"` // Include block timestamps in the events generated
+	TimestampCacheSize   int                  `json:"timestampCacheSize,omitempty"`
 }
 
 type webhookActionInfo struct {
@@ -91,26 +93,27 @@ type webSocketActionInfo struct {
 type eventHandler func(*eventData)
 
 type eventStream struct {
-	sm                subscriptionManager
-	allowPrivateIPs   bool
-	spec              *StreamInfo
-	eventStream       chan *eventData
-	eventHandler      eventHandler
-	stopped           bool
-	processorDone     bool
-	pollingInterval   time.Duration
-	pollerDone        bool
-	inFlight          uint64
-	batchCond         *sync.Cond
-	batchQueue        *list.List
-	batchCount        uint64
-	initialRetryDelay time.Duration
-	backoffFactor     float64
-	updateInProgress  bool
-	updateInterrupt   chan struct{}   // a zero-sized struct used only for signaling (hand rolled alternative to context)
-	updateWG          *sync.WaitGroup // Wait group for the go routines to reply back after they have stopped
-	action            eventStreamAction
-	wsChannels        ws.WebSocketChannels
+	sm                  subscriptionManager
+	allowPrivateIPs     bool
+	spec                *StreamInfo
+	eventStream         chan *eventData
+	eventHandler        eventHandler
+	stopped             bool
+	processorDone       bool
+	pollingInterval     time.Duration
+	pollerDone          bool
+	inFlight            uint64
+	batchCond           *sync.Cond
+	batchQueue          *list.List
+	batchCount          uint64
+	initialRetryDelay   time.Duration
+	backoffFactor       float64
+	updateInProgress    bool
+	updateInterrupt     chan struct{}   // a zero-sized struct used only for signaling (hand rolled alternative to context)
+	updateWG            *sync.WaitGroup // Wait group for the go routines to reply back after they have stopped
+	action              eventStreamAction
+	wsChannels          ws.WebSocketChannels
+	blockTimestampCache *lru.Cache
 }
 
 type eventStreamAction interface {
@@ -149,6 +152,9 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 	} else {
 		spec.ErrorHandling = ErrorHandlingSkip
 	}
+	if spec.TimestampCacheSize == 0 {
+		spec.TimestampCacheSize = DefaultTimestampCacheSize
+	}
 
 	a = &eventStream{
 		sm:                sm,
@@ -163,6 +169,10 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 		wsChannels:        wsChannels,
 	}
 	a.eventHandler = a.handleEvent
+
+	if a.blockTimestampCache, err = lru.New(spec.TimestampCacheSize); err != nil {
+		return nil, errors.Errorf(errors.EventStreamsCreateStreamResourceErr, err)
+	}
 
 	if a.pollingInterval == 0 {
 		// Let's us do this from UTs, without exposing it

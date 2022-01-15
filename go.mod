@@ -11,6 +11,7 @@ require (
 	github.com/google/certificate-transparency-go v1.1.1 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/websocket v1.4.2
+	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hyperledger/fabric-config v0.0.7 // indirect
 	github.com/hyperledger/fabric-protos-go v0.0.0-20201028172056-a3136dde2354
 	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20210729165856-3be4ed253dcf

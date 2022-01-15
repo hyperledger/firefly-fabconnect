@@ -17,64 +17,16 @@ package events
 import (
 	"io/ioutil"
 	"net/http/httptest"
-	"os"
 	"path"
 	"testing"
 	"time"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
-	mockkvstore "github.com/hyperledger/firefly-fabconnect/mocks/kvstore"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
 )
-
-type mockWebSocket struct {
-	capturedNamespace string
-	sender            chan interface{}
-	broadcast         chan interface{}
-	receiver          chan error
-	closing           chan struct{}
-}
-
-func (m *mockWebSocket) GetChannels(namespace string) (chan<- interface{}, chan<- interface{}, <-chan error, <-chan struct{}) {
-	m.capturedNamespace = namespace
-	return m.sender, m.broadcast, m.receiver, m.closing
-}
-
-func (m *mockWebSocket) SendReply(message interface{}) {}
-
-func tempdir(t *testing.T) string {
-	dir, _ := ioutil.TempDir("", "fly")
-	t.Logf("tmpdir/create: %s", dir)
-	return dir
-}
-
-func cleanup(t *testing.T, dir string) {
-	t.Logf("tmpdir/cleanup: %s [dir]", dir)
-	os.RemoveAll(dir)
-}
-
-func newMockWebSocket() *mockWebSocket {
-	return &mockWebSocket{
-		sender:    make(chan interface{}),
-		broadcast: make(chan interface{}),
-		receiver:  make(chan error),
-		closing:   make(chan struct{}),
-	}
-}
-
-func newTestSubscriptionManager() *subscriptionMGR {
-	smconf := &conf.EventstreamConf{}
-	rpc := mockRPCClient("")
-	sm := NewSubscriptionManager(smconf, rpc, newMockWebSocket()).(*subscriptionMGR)
-	sm.db = &mockkvstore.KVStore{}
-	sm.config.WebhooksAllowPrivateIPs = true
-	sm.config.PollingIntervalSec = 0
-	return sm
-}
 
 func TestInitLevelDBSuccess(t *testing.T) {
 	assert := assert.New(t)

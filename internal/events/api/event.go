@@ -22,6 +22,7 @@ const (
 	EventPayloadType_Bytes           = "bytes"           // default data type of the event payload, no special processing is done before returning to the subscribing client
 	EventPayloadType_String          = "string"          // event payload will be an UTF-8 encoded string
 	EventPayloadType_StringifiedJSON = "stringifiedJSON" // event payload will be a structured map with UTF-8 encoded string values
+	EventPayloadType_JSON            = "json"            // equivalent to "stringifiedJSON"
 )
 
 // persistedFilter is the part of the filter we record to storage
@@ -52,7 +53,7 @@ type SubscriptionInfo struct {
 	Signer      string          `json:"signer"`
 	FromBlock   string          `json:"fromBlock,omitempty"`
 	Filter      persistedFilter `json:"filter"`
-	PayloadType string          `json:"payloadType,omitempty"` // optional. data type of the payload bytes; "bytes", "string" or "stringifiedJSON". Default to "bytes"
+	PayloadType string          `json:"payloadType,omitempty"` // optional. data type of the payload bytes; "bytes", "string" or "stringifiedJSON/json". Default to "bytes"
 }
 
 // GetID returns the ID (for sorting)
@@ -61,11 +62,12 @@ func (info *SubscriptionInfo) GetID() string {
 }
 
 type EventEntry struct {
-	ChaincodeId   string      `json:"chaincodeId"`
-	BlockNumber   uint64      `json:"blockNumber"`
-	TransactionId string      `json:"transactionId"`
-	EventName     string      `json:"eventName"`
-	Payload       interface{} `json:"payload"`
-	Timestamp     uint64      `json:"timestamp,omitempty"`
-	SubID         string      `json:"subId"`
+	ChaincodeId      string      `json:"chaincodeId"`
+	BlockNumber      uint64      `json:"blockNumber"`
+	TransactionId    string      `json:"transactionId"`
+	TransactionIndex int         `json:"transactionIndex"`
+	EventName        string      `json:"eventName"`
+	Payload          interface{} `json:"payload"`
+	Timestamp        int64       `json:"timestamp,omitempty"`
+	SubID            string      `json:"subId"`
 }

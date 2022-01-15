@@ -140,11 +140,33 @@ func (s *subscription) processNewEvents() {
 				EventName:     ccEvent.EventName,
 				Payload:       ccEvent.Payload,
 			}
+			if s.ep.stream.spec.Timestamps {
+				s.getEventTimestamp(event)
+			}
 			if err := s.ep.processEventEntry(s.info, event); err != nil {
 				log.Errorf("Failed to process event: %s", err)
 			}
 		}
 	}
+}
+
+func (s *subscription) getEventTimestamp(evt *eventsapi.EventEntry) {
+	// the key in the cache is the block number represented as a string
+	blockNumber := strconv.FormatUint(evt.BlockNumber, 10)
+	if ts, ok := s.ep.stream.blockTimestampCache.Get(blockNumber); ok {
+		// we found the timestamp for the block in our local cache, assert it's type and return, no need to query the chain
+		evt.Timestamp = ts.(int64)
+		return
+	}
+	// we didn't find the timestamp in our cache, query the node for the block header where we can find the timestamp
+	_, block, err := s.client.QueryBlock(s.info.ChannelId, evt.BlockNumber, s.info.Signer)
+	if err != nil {
+		log.Errorf("Unable to retrieve block[%s] timestamp: %s", blockNumber, err)
+		evt.Timestamp = 0 // set to 0, we were not able to retrieve the timestamp.
+		return
+	}
+	evt.Timestamp = block.Timestamp
+	s.ep.stream.blockTimestampCache.Add(blockNumber, evt.Timestamp)
 }
 
 func (s *subscription) unsubscribe(deleting bool) {

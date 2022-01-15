@@ -393,10 +393,44 @@ components:
           enum:
             - websocket
             - webhook
+          default: websocket
         websocket:
           oneOf:
             - $ref: "#/components/schemas/websocket_info"
             - $ref: "#/components/schemas/webhook_info"
+        suspended:
+          type: boolean
+          default: false
+          description: if set to 'true', the stream will be suspended
+        batchSize:
+          type: integer
+          default: 1
+          description: how many events should be packed in each event batch to deliver to the client. Range is 1-1000
+        batchTimeoutMS:
+          type: integer
+          default: 5000
+          description: if there are pending events to deliver, but the batch size has not been reached, this is the maximum amount of milliseconds to wait before delivering the current batch
+        errorHandling:
+          type: string
+          description: when the delivery should be blocked when the event listener client failed to take delivery, or skip and continue
+          enum:
+            - block
+            - skip
+          default: skip
+        retryTimeoutSec:
+          type: integer
+          description: total amount of time (in seconds) to retry a failed event delivery
+        blockedReryDelaySec:
+          type: integer
+          description: amount of time (in seconds) to wait before retrying a failed delivery
+        timestamps:
+          type: boolean
+          default: false
+          description: Chaincode events from Fabric do not contain timestamps. If set to 'true', FabConnect to make a call to Fabric to download the block to obtain the timestamp, and set on the event. Note doing this incurs time overhead in events processing
+        timestampCacheSize:
+          type: integer
+          default: 1000
+          description: The size of the internal cache for the blocknumber <-> timestamp map
     subscription_input:
       type: "object"
       properties:
@@ -416,7 +450,7 @@ components:
           type: string
           default: string
           enum:
-            - stringifiedJSON
+            - json
             - string
         filter:
           type: object

@@ -22,6 +22,7 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/utils"
 )
 
 type ChaincodeSpec struct {
@@ -54,6 +55,7 @@ type RPCClient interface {
 	Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error)
 	Query(channelId, signer, chaincodeName, method string, args []string) ([]byte, error)
 	QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error)
+	QueryBlock(channelId string, blockNumber uint64, signer string) (*utils.RawBlock, *utils.Block, error)
 	QueryTransaction(channelId, signer, txId string) (map[string]interface{}, error)
 	SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error)
 	Unregister(*RegistrationWrapper)

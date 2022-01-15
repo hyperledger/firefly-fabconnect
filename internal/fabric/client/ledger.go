@@ -60,6 +60,19 @@ func (l *ledgerClientWrapper) queryChainInfo(channelId, signer string) (*fab.Blo
 	return result, nil
 }
 
+func (l *ledgerClientWrapper) queryBlock(channelId string, blockNumber uint64, signer string) (*utils.RawBlock, *utils.Block, error) {
+	client, err := l.getLedgerClient(channelId, signer)
+	if err != nil {
+		return nil, nil, errors.Errorf("Failed to get channel client. %s", err)
+	}
+	result, err := client.QueryBlock(blockNumber)
+	if err != nil {
+		return nil, nil, err
+	}
+	rawblock, block, err := utils.DecodeBlock(result)
+	return rawblock, block, err
+}
+
 func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (map[string]interface{}, error) {
 	client, err := l.getLedgerClient(channelId, signer)
 	if err != nil {
@@ -70,12 +83,16 @@ func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (
 	if err != nil {
 		return nil, err
 	}
-	tx, err := utils.DecodeBlockDataEnvelope(result.TransactionEnvelope)
+	bloc := &utils.RawBlock{}
+	envelope, tx, err := bloc.DecodeBlockDataEnvelope(result.TransactionEnvelope)
 	if err != nil {
 		return nil, err
 	}
 
-	return tx, nil
+	ret := make(map[string]interface{})
+	ret["tx"] = tx
+	ret["raw"] = envelope
+	return ret, nil
 }
 
 func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerClient *ledger.Client, err error) {

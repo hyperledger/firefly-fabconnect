@@ -73,7 +73,7 @@ func (ep *evtProcessor) processEventEntry(subInfo *api.SubscriptionInfo, entry *
 	switch payloadType {
 	case api.EventPayloadType_String:
 		entry.Payload = string(entry.Payload.([]byte))
-	case api.EventPayloadType_StringifiedJSON:
+	case api.EventPayloadType_StringifiedJSON, api.EventPayloadType_JSON:
 		structuredMap := make(map[string]interface{})
 		err := json.Unmarshal(entry.Payload.([]byte), &structuredMap)
 		if err != nil {
