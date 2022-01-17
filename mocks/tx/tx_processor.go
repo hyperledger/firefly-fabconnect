@@ -14,6 +14,22 @@ type TxProcessor struct {
 	mock.Mock
 }
 
+// GetRPCClient provides a mock function with given fields:
+func (_m *TxProcessor) GetRPCClient() client.RPCClient {
+	ret := _m.Called()
+
+	var r0 client.RPCClient
+	if rf, ok := ret.Get(0).(func() client.RPCClient); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(client.RPCClient)
+		}
+	}
+
+	return r0
+}
+
 // Init provides a mock function with given fields: _a0
 func (_m *TxProcessor) Init(_a0 client.RPCClient) {
 	_m.Called(_a0)

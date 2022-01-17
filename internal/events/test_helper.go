@@ -1,4 +1,4 @@
-// Copyright 2019 Kaleido
+// Copyright 2022 Kaleido
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,16 +22,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
-	eventmocks "github.com/hyperledger/fabric-sdk-go/pkg/fab/events/service/mocks"
-
-	"github.com/hyperledger/fabric-protos-go/common"
-	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
-	"github.com/hyperledger/firefly-fabconnect/internal/fabric/utils"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/test"
 	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
-	mockfabric "github.com/hyperledger/firefly-fabconnect/mocks/fabric/client"
 	mockkvstore "github.com/hyperledger/firefly-fabconnect/mocks/kvstore"
 	"github.com/stretchr/testify/mock"
 )
@@ -115,7 +109,7 @@ func newTestStream(submgr subscriptionManager) *eventStream {
 
 func newTestSubscriptionManager() *subscriptionMGR {
 	smconf := &conf.EventstreamConf{}
-	rpc := mockRPCClient("")
+	rpc := test.MockRPCClient("")
 	sm := NewSubscriptionManager(smconf, rpc, newMockWebSocket()).(*subscriptionMGR)
 	sm.db = &mockkvstore.KVStore{}
 	sm.config.WebhooksAllowPrivateIPs = true
@@ -180,57 +174,8 @@ func testEvent(subID string) *eventData {
 	}
 }
 
-func mockRPCClient(fromBlock string, withReset ...bool) *mockfabric.RPCClient {
-	rpc := &mockfabric.RPCClient{}
-	blockEventChan := make(chan *fab.BlockEvent)
-	ccEventChan := make(chan *fab.CCEvent)
-	var roBlockEventChan <-chan *fab.BlockEvent = blockEventChan
-	var roCCEventChan <-chan *fab.CCEvent = ccEventChan
-	res := &fab.BlockchainInfoResponse{
-		BCI: &common.BlockchainInfo{
-			Height: 10,
-		},
-	}
-	rawBlock := &utils.RawBlock{
-		Header: &common.BlockHeader{
-			Number: uint64(20),
-		},
-	}
-	block := &utils.Block{
-		Number:    uint64(20),
-		Timestamp: int64(1000000),
-	}
-	rpc.On("SubscribeEvent", mock.Anything, mock.Anything).Return(nil, roBlockEventChan, roCCEventChan, nil)
-	rpc.On("QueryChainInfo", mock.Anything, mock.Anything).Return(res, nil)
-	rpc.On("QueryBlock", mock.Anything, mock.Anything, mock.Anything).Return(rawBlock, block, nil)
-	rpc.On("Unregister", mock.Anything).Return()
-
-	go func() {
-		if fromBlock == "0" {
-			blockEventChan <- &fab.BlockEvent{
-				Block: constructBlock(1),
-			}
-		}
-		blockEventChan <- &fab.BlockEvent{
-			Block: constructBlock(11),
-		}
-		ccEventChan <- &fab.CCEvent{
-			BlockNumber: uint64(10),
-			TxID:        "3144a3ad43dcc11374832bbb71561320de81fd80d69cc8e26a9ea7d3240a5e84",
-			ChaincodeID: "asset_transfer",
-		}
-		if len(withReset) > 0 {
-			blockEventChan <- &fab.BlockEvent{
-				Block: constructBlock(11),
-			}
-		}
-	}()
-
-	return rpc
-}
-
 func setupTestSubscription(sm *subscriptionMGR, stream *eventStream, subscriptionName, fromBlock string, withReset ...bool) *eventsapi.SubscriptionInfo {
-	rpc := mockRPCClient(fromBlock, withReset...)
+	rpc := test.MockRPCClient(fromBlock, withReset...)
 	sm.rpc = rpc
 	spec := &eventsapi.SubscriptionInfo{
 		Name:   subscriptionName,
@@ -242,11 +187,4 @@ func setupTestSubscription(sm *subscriptionMGR, stream *eventStream, subscriptio
 	_ = sm.addSubscription(spec)
 
 	return spec
-}
-
-func constructBlock(number uint64) *common.Block {
-	mockTx := eventmocks.NewTransactionWithCCEvent("testTxID", peer.TxValidationCode_VALID, "testChaincodeID", "testCCEventName", []byte("testPayload"))
-	mockBlock := eventmocks.NewBlock("testChannelID", mockTx)
-	mockBlock.Header.Number = number
-	return mockBlock
 }

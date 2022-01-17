@@ -6,6 +6,8 @@ import (
 	context "context"
 	http "net/http"
 
+	httprouter "github.com/julienschmidt/httprouter"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -17,4 +19,24 @@ type SyncDispatcher struct {
 // DispatchMsgSync provides a mock function with given fields: ctx, res, req, msg
 func (_m *SyncDispatcher) DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg interface{}) {
 	_m.Called(ctx, res, req, msg)
+}
+
+// GetBlock provides a mock function with given fields: res, req, params
+func (_m *SyncDispatcher) GetBlock(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	_m.Called(res, req, params)
+}
+
+// GetChainInfo provides a mock function with given fields: res, req, params
+func (_m *SyncDispatcher) GetChainInfo(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	_m.Called(res, req, params)
+}
+
+// GetTxById provides a mock function with given fields: res, req, params
+func (_m *SyncDispatcher) GetTxById(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	_m.Called(res, req, params)
+}
+
+// QueryChaincode provides a mock function with given fields: res, req, params
+func (_m *SyncDispatcher) QueryChaincode(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	_m.Called(res, req, params)
 }

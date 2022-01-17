@@ -27,8 +27,10 @@ import (
 
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/messages"
+	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
 	"github.com/hyperledger/firefly-fabconnect/internal/tx"
 	"github.com/hyperledger/firefly-fabconnect/internal/utils"
+	"github.com/julienschmidt/httprouter"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -37,6 +39,10 @@ import (
 // synchronously. We perform those within this package.
 type SyncDispatcher interface {
 	DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg interface{})
+	QueryChaincode(res http.ResponseWriter, req *http.Request, params httprouter.Params)
+	GetTxById(res http.ResponseWriter, req *http.Request, params httprouter.Params)
+	GetChainInfo(res http.ResponseWriter, req *http.Request, params httprouter.Params)
+	GetBlock(res http.ResponseWriter, req *http.Request, params httprouter.Params)
 }
 
 type syncDispatcher struct {
@@ -148,6 +154,7 @@ func (i *syncResponder) ReplyWithReceipt(receipt messages.ReplyWithHeaders) {
 	i.waiter.Broadcast()
 }
 
+// handles transactions that require tracking transaction results
 func (d *syncDispatcher) DispatchMsgSync(ctx context.Context, res http.ResponseWriter, req *http.Request, msg interface{}) {
 	responder := &syncResponder{
 		res:    res,
@@ -166,4 +173,105 @@ func (d *syncDispatcher) DispatchMsgSync(ctx context.Context, res http.ResponseW
 	for !responder.done {
 		responder.waiter.Wait()
 	}
+}
+
+//
+// synchronous request to Fabric API endpoints
+//
+
+func (d *syncDispatcher) QueryChaincode(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	start := time.Now().UTC()
+	msg, err := restutil.BuildQueryMessage(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+
+	result, err1 := d.processor.GetRPCClient().Query(msg.Headers.ChannelID, msg.Headers.Signer, msg.Headers.ChaincodeName, msg.Function, msg.Args)
+	callTime := time.Now().UTC().Sub(start)
+	if err1 != nil {
+		log.Warnf("Query [chaincode=%s, func=%s] failed to send: %s [%.2fs]", msg.Headers.ChaincodeName, msg.Function, err1, callTime.Seconds())
+		errors.RestErrReply(res, req, err1, 500)
+		return
+	}
+	log.Infof("Query [chaincode=%s, func=%s] [%.2fs]", msg.Headers.ChaincodeName, msg.Function, callTime.Seconds())
+	var reply messages.QueryResult
+	reply.Headers.ChannelID = msg.Headers.ChannelID
+	reply.Headers.ID = msg.Headers.ID
+	reply.Result = utils.DecodePayload(result)
+	sendReply(res, req, reply)
+}
+
+func (d *syncDispatcher) GetTxById(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	start := time.Now().UTC()
+	msg, err := restutil.BuildTxByIdMessage(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+
+	result, err1 := d.processor.GetRPCClient().QueryTransaction(msg.Headers.ChannelID, msg.Headers.Signer, msg.TxId)
+	callTime := time.Now().UTC().Sub(start)
+	if err1 != nil {
+		log.Warnf("Query transaction %s failed to send: %s [%.2fs]", msg.TxId, err1, callTime.Seconds())
+		errors.RestErrReply(res, req, err1, 500)
+		return
+	}
+	log.Infof("Query transaction %s [%.2fs]", msg.TxId, callTime.Seconds())
+	var reply messages.LedgerQueryResult
+	reply.Result = result
+
+	sendReply(res, req, reply)
+}
+
+func (d *syncDispatcher) GetChainInfo(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	msg, err := restutil.BuildGetChainInfoMessage(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+
+	result, err1 := d.processor.GetRPCClient().QueryChainInfo(msg.Headers.ChannelID, msg.Headers.Signer)
+	if err1 != nil {
+		errors.RestErrReply(res, req, err1, 500)
+		return
+	}
+	var reply messages.LedgerQueryResult
+	m := make(map[string]interface{})
+	m["height"] = result.BCI.Height
+	m["current_block_hash"] = result.BCI.CurrentBlockHash
+	m["previous_block_hash"] = result.BCI.PreviousBlockHash
+	reply.Result = m
+
+	sendReply(res, req, reply)
+}
+
+func (d *syncDispatcher) GetBlock(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	msg, err := restutil.BuildGetBlockMessage(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+
+	rawblock, block, err1 := d.processor.GetRPCClient().QueryBlock(msg.Headers.ChannelID, msg.BlockNumber, msg.Headers.Signer)
+	if err1 != nil {
+		errors.RestErrReply(res, req, err1, 500)
+		return
+	}
+	var reply messages.LedgerQueryResult
+	result := make(map[string]interface{})
+	result["raw"] = rawblock
+	result["block"] = block
+	reply.Result = result
+
+	sendReply(res, req, reply)
+}
+
+func sendReply(res http.ResponseWriter, req *http.Request, content interface{}) {
+	reply, _ := json.MarshalIndent(content, "", "  ")
+	log.Infof("<-- %s %s [%d]", req.Method, req.URL, 200)
+	log.Debugf("<-- %s", reply)
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(200)
+	_, _ = res.Write(reply)
 }

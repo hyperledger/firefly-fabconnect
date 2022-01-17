@@ -16,17 +16,38 @@
 
 package utils
 
+import "github.com/hyperledger/fabric-protos-go/peer"
+
 type Block struct {
-	Number       uint64
-	Timestamp    int64 // unix nano
-	Transactions []*Transaction
+	Number       uint64 `json:"block_number"`
+	DataHash     string `json:"data_hash"`     // hex string
+	PreviousHash string `json:"previous_hash"` // hex string
+
+	Transactions []*Transaction `json:"transactions"`
+}
+
+type Creator struct {
+	MspID string `json:"msp_id"`
+	Cert  string `json:"cert"`
 }
 
 type Transaction struct {
-	Type      string
-	Status    string
-	Proposals []*Proposal
+	Type      string               `json:"type"`
+	TxId      string               `json:"tx_id"`
+	Nonce     string               `json:"nonce"` // hex string
+	Creator   *Creator             `json:"creator"`
+	Status    string               `json:"status"`
+	Signature string               `json:"signature"`
+	Timestamp int64                `json:"timestamp"` // unix nano
+	Actions   []*TransactionAction `json:"actions"`
 }
 
-type Proposal struct {
+type TransactionAction struct {
+	Nonce        string              `json:"nonce"` // hex string
+	Creator      *Creator            `json:"creator"`
+	TransientMap *map[string][]byte  `json:"transient_map"`
+	ChaincodeId  *peer.ChaincodeID   `json:"chaincode_id"`
+	Input        *ChaincodeSpecInput `json:"input"`
+	ProposalHash string              `json:"proposal_hash"` // hex string
+	Event        *ChaincodeEvent     `json:"event"`
 }

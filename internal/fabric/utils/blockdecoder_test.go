@@ -50,7 +50,10 @@ func TestDecodeEndorserBlockWithEvents(t *testing.T) {
 	assert.Regexp("[0-9a-f]{64}", event.TxId)
 	assert.Regexp("[0-9]+", event.Timestamp)
 	assert.Equal("AssetCreated", event.EventName)
-	assert.Equal("{\"ID\":\"asset05\",\"color\":\"red\",\"size\":10,\"owner\":\"Tom\",\"appraisedValue\":123000}", string(event.Payload))
+	m, ok := event.Payload.(map[string]interface{})
+	assert.Equal(true, ok)
+	assert.Equal("asset05", m["ID"])
+	assert.Equal(float64(123000), m["appraisedValue"])
 
 	cpp := action.Payload.ChaincodeProposalPayload
 	assert.Equal("asset_transfer", cpp.Input.ChaincodeSpec.ChaincodeId.Name)

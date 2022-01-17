@@ -26,9 +26,6 @@ type RawBlock struct {
 	Data     *BlockData            `json:"data"`
 	Header   *common.BlockHeader   `json:"header"`
 	Metadata *common.BlockMetadata `json:"metadata"`
-
-	channelHeader *ChannelHeader
-	timestamp     int64
 }
 
 type BlockData struct {
@@ -77,11 +74,11 @@ type Extension struct {
 }
 
 type ChaincodeEvent struct {
-	ChaincodeId string
-	TxId        string
-	Timestamp   string
-	EventName   string
-	Payload     []byte
+	ChaincodeId string      `json:"chaincodeId"`
+	TxId        string      `json:"transactionId"`
+	Timestamp   string      `json:"timestamp"`
+	EventName   string      `json:"eventName"`
+	Payload     interface{} `json:"payload"`
 }
 
 type ChaincodeProposalPayload struct {

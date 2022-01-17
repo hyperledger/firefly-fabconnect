@@ -90,7 +90,7 @@ func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (
 	}
 
 	ret := make(map[string]interface{})
-	ret["tx"] = tx
+	ret["transaction"] = tx
 	ret["raw"] = envelope
 	return ret, nil
 }

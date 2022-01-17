@@ -103,13 +103,15 @@ func BuildQueryMessage(res http.ResponseWriter, req *http.Request, params httpro
 
 	msg := messages.QueryChaincode{}
 	msg.Headers.ID = msgId // this could be empty
-	msg.Headers.MsgType = messages.MsgTypeQueryChaincode
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
 	msg.Headers.ChaincodeName = chaincode
+	if body["func"] == nil {
+		return nil, NewRestError("Must specify target chaincode function", 400)
+	}
 	msg.Function = body["func"].(string)
 	if msg.Function == "" {
-		return nil, NewRestError("Must specify target chaincode function", 400)
+		return nil, NewRestError("Target chaincode function must not be empty", 400)
 	}
 	argsVal, err := processArgs(body)
 	if err != nil {
@@ -138,10 +140,62 @@ func BuildTxByIdMessage(res http.ResponseWriter, req *http.Request, params httpr
 
 	msg := messages.GetTxById{}
 	msg.Headers.ID = msgId // this could be empty
-	msg.Headers.MsgType = messages.MsgTypeGetTxById
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
 	msg.TxId = params.ByName("txId")
+
+	return &msg, nil
+}
+
+func BuildGetChainInfoMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetChainInfo, *RestError) {
+	var body map[string]interface{}
+	err := req.ParseForm()
+	if err != nil {
+		return nil, NewRestError(err.Error(), 400)
+	}
+	msgId := getFlyParam("id", body, req)
+	channel := getFlyParam("channel", body, req)
+	if channel == "" {
+		return nil, NewRestError("Must specify the channel", 400)
+	}
+	signer := getFlyParam("signer", body, req)
+	if signer == "" {
+		return nil, NewRestError("Must specify the signer", 400)
+	}
+
+	msg := messages.GetChainInfo{}
+	msg.Headers.ID = msgId // this could be empty
+	msg.Headers.ChannelID = channel
+	msg.Headers.Signer = signer
+
+	return &msg, nil
+}
+
+func BuildGetBlockMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetBlock, *RestError) {
+	var body map[string]interface{}
+	err := req.ParseForm()
+	if err != nil {
+		return nil, NewRestError(err.Error(), 400)
+	}
+	msgId := getFlyParam("id", body, req)
+	channel := getFlyParam("channel", body, req)
+	if channel == "" {
+		return nil, NewRestError("Must specify the channel", 400)
+	}
+	signer := getFlyParam("signer", body, req)
+	if signer == "" {
+		return nil, NewRestError("Must specify the signer", 400)
+	}
+	blockNumber, err := strconv.ParseUint(params.ByName("blockNumber"), 10, 64)
+	if err != nil {
+		return nil, NewRestError("Invalid block number", 400)
+	}
+
+	msg := messages.GetBlock{}
+	msg.Headers.ID = msgId // this could be empty
+	msg.Headers.ChannelID = channel
+	msg.Headers.Signer = signer
+	msg.BlockNumber = blockNumber
 
 	return &msg, nil
 }

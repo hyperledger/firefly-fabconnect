@@ -23,6 +23,7 @@ import (
 
 	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/test"
 	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
@@ -145,7 +146,7 @@ func TestActionChildCleanup(t *testing.T) {
 	dir := tempdir(t)
 	defer cleanup(t, dir)
 	sm := newTestSubscriptionManager()
-	sm.rpc = mockRPCClient("")
+	sm.rpc = test.MockRPCClient("")
 	sm.db = kvstore.NewLDBKeyValueStore(path.Join(dir, "db"))
 	_ = sm.db.Init()
 	defer sm.db.Close()
@@ -177,7 +178,7 @@ func TestStreamAndSubscriptionErrors(t *testing.T) {
 	dir := tempdir(t)
 	defer cleanup(t, dir)
 	sm := newTestSubscriptionManager()
-	sm.rpc = mockRPCClient("")
+	sm.rpc = test.MockRPCClient("")
 	sm.db = kvstore.NewLDBKeyValueStore(path.Join(dir, "db"))
 	_ = sm.db.Init()
 	defer sm.db.Close()
