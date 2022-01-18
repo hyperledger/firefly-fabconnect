@@ -73,7 +73,7 @@ func (r *router) addRoutes() {
 	r.httpRouter.GET("/identities", r.listUsers)
 	r.httpRouter.GET("/identities/:username", r.getUser)
 
-	r.httpRouter.GET("/chainInfo", r.queryChainInfo)
+	r.httpRouter.GET("/chaininfo", r.queryChainInfo)
 	r.httpRouter.GET("/blocks/:blockNumber", r.queryBlock)
 
 	r.httpRouter.POST("/query", r.queryChaincode)

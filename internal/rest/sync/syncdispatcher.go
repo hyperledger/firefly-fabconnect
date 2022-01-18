@@ -18,6 +18,7 @@ package sync
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -239,8 +240,8 @@ func (d *syncDispatcher) GetChainInfo(res http.ResponseWriter, req *http.Request
 	var reply messages.LedgerQueryResult
 	m := make(map[string]interface{})
 	m["height"] = result.BCI.Height
-	m["current_block_hash"] = result.BCI.CurrentBlockHash
-	m["previous_block_hash"] = result.BCI.PreviousBlockHash
+	m["current_block_hash"] = hex.EncodeToString(result.BCI.CurrentBlockHash)
+	m["previous_block_hash"] = hex.EncodeToString(result.BCI.PreviousBlockHash)
 	reply.Result = m
 
 	sendReply(res, req, reply)

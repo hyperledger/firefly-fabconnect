@@ -68,6 +68,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/identity_enroll_output"
+  /chaininfo:
+    get:
+      summary: Return information of the ledger for a specified channel
+      parameters:
+        - $ref: "#/components/parameters/channel"
+        - $ref: "#/components/parameters/signer"
+      responses:
+        200:
+          description: Chain info retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/chaininfo"
+  /blocks/{blockNumber}:
+    get:
+      summary: "Query the block by number"
+      parameters:
+        - $ref: "#/components/parameters/blockNumber"
+        - $ref: "#/components/parameters/channel"
+        - $ref: "#/components/parameters/signer"
+      responses:
+        200:
+          description: "Transaction retrieved"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/get_block_output"
   /transactions:
     post:
       summary: "Send proposal to peers then send the transaction with the endorsements to the orderer"
@@ -94,6 +121,10 @@ paths:
       responses:
         200:
           description: "Transaction retrieved"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/get_transaction_output"
   /query:
     post:
       summary: "Send query request to the target chaincode"
@@ -470,6 +501,259 @@ components:
               type: string
               default: ""
               description: "Optionally specify a regular expression for the event names"
+    chaininfo:
+      type: object
+      properties:
+        height:
+          type: integer
+        current_block_hash:
+          type: string
+          description: hexidecimal string for the hash of the current block
+        previous_block_hash:
+          type: string
+          description: hexidecimal string for the hash of the previous block
+    get_transaction_output:
+      type: object
+      properties:
+        raw:
+          $ref: "#/components/schemas/raw_transaction"
+        transaction:
+          $ref: "#/components/schemas/transaction"
+    raw_transaction:
+      type: object
+      description: The transaction object defined by Fabric protobuf type `common.Envelope`
+      properties:
+        payload:
+          type: object
+          properties:
+            data:
+              type: object
+              properties:
+                actions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/payload_action"
+            header:
+              type: object
+              properties:
+                channel_header:
+                  type: object
+                  properties:
+                    channel_id:
+                      type: string
+                    epoch:
+                      type: string
+                    timestamp:
+                      type: integer
+                      description: unix nano time for when the transaction was submitted
+                    tx_id:
+                      type: string
+                    type:
+                      type: string
+                    version:
+                      type: integer
+                signature_header:
+                  $ref: "#/components/schemas/signature_header"
+        siganture:
+          type: string
+          description: base64 encoded signature bytes
+    payload_action:
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/signature_header"
+        payload:
+          type: object
+          properties:
+            action:
+              type: object
+              properties:
+                proposal_response_payload:
+                  type: object
+                  properties:
+                    extension:
+                      type: object
+                      properties:
+                        chaincode_id:
+                          $ref: "#/components/schemas/chaincode_id"
+                        events:
+                          type: object
+                          properties:
+                            chaincodeId:
+                              type: string
+                            transactionId:
+                              type: string
+                            timestamp:
+                              type: string
+                              description: unix nano of the time when the transaction was submitted
+                            eventName:
+                              type: string
+                            payload:
+                              oneOf:
+                                - type: string
+                                - type: object
+                                - type: array
+                    proposal_hash:
+                      type: string
+                      description: base64 encoded bytes for the proposal's hash
+            chaincode_proposal_payload:
+              type: object
+              properties:
+                TransientMap:
+                  type: object
+                input:
+                  type: object
+                  properties:
+                    chaincode_spec:
+                      type: object
+                      properties:
+                        chaincode_id:
+                          $ref: "#/components/schemas/chaincode_id"
+                        input:
+                          $ref: "#/components/schemas/chaincode_input"
+    chaincode_input:
+      type: object
+      properties:
+        args:
+          type: array
+          items:
+            type: string
+        is_init:
+          type: boolean
+    signature_header:
+      type: object
+      properties:
+        creator:
+          type: object
+          properties:
+            mspid:
+              type: string
+            id_bytes:
+              type: string
+              description: base64 encoded bytes for the signer's enrollment certificate
+        nonce:
+          type: string
+          description: base64 encoded bytes for the transaction nonce
+    creator:
+      type: object
+      properties:
+        msp_id:
+          type: string
+        cert:
+          type: string
+    chaincode_id:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+    transaction:
+      type: object
+      properties:
+        type:
+          type: string
+        tx_id:
+          type: string
+        nonce:
+          type: string
+          description: hexidecimal encoded bytes for the transaction nonce
+        creator:
+          $ref: "#/components/schemas/creator"
+        status:
+          type: string
+        signature:
+          type: string
+          description: base64 encoded bytes for the transaction signature
+        timestamp:
+          type: integer
+          description: unix nano time for when the transaction was submitted
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/transaction_action"
+    transaction_action:
+      type: object
+      properties:
+        nonce:
+          type: string
+          description: hexidecimal encoded bytes for the transaction action's nonce
+        creator:
+          $ref: "#/components/schemas/creator"
+        transient_map:
+          type: object
+        chaincode_id:
+          $ref: "#/components/schemas/chaincode_id"
+        input:
+          $ref: "#/components/schemas/chaincode_input"
+        proposal_hash:
+          type: string
+          description: hexidecimal encoded bytes of the proposal's hash
+        event:
+          type: object
+          properties:
+            chaincodeId:
+              type: string
+            transactionId:
+              type: string
+            timestamp:
+              type: string
+            eventName:
+              type: string
+            payload:
+              oneOf:
+                - type: string
+                - type: object
+                - type: array
+    get_block_output:
+      type: object
+      properties:
+        block:
+          type: object
+          description: the optimized data structure for the retrieved block
+          properties:
+            block_numer:
+              type: integer
+            data_hash:
+              type: string
+              description: base64 encoded bytes of the hash of the block content
+            previous_hash:
+              type: string
+              description: base64 encoded bytes of the hash of the previous block
+            transactions:
+              type: array
+              items:
+                $ref: "#/components/schemas/transaction"
+        raw:
+          type: object
+          description: the raw data structure defined by Fabric protobuf type `common.Block`
+          properties:
+            data:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/raw_transaction"
+            header:
+              type: object
+              properties:
+                number:
+                  type: integer
+                data_hash:
+                  type: string
+                  description: base64 encoded bytes of the hash of the block content
+                previous_hash:
+                  type: string
+                  description: base64 encoded bytes of the hash of the previous block
+            metadata:
+              type: object
+              properties:
+                metadata:
+                  description: metadata about the block content, details see Fabric protobuf type `common.BlockMetadataIndex`
+                  type: array
+                  items:
+                    type: string
   parameters:
     username:
       required: true
@@ -516,3 +800,9 @@ components:
       in: "query"
       schema:
         type: "string"
+    blockNumber:
+      required: true
+      name: blockNumber
+      in: path
+      schema:
+        type: string
