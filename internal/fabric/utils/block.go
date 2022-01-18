@@ -16,14 +16,20 @@
 
 package utils
 
-import "github.com/hyperledger/fabric-protos-go/peer"
+import (
+	"github.com/hyperledger/fabric-protos-go/common"
+	"github.com/hyperledger/fabric-protos-go/peer"
+)
 
 type Block struct {
 	Number       uint64 `json:"block_number"`
-	DataHash     string `json:"data_hash"`     // hex string
-	PreviousHash string `json:"previous_hash"` // hex string
+	DataHash     string `json:"data_hash"`
+	PreviousHash string `json:"previous_hash"`
 
-	Transactions []*Transaction `json:"transactions"`
+	// only for endorser transaction blocks
+	Transactions []*Transaction `json:"transactions,omitempty"`
+	// only for Config blocks
+	Config *ConfigRecord `json:"config,omitempty"`
 }
 
 type Creator struct {
@@ -50,4 +56,13 @@ type TransactionAction struct {
 	Input        *ChaincodeSpecInput `json:"input"`
 	ProposalHash string              `json:"proposal_hash"` // hex string
 	Event        *ChaincodeEvent     `json:"event"`
+}
+
+type ConfigRecord struct {
+	Type      string         `json:"type"`
+	Signature string         `json:"signature"`
+	Timestamp int64          `json:"timestamp"` // unix nano
+	Nonce     string         `json:"nonce"`     // hex string
+	Creator   *Creator       `json:"creator"`
+	Config    *common.Config `json:"config"`
 }
