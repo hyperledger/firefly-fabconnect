@@ -705,6 +705,22 @@ components:
                 - type: string
                 - type: object
                 - type: array
+    config:
+      type: object
+      properties:
+        type:
+          type: string
+        signature:
+          type: string
+        timestamp:
+          type: integer
+        nonce:
+          type: string
+        creator:
+          $ref: "#/components/schemas/creator"
+        config:
+          type: object
+          description: the object defined by the Fabric protobuf type `common.Config`
     get_block_output:
       type: object
       properties:
@@ -724,6 +740,8 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/transaction"
+            config:
+              $ref: "#/components/schemas/config"
         raw:
           type: object
           description: the raw data structure defined by Fabric protobuf type `common.Block`
