@@ -20,17 +20,11 @@ import "encoding/json"
 
 func DecodePayload(payload []byte) interface{} {
 	// first attempt to parse for JSON, if not successful then just decode to string
-	var structuredArray []map[string]interface{}
-	err2 := json.Unmarshal(payload, &structuredArray)
-	if err2 != nil {
-		structuredMap := make(map[string]interface{})
-		err2 = json.Unmarshal(payload, &structuredMap)
-		if err2 != nil {
-			return string(payload)
-		} else {
-			return structuredMap
-		}
+	var structured interface{}
+	err := json.Unmarshal(payload, &structured)
+	if err != nil {
+		return string(payload)
 	} else {
-		return structuredArray
+		return structured
 	}
 }
