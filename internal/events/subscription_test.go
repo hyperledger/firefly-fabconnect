@@ -18,13 +18,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/test"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCreateWebhookSub(t *testing.T) {
 	assert := assert.New(t)
 
-	rpc := mockRPCClient("")
+	rpc := test.MockRPCClient("")
 	m := &mockSubMgr{}
 	m.stream = newTestStream(m)
 

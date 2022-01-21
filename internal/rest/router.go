@@ -73,6 +73,9 @@ func (r *router) addRoutes() {
 	r.httpRouter.GET("/identities", r.listUsers)
 	r.httpRouter.GET("/identities/:username", r.getUser)
 
+	r.httpRouter.GET("/chaininfo", r.queryChainInfo)
+	r.httpRouter.GET("/blocks/:blockNumber", r.queryBlock)
+
 	r.httpRouter.POST("/query", r.queryChaincode)
 	r.httpRouter.POST("/transactions", r.sendTransaction)
 	r.httpRouter.GET("/transactions/:txId", r.getTransaction)
@@ -139,28 +142,28 @@ func (r *router) serveSwaggerUI(res http.ResponseWriter, req *http.Request, para
 	_, _ = res.Write(utils.SwaggerUIHTML(req.Context()))
 }
 
+func (r *router) queryChainInfo(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	// query requests are always synchronous
+	r.syncDispatcher.GetChainInfo(res, req, params)
+}
+
+func (r *router) queryBlock(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	// query requests are always synchronous
+	r.syncDispatcher.GetBlock(res, req, params)
+}
+
 func (r *router) queryChaincode(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
-
-	msg, err := restutil.BuildQueryMessage(res, req, params)
-	if err != nil {
-		errors.RestErrReply(res, req, err.Error, err.StatusCode)
-		return
-	}
 	// query requests are always synchronous
-	r.syncDispatcher.DispatchMsgSync(req.Context(), res, req, msg)
+	r.syncDispatcher.QueryChaincode(res, req, params)
 }
 
 func (r *router) getTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
-
-	msg, err := restutil.BuildTxByIdMessage(res, req, params)
-	if err != nil {
-		errors.RestErrReply(res, req, err.Error, err.StatusCode)
-		return
-	}
 	// query requests are always synchronous
-	r.syncDispatcher.DispatchMsgSync(req.Context(), res, req, msg)
+	r.syncDispatcher.GetTxById(res, req, params)
 }
 
 func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {

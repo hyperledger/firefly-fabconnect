@@ -17,6 +17,8 @@
 package utils
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"strconv"
 
 	"github.com/golang/protobuf/proto" //nolint
@@ -24,6 +26,7 @@ import (
 	"github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
+	"github.com/hyperledger/firefly-fabconnect/internal/utils"
 	"github.com/pkg/errors"
 )
 
@@ -34,6 +37,7 @@ func GetEvents(block *common.Block) []*api.EventEntry {
 		return events
 	}
 	for idx, entry := range rawBlock.Data.Data {
+		timestamp := entry.Payload.Header.ChannelHeader.Timestamp
 		actions := entry.Payload.Data.Actions
 		for _, action := range actions {
 			event := action.Payload.Action.ProposalResponsePayload.Extension.Events
@@ -47,7 +51,7 @@ func GetEvents(block *common.Block) []*api.EventEntry {
 				TransactionIndex: idx,
 				EventName:        event.EventName,
 				Payload:          event.Payload,
-				Timestamp:        rawBlock.timestamp,
+				Timestamp:        timestamp,
 			}
 			events = append(events, &eventEntry)
 		}
@@ -65,11 +69,10 @@ func DecodeBlock(block *common.Block) (*RawBlock, *Block, error) {
 	blockdata.Data = dataEnvs
 
 	bloc := &Block{}
-	transactions := make([]*Transaction, len(block.Data.Data))
-	bloc.Transactions = transactions
 
 	// this array in the block header's metadata contains each transaction's status code
 	txFilter := []byte(block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER])
+	var transactions []*Transaction
 	for i, data := range block.Data.Data {
 		env, err := getEnvelopeFromBlock(data)
 		if err != nil {
@@ -79,28 +82,37 @@ func DecodeBlock(block *common.Block) (*RawBlock, *Block, error) {
 			return nil, nil, errors.New("nil envelope")
 		}
 
-		data, tx, err := rawblock.DecodeBlockDataEnvelope(env)
+		data, payload, err := rawblock.DecodeBlockDataEnvelope(env)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "error decoding block data envelope")
 		}
 		dataEnvs[i] = data
-		transactions[i] = tx
-		tx.Status = peer.TxValidationCode(txFilter[i]).String()
+		tx, ok := payload.(*Transaction)
+		if ok {
+			if transactions == nil {
+				transactions = make([]*Transaction, len(block.Data.Data))
+				bloc.Transactions = transactions
+			}
+			transactions[i] = tx
+			tx.Status = peer.TxValidationCode(txFilter[i]).String()
+		} else {
+			// there should only be one config record in the block data
+			config := payload.(*ConfigRecord)
+			bloc.Config = config
+		}
 	}
 
 	bloc.Number = rawblock.Header.Number
-	bloc.Timestamp = rawblock.timestamp
+	bloc.DataHash = hex.EncodeToString(rawblock.Header.DataHash)
+	bloc.PreviousHash = hex.EncodeToString(rawblock.Header.PreviousHash)
 
 	return rawblock, bloc, nil
 }
 
-func (block *RawBlock) DecodeBlockDataEnvelope(env *common.Envelope) (*BlockDataEnvelope, *Transaction, error) {
+func (block *RawBlock) DecodeBlockDataEnvelope(env *common.Envelope) (*BlockDataEnvelope, interface{}, error) {
 	// used for the raw block
 	dataEnv := &BlockDataEnvelope{}
-	dataEnv.Signature = string(env.Signature)
-
-	// used in the user-friendly block
-	transaction := &Transaction{}
+	dataEnv.Signature = base64.StdEncoding.EncodeToString(env.Signature)
 
 	_payload := &Payload{}
 	dataEnv.Payload = _payload
@@ -110,32 +122,77 @@ func (block *RawBlock) DecodeBlockDataEnvelope(env *common.Envelope) (*BlockData
 		return nil, nil, errors.Wrap(err, "error decoding Payload from envelope")
 	}
 
-	err = block.decodePayload(payload, _payload, transaction)
+	result, err := block.decodePayload(payload, _payload)
 	if err != nil {
 		return nil, nil, err
 	}
-	return dataEnv, transaction, nil
+	tx, ok := result.(*Transaction)
+	if ok {
+		tx.Signature = dataEnv.Signature
+		return dataEnv, tx, nil
+	} else {
+		config := result.(*ConfigRecord)
+		config.Signature = dataEnv.Signature
+		return dataEnv, config, nil
+	}
 }
 
-func (block *RawBlock) decodePayload(payload *common.Payload, _payload *Payload, _transaction *Transaction) error {
+// based on the channel header type, returns a *Transaction (type=1) or a *ConfigRecord (type=3)
+func (block *RawBlock) decodePayload(payload *common.Payload, _payload *Payload) (interface{}, error) {
 	_payloadData := &PayloadData{}
 	_payload.Data = _payloadData
 	_payloadHeader := &PayloadHeader{}
 	_payload.Header = _payloadHeader
 
 	if err := block.decodePayloadHeader(payload.Header, _payloadHeader); err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := block.decodePayloadData(payload.Data, _payloadData, _transaction); err != nil {
-		return err
+	timestamp := _payloadHeader.ChannelHeader.Timestamp
+	creator := _payloadHeader.SignatureHeader.Creator
+	_creator := &Creator{
+		MspID: creator.Mspid,
+		Cert:  string(creator.IdBytes),
 	}
 
-	return nil
+	if _payloadHeader.ChannelHeader.Type == common.HeaderType_name[3] {
+		// used in the user-friendly block
+		_transaction := &Transaction{}
+		_transaction.Type = _payloadHeader.ChannelHeader.Type
+		_transaction.Timestamp = timestamp
+		_transaction.Creator = _creator
+		_transaction.Nonce = hex.EncodeToString([]byte(_payloadHeader.SignatureHeader.Nonce))
+		_transaction.TxId = _payloadHeader.ChannelHeader.TxId
+
+		if err := block.decodeTxPayloadData(payload.Data, _payloadData, _transaction); err != nil {
+			return nil, err
+		}
+		for _, action := range _payloadData.Actions {
+			if action.Payload.Action.ProposalResponsePayload.Extension.Events != nil {
+				action.Payload.Action.ProposalResponsePayload.Extension.Events.Timestamp = strconv.FormatInt(timestamp, 10)
+			}
+		}
+		return _transaction, nil
+	} else if _payloadHeader.ChannelHeader.Type == common.HeaderType_name[1] {
+		_configRec := &ConfigRecord{}
+		_configRec.Type = _payloadHeader.ChannelHeader.Type
+		_configRec.Timestamp = timestamp
+		_configRec.Creator = _creator
+		_configRec.Nonce = hex.EncodeToString([]byte(_payloadHeader.SignatureHeader.Nonce))
+
+		if err := block.decodeConfigPayloadData(payload.Data, _payloadData, _configRec); err != nil {
+			return nil, err
+		}
+
+		return _configRec, nil
+	}
+
+	return nil, nil
 }
 
 func (block *RawBlock) decodePayloadHeader(header *common.Header, _header *PayloadHeader) error {
 	_channelHeader := &ChannelHeader{}
+	_header.ChannelHeader = _channelHeader
 	channelHeader := &common.ChannelHeader{}
 	if err := proto.Unmarshal(header.ChannelHeader, channelHeader); err != nil {
 		return errors.Wrap(err, "error decoding ChannelHeader from payload")
@@ -146,12 +203,13 @@ func (block *RawBlock) decodePayloadHeader(header *common.Header, _header *Paylo
 	_channelHeader.TxId = channelHeader.TxId
 	_channelHeader.Type = common.HeaderType_name[channelHeader.Type]
 	_channelHeader.Version = int(channelHeader.Version)
-	_header.ChannelHeader = _channelHeader
-	block.timestamp = _channelHeader.Timestamp
-	block.channelHeader = _channelHeader
 
 	_signatureHeader := &SignatureHeader{}
 	_header.SignatureHeader = _signatureHeader
+	err := block.decodeSignatureHeader(_signatureHeader, header.SignatureHeader)
+	if err != nil {
+		return errors.Wrap(err, "error decoding SignatureHeader from payload")
+	}
 
 	return nil
 }
@@ -161,7 +219,7 @@ func (block *RawBlock) decodeSignatureHeader(_signatureHeader *SignatureHeader, 
 	if err := proto.Unmarshal(bytes, signatureHeader); err != nil {
 		return errors.Wrap(err, "error decoding SignatureHeader from payload")
 	}
-	_signatureHeader.Nonce = string(signatureHeader.Nonce)
+	_signatureHeader.Nonce = base64.StdEncoding.EncodeToString(signatureHeader.Nonce)
 	creator := &msp.SerializedIdentity{}
 	if err := proto.Unmarshal(signatureHeader.Creator, creator); err != nil {
 		return errors.Wrap(err, "error decoding Creator from signature header")
@@ -170,44 +228,52 @@ func (block *RawBlock) decodeSignatureHeader(_signatureHeader *SignatureHeader, 
 	return nil
 }
 
-func (block *RawBlock) decodePayloadData(payloadData []byte, _payloadData *PayloadData, _transaction *Transaction) error {
-	_transaction.Type = block.channelHeader.Type
+func (block *RawBlock) decodeTxPayloadData(payloadData []byte, _payloadData *PayloadData, _transaction *Transaction) error {
+	tx := &peer.Transaction{}
+	if err := proto.Unmarshal(payloadData, tx); err != nil {
+		return errors.Wrap(err, "error decoding transaction payload data")
+	}
 
-	// TODO: support other block types (1=ConfigEvelope, 2=ConfigUpdateEnvelope)
-	if block.channelHeader.Type == common.HeaderType_name[3] {
-		tx := &peer.Transaction{}
-		if err := proto.Unmarshal(payloadData, tx); err != nil {
-			return errors.Wrap(err, "error decoding transaction payload data")
+	// each transaction may pack multiple proposals, for instance a DvP transaction that
+	// includes both a proposal for the payment and a proposal for the delivery.
+	_actions := make([]*Action, len(tx.Actions))
+	_payloadData.Actions = _actions
+
+	txActions := make([]*TransactionAction, len(tx.Actions))
+	_transaction.Actions = txActions
+
+	for i, action := range tx.Actions {
+		_action := &Action{}
+		_signatureHeader := &SignatureHeader{}
+		_action.Header = _signatureHeader
+		if err := block.decodeSignatureHeader(_signatureHeader, action.Header); err != nil {
+			return err
+		}
+		_actions[i] = _action
+
+		txAction := &TransactionAction{}
+		txActions[i] = txAction
+
+		_actionPayload := &ActionPayload{}
+		_action.Payload = _actionPayload
+
+		if err := block.decodeActionPayload(_actionPayload, action.Payload); err != nil {
+			return err
 		}
 
-		// each transaction may pack multiple proposals, for instance a DvP transaction that
-		// includes both a proposal for the payment and a proposal for the delivery.
-		_actions := make([]*Action, len(tx.Actions))
-		_payloadData.Actions = _actions
-
-		proposals := make([]*Proposal, len(tx.Actions))
-		_transaction.Proposals = proposals
-
-		for i, action := range tx.Actions {
-			_action := &Action{}
-			_signatureHeader := &SignatureHeader{}
-			_action.Header = _signatureHeader
-			if err := block.decodeSignatureHeader(_signatureHeader, action.Header); err != nil {
-				return err
-			}
-			_actions[i] = _action
-
-			proposal := &Proposal{}
-			proposals[i] = proposal
-
-			_actionPayload := &ActionPayload{}
-			_action.Payload = _actionPayload
-
-			if err := block.decodeActionPayload(_actionPayload, action.Payload); err != nil {
-				return err
-			}
-
+		txAction.Nonce = hex.EncodeToString([]byte(_signatureHeader.Nonce))
+		txAction.ChaincodeId = _actionPayload.Action.ProposalResponsePayload.Extension.ChaincodeId
+		creator := _signatureHeader.Creator
+		txAction.Creator = &Creator{
+			MspID: creator.Mspid,
+			Cert:  string(creator.IdBytes),
 		}
+		txAction.Event = _actionPayload.Action.ProposalResponsePayload.Extension.Events
+		if _actionPayload.ChaincodeProposalPayload.Input.ChaincodeSpec != nil {
+			txAction.Input = _actionPayload.ChaincodeProposalPayload.Input.ChaincodeSpec.Input
+		}
+		txAction.ProposalHash = hex.EncodeToString([]byte(_actionPayload.Action.ProposalResponsePayload.ProposalHash))
+		txAction.TransientMap = _actionPayload.ChaincodeProposalPayload.TransientMap
 	}
 
 	return nil
@@ -288,7 +354,7 @@ func (block *RawBlock) decodeProposalResponsePayload(_proposalResponsePayload *P
 		return errors.Wrap(err, "error decoding chaincode proposal response payload")
 	}
 
-	_proposalResponsePayload.ProposalHash = string(prp.ProposalHash)
+	_proposalResponsePayload.ProposalHash = base64.StdEncoding.EncodeToString(prp.ProposalHash)
 
 	_extension := &Extension{}
 	_proposalResponsePayload.Extension = _extension
@@ -316,9 +382,19 @@ func (block *RawBlock) decodeProposalResponsePayloadExtension(_extension *Extens
 	_extension.Events = _chaincodeEvent
 	_chaincodeEvent.ChaincodeId = ccevt.ChaincodeId
 	_chaincodeEvent.TxId = ccevt.TxId
-	_chaincodeEvent.Timestamp = strconv.FormatInt(block.timestamp, 10)
 	_chaincodeEvent.EventName = ccevt.EventName
-	_chaincodeEvent.Payload = ccevt.Payload
+	_chaincodeEvent.Payload = utils.DecodePayload(ccevt.Payload)
+
+	return nil
+}
+
+func (block *RawBlock) decodeConfigPayloadData(payloadData []byte, _payloadData *PayloadData, _configRec *ConfigRecord) error {
+	configEnv := &common.ConfigEnvelope{}
+	if err := proto.Unmarshal(payloadData, configEnv); err != nil {
+		return errors.Wrap(err, "error decoding config envelope")
+	}
+	_configRec.Config = configEnv.Config
+	_payloadData.Config = configEnv.Config
 
 	return nil
 }

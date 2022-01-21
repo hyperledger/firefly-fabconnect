@@ -27,7 +27,7 @@ import (
 
 func TestDecodeEndorserBlockWithEvents(t *testing.T) {
 	assert := assert.New(t)
-	content, _ := os.ReadFile("../../../test/resources/block-2.bin")
+	content, _ := os.ReadFile("../../../test/resources/tx-event.block")
 	testblock := &common.Block{}
 	_ = proto.Unmarshal(content, testblock)
 	decoded, _, err := DecodeBlock(testblock)
@@ -50,7 +50,10 @@ func TestDecodeEndorserBlockWithEvents(t *testing.T) {
 	assert.Regexp("[0-9a-f]{64}", event.TxId)
 	assert.Regexp("[0-9]+", event.Timestamp)
 	assert.Equal("AssetCreated", event.EventName)
-	assert.Equal("{\"ID\":\"asset05\",\"color\":\"red\",\"size\":10,\"owner\":\"Tom\",\"appraisedValue\":123000}", string(event.Payload))
+	m, ok := event.Payload.(map[string]interface{})
+	assert.Equal(true, ok)
+	assert.Equal("asset05", m["ID"])
+	assert.Equal(float64(123000), m["appraisedValue"])
 
 	cpp := action.Payload.ChaincodeProposalPayload
 	assert.Equal("asset_transfer", cpp.Input.ChaincodeSpec.ChaincodeId.Name)
@@ -59,7 +62,7 @@ func TestDecodeEndorserBlockWithEvents(t *testing.T) {
 
 func TestDecodeEndorserBlockLifecycleTxs(t *testing.T) {
 	assert := assert.New(t)
-	content, _ := os.ReadFile("../../../test/resources/block-1.bin")
+	content, _ := os.ReadFile("../../../test/resources/chaincode-deploy.block")
 	testblock := &common.Block{}
 	_ = proto.Unmarshal(content, testblock)
 	decoded, _, err := DecodeBlock(testblock)
@@ -83,9 +86,27 @@ func TestDecodeEndorserBlockLifecycleTxs(t *testing.T) {
 	assert.Equal("ApproveChaincodeDefinitionForMyOrg", cpp.Input.ChaincodeSpec.Input.Args[0])
 }
 
+func TestDecodeConfigBlock(t *testing.T) {
+	assert := assert.New(t)
+
+	content, _ := os.ReadFile("../../../test/resources/config-0.block")
+	testblock := &common.Block{}
+	_ = proto.Unmarshal(content, testblock)
+	decoded, _, err := DecodeBlock(testblock)
+	assert.NoError(err)
+	assert.Equal(1, len(decoded.Data.Data))
+
+	content, _ = os.ReadFile("../../../test/resources/config-1.block")
+	testblock = &common.Block{}
+	_ = proto.Unmarshal(content, testblock)
+	decoded, _, err = DecodeBlock(testblock)
+	assert.NoError(err)
+	assert.Equal(1, len(decoded.Data.Data))
+}
+
 func TestGetEvents(t *testing.T) {
 	assert := assert.New(t)
-	content, _ := os.ReadFile("../../../test/resources/block-2.bin")
+	content, _ := os.ReadFile("../../../test/resources/tx-event.block")
 	testblock := &common.Block{}
 	_ = proto.Unmarshal(content, testblock)
 	events := GetEvents(testblock)

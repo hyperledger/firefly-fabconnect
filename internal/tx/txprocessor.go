@@ -17,7 +17,6 @@
 package tx
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -39,6 +38,7 @@ const (
 type TxProcessor interface {
 	OnMessage(TxContext)
 	Init(client.RPCClient)
+	GetRPCClient() client.RPCClient
 }
 
 var highestID = 1000000
@@ -91,6 +91,10 @@ func (p *txProcessor) Init(rpc client.RPCClient) {
 	p.maxTXWaitTime = time.Duration(p.config.MaxTXWaitTime) * time.Second
 }
 
+func (p *txProcessor) GetRPCClient() client.RPCClient {
+	return p.rpc
+}
+
 // OnMessage checks the type and dispatches to the correct logic
 // ** From this point on the processor MUST ensure Reply is called
 //    on txnContext eventually in all scenarios.
@@ -107,18 +111,6 @@ func (p *txProcessor) OnMessage(txContext TxContext) {
 			break
 		}
 		p.OnSendTransactionMessage(txContext, &sendTransactionMsg)
-	case messages.MsgTypeQueryChaincode:
-		var queryChaincodeMsg messages.QueryChaincode
-		if unmarshalErr = txContext.Unmarshal(&queryChaincodeMsg); unmarshalErr != nil {
-			break
-		}
-		p.OnQueryChaincodeMessage(txContext, &queryChaincodeMsg)
-	case messages.MsgTypeGetTxById:
-		var getTxByIdMsg messages.GetTxById
-		if unmarshalErr = txContext.Unmarshal(&getTxByIdMsg); unmarshalErr != nil {
-			break
-		}
-		p.OnGetTxByIdMessage(txContext, &getTxByIdMsg)
 	default:
 		unmarshalErr = errors.Errorf(errors.TransactionSendMsgTypeUnknown, headers.MsgType)
 	}
@@ -285,49 +277,6 @@ func (p *txProcessor) trackMining(inflight *inflightTx, tx *fabric.Tx) {
 
 // 	p.sendTransactionCommon(txnContext, inflight, tx)
 // }
-
-func (p *txProcessor) OnQueryChaincodeMessage(txContext TxContext, msg *messages.QueryChaincode) {
-
-	query := fabric.NewQuery(msg, txContext.Headers().Signer)
-	result, err := query.Send(txContext.Context(), p.rpc)
-	if err != nil {
-		txContext.SendErrorReply(500, err)
-		return
-	}
-	var reply messages.QueryResult
-	reply.Headers.MsgType = messages.MsgTypeQuerySuccess
-	// first attempt to parse for JSON, if not successful then just decode to string
-	var structuredArray []map[string]interface{}
-	err = json.Unmarshal(result, &structuredArray)
-	if err != nil {
-		structuredMap := make(map[string]interface{})
-		err = json.Unmarshal(result, &structuredMap)
-		if err != nil {
-			reply.Result = string(result)
-		} else {
-			reply.Result = structuredMap
-		}
-	} else {
-		reply.Result = structuredArray
-	}
-
-	txContext.Reply(&reply)
-}
-
-func (p *txProcessor) OnGetTxByIdMessage(txContext TxContext, msg *messages.GetTxById) {
-
-	query := fabric.NewLedgerQuery(msg, txContext.Headers().Signer)
-	result, err := query.Send(txContext.Context(), p.rpc)
-	if err != nil {
-		txContext.SendErrorReply(500, err)
-		return
-	}
-	var reply messages.LedgerQueryResult
-	reply.Headers.MsgType = messages.MsgTypeQuerySuccess
-	reply.Result = result
-
-	txContext.Reply(&reply)
-}
 
 func (p *txProcessor) OnSendTransactionMessage(txContext TxContext, msg *messages.SendTransaction) {
 

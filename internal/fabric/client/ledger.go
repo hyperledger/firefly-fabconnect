@@ -17,8 +17,6 @@
 package client
 
 import (
-	//nolint
-
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
@@ -90,7 +88,7 @@ func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (
 	}
 
 	ret := make(map[string]interface{})
-	ret["tx"] = tx
+	ret["transaction"] = tx
 	ret["raw"] = envelope
 	return ret, nil
 }

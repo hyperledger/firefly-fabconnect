@@ -155,7 +155,8 @@ func (s *subscription) getEventTimestamp(evt *eventsapi.EventEntry) {
 	blockNumber := strconv.FormatUint(evt.BlockNumber, 10)
 	if ts, ok := s.ep.stream.blockTimestampCache.Get(blockNumber); ok {
 		// we found the timestamp for the block in our local cache, assert it's type and return, no need to query the chain
-		evt.Timestamp = ts.(int64)
+		timestamps := ts.([]int64)
+		evt.Timestamp = timestamps[evt.TransactionIndex]
 		return
 	}
 	// we didn't find the timestamp in our cache, query the node for the block header where we can find the timestamp
@@ -165,8 +166,14 @@ func (s *subscription) getEventTimestamp(evt *eventsapi.EventEntry) {
 		evt.Timestamp = 0 // set to 0, we were not able to retrieve the timestamp.
 		return
 	}
-	evt.Timestamp = block.Timestamp
-	s.ep.stream.blockTimestampCache.Add(blockNumber, evt.Timestamp)
+	// blocks in Fabric does not have a timestamp. instead only transactions have their own timestamps
+	// so each entry in the cache is a slice of (tx timestamp)
+	timestamps := make([]int64, len(block.Transactions))
+	for idx, tx := range block.Transactions {
+		timestamps[idx] = tx.Timestamp
+	}
+	s.ep.stream.blockTimestampCache.Add(blockNumber, timestamps)
+	evt.Timestamp = timestamps[evt.TransactionIndex]
 }
 
 func (s *subscription) unsubscribe(deleting bool) {

@@ -17,8 +17,11 @@
 package rest
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -32,7 +35,9 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/auth/authtest"
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	fabtest "github.com/hyperledger/firefly-fabconnect/internal/fabric/test"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/test"
+	"github.com/hyperledger/firefly-fabconnect/internal/utils"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
 )
@@ -99,6 +104,131 @@ func TestStartStatusStopNoKafkaHandlerAccessToken(t *testing.T) {
 	var statusResp statusMsg
 	err = json.NewDecoder(resp.Body).Decode(&statusResp)
 	assert.Equal(true, statusResp.OK)
+
+	g.srv.Close()
+	wg.Wait()
+	assert.EqualError(err, "http: Server closed")
+
+	auth.RegisterSecurityModule(nil)
+
+}
+
+func TestQueryEndpoints(t *testing.T) {
+	assert := assert.New(t)
+
+	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
+
+	testConfig.HTTP.Port = lastPort
+	testConfig.HTTP.LocalAddr = "127.0.0.1"
+	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
+	g := NewRESTGateway(testConfig)
+	err := g.Init()
+	testRPC := fabtest.MockRPCClient("")
+	g.processor.Init(testRPC)
+	assert.NoError(err)
+
+	lastPort++
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err = g.Start()
+		wg.Done()
+	}()
+
+	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/chainInfo?fly-channel=default-channel&fly-signer=user1", g.config.HTTP.Port))
+	var resp *http.Response
+	for i := 0; i < 5; i++ {
+		time.Sleep(200 * time.Millisecond)
+		req := &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
+			"authorization": []string{"bearer testat"},
+		}}
+		resp, err = http.DefaultClient.Do(req)
+		if err == nil {
+			break
+		}
+	}
+	assert.NoError(err)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	result := utils.DecodePayload(bodyBytes).(map[string]interface{})
+	rr := result["result"].(map[string]interface{})
+	assert.Equal(float64(10), rr["height"])
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/chainInfo", g.config.HTTP.Port))
+	req := &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
+		"authorization": []string{"bearer testat"},
+	}}
+	resp, err = http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"Must specify the channel\"}", string(bodyBytes))
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/chainInfo?fly-channel=default-channel", g.config.HTTP.Port))
+	req = &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
+		"authorization": []string{"bearer testat"},
+	}}
+	resp, err = http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"Must specify the signer\"}", string(bodyBytes))
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/transactions/3144a3ad43dcc11374832bbb71561320de81fd80d69cc8e26a9ea7d3240a5e84?fly-channel=default-channel&fly-signer=user1", g.config.HTTP.Port))
+	req = &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
+		"authorization": []string{"bearer testat"},
+	}}
+	resp, err = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result = utils.DecodePayload(bodyBytes).(map[string]interface{})
+	rr = result["result"].(map[string]interface{})
+	tx := rr["transaction"].(map[string]interface{})
+	assert.Equal("3144a3ad43dcc11374832bbb71561320de81fd80d69cc8e26a9ea7d3240a5e84", tx["tx_id"])
+	assert.Equal(float64(1000000), tx["timestamp"])
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/blocks/20?fly-channel=default-channel&fly-signer=user1", g.config.HTTP.Port))
+	req = &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
+		"authorization": []string{"bearer testat"},
+	}}
+	resp, err = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result = utils.DecodePayload(bodyBytes).(map[string]interface{})
+	rr = result["result"].(map[string]interface{})
+	block := rr["block"].(map[string]interface{})
+	assert.Equal(float64(20), block["block_number"])
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/query?fly-channel=default-channel&fly-signer=user1&fly-chaincode=asset_transfer", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: http.Header{"authorization": []string{"bearer testat"}},
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"Must specify target chaincode function\"}", string(bodyBytes))
+
+	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"func\":\"\"}")))
+	resp, err = http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"Target chaincode function must not be empty\"}", string(bodyBytes))
+
+	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"func\":\"CreateAsset\"}")))
+	resp, err = http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"must specify args\"}", string(bodyBytes))
+
+	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"func\":\"CreateAsset\",\"args\":[]}")))
+	resp, err = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result = utils.DecodePayload(bodyBytes).(map[string]interface{})
+	rr = result["result"].(map[string]interface{})
+	assert.Equal(float64(123000), rr["AppraisedValue"])
+	assert.Equal("asset01", rr["ID"])
 
 	g.srv.Close()
 	wg.Wait()

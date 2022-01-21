@@ -26,9 +26,6 @@ type RawBlock struct {
 	Data     *BlockData            `json:"data"`
 	Header   *common.BlockHeader   `json:"header"`
 	Metadata *common.BlockMetadata `json:"metadata"`
-
-	channelHeader *ChannelHeader
-	timestamp     int64
 }
 
 type BlockData struct {
@@ -45,9 +42,35 @@ type Payload struct {
 	Header *PayloadHeader `json:"header"`
 }
 
-type PayloadData struct {
-	Actions []*Action `json:"actions"`
+type PayloadHeader struct {
+	ChannelHeader   *ChannelHeader   `json:"channel_header"`
+	SignatureHeader *SignatureHeader `json:"signature_header"`
 }
+
+type ChannelHeader struct {
+	ChannelId string `json:"channel_id"`
+	Epoch     string `json:"epoch"`
+	Timestamp int64  `json:"timestamp"`
+	TxId      string `json:"tx_id"`
+	Type      string `json:"type"`
+	Version   int    `json:"version"`
+}
+
+type SignatureHeader struct {
+	Creator *msp.SerializedIdentity `json:"creator"`
+	Nonce   string                  `json:"nonce"`
+}
+
+type PayloadData struct {
+	// Actions only exists in endorsement transaction blocks
+	Actions []*Action `json:"actions,omitempty"`
+	// Config only exists in config and config update blocks
+	Config *common.Config `json:"config,omitempty"`
+}
+
+//
+// Types used only in endorsement transaction blocks
+//
 
 type Action struct {
 	Header  *SignatureHeader `json:"header"`
@@ -77,11 +100,11 @@ type Extension struct {
 }
 
 type ChaincodeEvent struct {
-	ChaincodeId string
-	TxId        string
-	Timestamp   string
-	EventName   string
-	Payload     []byte
+	ChaincodeId string      `json:"chaincodeId"`
+	TxId        string      `json:"transactionId"`
+	Timestamp   string      `json:"timestamp"`
+	EventName   string      `json:"eventName"`
+	Payload     interface{} `json:"payload"`
 }
 
 type ChaincodeProposalPayload struct {
@@ -102,23 +125,4 @@ type ChaincodeSpec struct {
 type ChaincodeSpecInput struct {
 	Args   []string `json:"args"`
 	IsInit bool     `json:"is_init"`
-}
-
-type PayloadHeader struct {
-	ChannelHeader   *ChannelHeader   `json:"channel_header"`
-	SignatureHeader *SignatureHeader `json:"signature_header"`
-}
-
-type ChannelHeader struct {
-	ChannelId string `json:"channel_id"`
-	Epoch     string `json:"epoch"`
-	Timestamp int64  `json:"timestamp"`
-	TxId      string `json:"tx_id"`
-	Type      string `json:"type"`
-	Version   int    `json:"version"`
-}
-
-type SignatureHeader struct {
-	Creator *msp.SerializedIdentity `json:"creator"`
-	Nonce   string                  `json:"nonce"`
 }

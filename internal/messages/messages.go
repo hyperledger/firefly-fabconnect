@@ -31,10 +31,6 @@ const (
 	MsgTypeDeployContract = "DeployContract"
 	// MsgTypeSendTransaction - send a transaction
 	MsgTypeSendTransaction = "SendTransaction"
-	// MsgTypeQueryChaincode - query a chaincode method
-	MsgTypeQueryChaincode = "QueryChaincode"
-	// MsgTypeTxById - get transaction by Id
-	MsgTypeGetTxById = "GetTxById"
 
 	MsgTypeTransactionSuccess = "TransactionSuccess"
 	MsgTypeTransactionFailure = "TransactionFailure"
@@ -105,6 +101,15 @@ type QueryChaincode struct {
 type GetTxById struct {
 	RequestCommon
 	TxId string `json:"txId"`
+}
+
+type GetChainInfo struct {
+	RequestCommon
+}
+
+type GetBlock struct {
+	RequestCommon
+	BlockNumber uint64 `json:"blockNumber"`
 }
 
 // SendTransaction message instructs the bridge to install a contract
