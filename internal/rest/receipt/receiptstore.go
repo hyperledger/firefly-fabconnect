@@ -89,9 +89,11 @@ func (r *receiptStore) ValidateConf() error {
 func (r *receiptStore) Init(ws ws.WebSocketChannels, persistence api.ReceiptStorePersistence) error {
 	r.ws = ws
 	if persistence != nil {
+		// only used in test code to pass in a mocked impl
 		r.persistence = persistence
 		return nil
 	} else {
+		// the regular runtime does this
 		return r.persistence.Init()
 	}
 }
@@ -171,7 +173,7 @@ func (r *receiptStore) writeReceipt(requestID string, receipt map[string]interfa
 		// Check if the reason is that there is a receipt already
 		existing, qErr := r.persistence.GetReceipt(requestID)
 		if qErr == nil && existing != nil {
-			log.Warnf("%s: existing   receipt: %+v", requestID, *existing)
+			log.Warnf("%s: existing  receipt: %+v", requestID, *existing)
 			log.Warnf("%s: duplicate receipt: %+v", requestID, receipt)
 			break
 		}
