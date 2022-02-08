@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/messages"
+	"github.com/hyperledger/firefly-fabconnect/internal/rest/receipt/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/utils"
 	"github.com/hyperledger/firefly-fabconnect/internal/ws"
 	"github.com/julienschmidt/httprouter"
@@ -42,18 +43,8 @@ const (
 
 var uuidCharsVerifier, _ = regexp.Compile("^[0-9a-zA-Z-]+$")
 
-// receiptStorePersistence interface implemented by persistence layers
-type receiptStorePersistence interface {
-	Init() error
-	validateConf() error
-	GetReceipts(skip, limit int, ids []string, sinceEpochMS int64, from, to, start string) (*[]map[string]interface{}, error)
-	GetReceipt(requestID string) (*map[string]interface{}, error)
-	AddReceipt(requestID string, receipt *map[string]interface{}) error
-	Close()
-}
-
 type ReceiptStore interface {
-	Init() error
+	Init(ws.WebSocketChannels, api.ReceiptStorePersistence) error
 	ValidateConf() error
 	ProcessReceipt(msgBytes []byte)
 	GetReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params)
@@ -63,12 +54,12 @@ type ReceiptStore interface {
 
 type receiptStore struct {
 	config      *conf.ReceiptsDBConf
-	persistence receiptStorePersistence
+	persistence api.ReceiptStorePersistence
 	ws          ws.WebSocketChannels
 }
 
 func NewReceiptStore(config *conf.RESTGatewayConf) ReceiptStore {
-	var receiptStorePersistence receiptStorePersistence
+	var receiptStorePersistence api.ReceiptStorePersistence
 	if config.Receipts.LevelDB.Path != "" {
 		leveldbStore := newLevelDBReceipts(&config.Receipts)
 		receiptStorePersistence = leveldbStore
@@ -92,11 +83,17 @@ func NewReceiptStore(config *conf.RESTGatewayConf) ReceiptStore {
 	}
 }
 func (r *receiptStore) ValidateConf() error {
-	return r.persistence.validateConf()
+	return r.persistence.ValidateConf()
 }
 
-func (r *receiptStore) Init() error {
-	return r.persistence.Init()
+func (r *receiptStore) Init(ws ws.WebSocketChannels, persistence api.ReceiptStorePersistence) error {
+	r.ws = ws
+	if persistence != nil {
+		r.persistence = persistence
+		return nil
+	} else {
+		return r.persistence.Init()
+	}
 }
 
 func (r *receiptStore) extractHeaders(parsedMsg map[string]interface{}) map[string]interface{} {
@@ -174,7 +171,7 @@ func (r *receiptStore) writeReceipt(requestID string, receipt map[string]interfa
 		// Check if the reason is that there is a receipt already
 		existing, qErr := r.persistence.GetReceipt(requestID)
 		if qErr == nil && existing != nil {
-			log.Warnf("%s: exiting   receipt: %+v", requestID, *existing)
+			log.Warnf("%s: existing   receipt: %+v", requestID, *existing)
 			log.Warnf("%s: duplicate receipt: %+v", requestID, receipt)
 			break
 		}
@@ -198,12 +195,6 @@ func (r *receiptStore) GetReceipts(res http.ResponseWriter, req *http.Request, p
 	if err != nil {
 		log.Errorf("Error querying replies: %s", err)
 		errors.RestErrReply(res, req, errors.Errorf(errors.Unauthorized), 401)
-		return
-	}
-
-	res.Header().Set("Content-Type", "application/json")
-	if r.persistence == nil {
-		errors.RestErrReply(res, req, errors.Errorf(errors.ReceiptStoreDisabled), 405)
 		return
 	}
 
@@ -263,6 +254,7 @@ func (r *receiptStore) GetReceipts(res http.ResponseWriter, req *http.Request, p
 			if sinceEpochMS, err = strconv.ParseInt(since, 10, 64); err != nil {
 				log.Errorf("since '%s' cannot be parsed as RFC3339 or millisecond timestamp: %s", since, err)
 				errors.RestErrReply(res, req, errors.Errorf(errors.ReceiptStoreInvalidRequestBadSince), 400)
+				return
 			}
 		}
 	}

@@ -40,7 +40,7 @@ func newMemoryReceipts(config *conf.ReceiptsDBConf) *memoryReceipts {
 	return r
 }
 
-func (m *memoryReceipts) validateConf() error {
+func (m *memoryReceipts) ValidateConf() error {
 	return nil
 }
 

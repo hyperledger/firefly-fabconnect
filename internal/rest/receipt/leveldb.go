@@ -54,7 +54,7 @@ func newLevelDBReceipts(conf *conf.ReceiptsDBConf) *levelDBReceipts {
 	}
 }
 
-func (m *levelDBReceipts) validateConf() error {
+func (m *levelDBReceipts) ValidateConf() error {
 	// leveldb creates the target directory on demand, no need to check for existence
 	return nil
 }
