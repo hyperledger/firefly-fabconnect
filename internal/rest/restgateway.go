@@ -91,13 +91,13 @@ func (g *RESTGateway) Init() error {
 	g.rpc = rpcClient
 	g.processor.Init(rpcClient)
 
-	err = g.receiptStore.Init()
+	ws := ws.NewWebSocketServer()
+	g.ws = ws
+
+	err = g.receiptStore.Init(ws, nil)
 	if err != nil {
 		return err
 	}
-
-	ws := ws.NewWebSocketServer()
-	g.ws = ws
 
 	if g.config.Events.LevelDB.Path != "" {
 		g.sm = events.NewSubscriptionManager(&g.config.Events, rpcClient, ws)
