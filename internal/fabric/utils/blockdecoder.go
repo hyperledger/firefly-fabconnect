@@ -39,7 +39,7 @@ func GetEvents(block *common.Block) []*api.EventEntry {
 	for idx, entry := range rawBlock.Data.Data {
 		timestamp := entry.Payload.Header.ChannelHeader.Timestamp
 		actions := entry.Payload.Data.Actions
-		for _, action := range actions {
+		for actionIdx, action := range actions {
 			event := action.Payload.Action.ProposalResponsePayload.Extension.Events
 			if event == nil {
 				continue
@@ -49,6 +49,7 @@ func GetEvents(block *common.Block) []*api.EventEntry {
 				BlockNumber:      rawBlock.Header.Number,
 				TransactionId:    event.TxId,
 				TransactionIndex: idx,
+				EventIndex:       actionIdx, // each action only allowed one event, so event index is the action index
 				EventName:        event.EventName,
 				Payload:          event.Payload,
 				Timestamp:        timestamp,
