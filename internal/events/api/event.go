@@ -66,6 +66,7 @@ type EventEntry struct {
 	BlockNumber      uint64      `json:"blockNumber"`
 	TransactionId    string      `json:"transactionId"`
 	TransactionIndex int         `json:"transactionIndex"`
+	EventIndex       int         `json:"eventIndex"`
 	EventName        string      `json:"eventName"`
 	Payload          interface{} `json:"payload"`
 	Timestamp        int64       `json:"timestamp,omitempty"`
