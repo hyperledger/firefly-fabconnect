@@ -21,16 +21,17 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/test"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var tmpdir string
-var testConfig *conf.RESTGatewayConf
+
+func runNothing(cmd *cobra.Command, args []string) error {
+	return nil
+}
 
 func TestMain(m *testing.M) {
 	setup()
@@ -40,7 +41,6 @@ func TestMain(m *testing.M) {
 }
 
 func setup() {
-	tmpdir, testConfig = test.Setup()
 	os.Setenv("FC_HTTP_PORT", "8002")
 	os.Setenv("FC_MAXINFLIGHT", "60")
 }
@@ -49,14 +49,10 @@ func teardown() {
 	test.Teardown(tmpdir)
 }
 
-func runNothing(cmd *cobra.Command, args []string) error {
-	return nil
-}
-
 func TestMissingConfigFile(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
+	rootCmd, _ := newRootCmd()
 	args := []string{}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
@@ -66,19 +62,22 @@ func TestMissingConfigFile(t *testing.T) {
 func TestBadConfigFile(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
+	tmpdir, _ := test.Setup()
+	rootCmd, _ := newRootCmd()
 	args := []string{
 		"-f", path.Join(tmpdir, "config-bad.json"),
 	}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	assert.Regexp(regexp.MustCompile(`User credentials store creation failed`), err)
+	test.Teardown(tmpdir)
 }
 
 func TestStartServerError(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
+	tmpdir, _ := test.Setup()
+	rootCmd, _ := newRootCmd()
 	args := []string{
 		"-Y",
 		"-f", path.Join(tmpdir, "config.json"),
@@ -86,14 +85,15 @@ func TestStartServerError(t *testing.T) {
 	}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
-	assert.Regexp(regexp.MustCompile(`User credentials store creation failed. Path: User credentials store path is empty`), err)
+	assert.Regexp(regexp.MustCompile(`User credentials store creation failed. User credentials store path is empty`), err)
+	test.Teardown(tmpdir)
 }
 
 func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
-	restGatewayConf.MaxTXWaitTime = 0
+	tmpdir, _ := test.Setup()
+	rootCmd, restGatewayConf := newRootCmd()
 	rootCmd.RunE = runNothing
 	args := []string{
 		"-f", path.Join(tmpdir, "config.json"),
@@ -109,12 +109,13 @@ func TestMaxWaitTimeTooSmallWarns(t *testing.T) {
 	assert.Equal(8002, restGatewayConf.HTTP.Port)
 	// test that settings in the config file that are not overriden
 	assert.Equal("192.168.0.100", restGatewayConf.HTTP.LocalAddr)
+	test.Teardown(tmpdir)
 }
 
 func TestEnvVarOverride(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
+	rootCmd, restGatewayConf := newRootCmd()
 	rootCmd.RunE = runNothing
 	_ = rootCmd.Execute()
 	assert.Equal(8002, restGatewayConf.HTTP.Port)
@@ -124,8 +125,7 @@ func TestEnvVarOverride(t *testing.T) {
 func TestCmdArgsOverride(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
-	restGatewayConf.Events.PollingIntervalSec = 0
+	rootCmd, restGatewayConf := newRootCmd()
 	rootCmd.RunE = runNothing
 	args := []string{
 		"-P", "8001",
@@ -140,23 +140,25 @@ func TestCmdArgsOverride(t *testing.T) {
 func TestDefaultsInConfigFile(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
-	restGatewayConf.HTTP.Port = 0
+	tmpdir, _ := test.Setup()
+	rootCmd, restGatewayConf := newRootCmd()
 	rootCmd.RunE = runNothing
-	viper.Reset()
 	args := []string{
 		"-f", path.Join(tmpdir, "config.json"),
 	}
 	rootCmd.SetArgs(args)
+	os.Unsetenv("FC_HTTP_PORT")
 	err := rootCmd.Execute()
 	assert.NoError(err)
 	assert.Equal(3000, restGatewayConf.HTTP.Port)
+	test.Teardown(tmpdir)
 }
 
 func TestMissingKafkaTopic(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
+	tmpdir, _ := test.Setup()
+	rootCmd, _ := newRootCmd()
 	rootCmd.RunE = runNothing
 	args := []string{
 		"-P", "8001",
@@ -167,27 +169,30 @@ func TestMissingKafkaTopic(t *testing.T) {
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	assert.EqualError(err, "No output topic specified for bridge to send events to")
+	test.Teardown(tmpdir)
 }
 
 func TestCmdLaunch(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
-	restGatewayConf.Kafka.Brokers = []string{}
-	rootCmd.RunE = runNothing
+	tmpdir, _ := test.Setup()
+	rootCmd, _ := newRootCmd()
 	args := []string{
 		"-P", "8001",
 		"-f", path.Join(tmpdir, "config.json"),
+		"-Y",
 	}
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 	assert.Nil(err)
+	test.Teardown(tmpdir)
 }
 
 func TestKafkaSuccess(t *testing.T) {
 	assert := assert.New(t)
 
-	restGateway = nil
+	tmpdir, _ := test.Setup()
+	rootCmd, restGatewayConf := newRootCmd()
 	rootCmd.RunE = runNothing
 	args := []string{
 		"-P", "8001",
@@ -200,4 +205,5 @@ func TestKafkaSuccess(t *testing.T) {
 	err := rootCmd.Execute()
 	assert.Nil(err)
 	assert.Equal([]string{"broker1", "broker2"}, restGatewayConf.Kafka.Brokers)
+	test.Teardown(tmpdir)
 }

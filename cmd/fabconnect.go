@@ -63,45 +63,61 @@ type cmdConfig struct {
 	Filename   string
 }
 
-var rootConfig = cmdConfig{}
-var restGatewayConf = conf.RESTGatewayConf{}
-var restGateway *rest.RESTGateway
+var rootConfig = &cmdConfig{}
 
-var rootCmd = &cobra.Command{
-	Use:   "fabconnect",
-	Short: "Connectivity Bridge for Hyperledger Fabric permissioned chains",
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		err := viper.Unmarshal(&restGatewayConf)
-		if err != nil {
-			return err
-		}
+func newRootCmd() (*cobra.Command, *conf.RESTGatewayConf) {
+	restGatewayConf := &conf.RESTGatewayConf{}
+	var restGateway *rest.RESTGateway
 
-		// allow tests to assign a mock
-		if restGateway == nil {
-			restGateway = rest.NewRESTGateway(&restGatewayConf)
-		}
-		err = restGateway.ValidateConf()
-		if err != nil {
-			return err
-		}
+	rootCmd := &cobra.Command{
+		Use:   "fabconnect",
+		Short: "Connectivity Bridge for Hyperledger Fabric permissioned chains",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			err := viper.Unmarshal(&restGatewayConf)
+			if err != nil {
+				return err
+			}
 
-		initLogging(rootConfig.DebugLevel)
+			// allow tests to assign a mock
+			if restGateway == nil {
+				restGateway = rest.NewRESTGateway(restGatewayConf)
+			}
+			err = restGateway.ValidateConf()
+			if err != nil {
+				return err
+			}
 
-		if rootConfig.DebugPort > 0 {
-			go func() {
-				log.Debugf("Debug HTTP endpoint listening on localhost:%d: %s", rootConfig.DebugPort, http.ListenAndServe(fmt.Sprintf("localhost:%d", rootConfig.DebugPort), nil))
-			}()
-		}
+			err = restGateway.Init()
+			if err != nil {
+				return err
+			}
 
-		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := startServer()
-		if err != nil {
-			return err
-		}
-		return nil
-	},
+			initLogging(rootConfig.DebugLevel)
+
+			if rootConfig.DebugPort > 0 {
+				go func() {
+					log.Debugf("Debug HTTP endpoint listening on localhost:%d: %s", rootConfig.DebugPort, http.ListenAndServe(fmt.Sprintf("localhost:%d", rootConfig.DebugPort), nil))
+				}()
+			}
+
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := startServer(restGatewayConf, restGateway)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	rootCmd.Flags().IntVarP(&rootConfig.DebugLevel, "debug", "d", 1, "0=error, 1=info, 2=debug")
+	rootCmd.Flags().IntVarP(&rootConfig.DebugPort, "debugPort", "Z", 6060, "Port for pprof HTTP endpoints (localhost only)")
+	rootCmd.Flags().BoolVarP(&rootConfig.PrintYAML, "print-yaml-confg", "Y", false, "Print YAML config snippet and exit")
+	rootCmd.Flags().StringVarP(&rootConfig.Filename, "configfile", "f", "", "Configuration file, must be one of .yml, .yaml, or .json")
+	conf.CobraInit(rootCmd, restGatewayConf)
+
+	return rootCmd, restGatewayConf
 }
 
 func init() {
@@ -111,12 +127,6 @@ func init() {
 	viper.SetEnvPrefix("FC")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	rootCmd.Flags().IntVarP(&rootConfig.DebugLevel, "debug", "d", 1, "0=error, 1=info, 2=debug")
-	rootCmd.Flags().IntVarP(&rootConfig.DebugPort, "debugPort", "Z", 6060, "Port for pprof HTTP endpoints (localhost only)")
-	rootCmd.Flags().BoolVarP(&rootConfig.PrintYAML, "print-yaml-confg", "Y", false, "Print YAML config snippet and exit")
-	rootCmd.Flags().StringVarP(&rootConfig.Filename, "configfile", "f", "", "Configuration file, must be one of .yml, .yaml, or .json")
-	conf.CobraInit(rootCmd, &restGatewayConf)
 }
 
 func initConfig() {
@@ -132,7 +142,7 @@ func initConfig() {
 	}
 }
 
-func startServer() error {
+func startServer(restGatewayConf *conf.RESTGatewayConf, restGateway *rest.RESTGateway) error {
 
 	if rootConfig.PrintYAML {
 		a, err := marshalToYAML(rootConfig)
@@ -146,10 +156,6 @@ func startServer() error {
 		print(fmt.Sprintf("# Full YAML configuration processed from supplied file\n%s\n%s\n", string(a), string(b)))
 	}
 
-	err := restGateway.Init()
-	if err != nil {
-		return err
-	}
 	serverDone := make(chan bool)
 	go func(done chan bool) {
 		log.Info("Starting REST gateway")
@@ -181,6 +187,7 @@ func marshalToYAML(conf interface{}) (yamlBytes []byte, err error) {
 
 // Execute is called by the main method of the package
 func Execute() int {
+	rootCmd, _ := newRootCmd()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		return 1
