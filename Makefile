@@ -1,7 +1,10 @@
 VGO=go
 BINARY_NAME=fabconnect
 GOFILES := $(shell find cmd internal -name '*.go' -print)
-TESTED_INTERNALS := $(shell go list ./internal/... | grep -v rest/test)
+TESTED_INTERNALS := $(shell go list ./internal/... | grep -v test | grep -v kafka)
+TESTED_CMD := $(shell go list ./cmd/...)
+COVERPKG_INTERNALS = $(shell go list ./internal/... | grep -v test | grep -v kafka | tr "\n" ",")
+COVERPKG_CMD = $(shell go list ./cmd/... | tr "\n" ",")
 # Expect that FireFly compiles with CGO disabled
 CGO_ENABLED=0
 GOGC=30
@@ -9,7 +12,7 @@ GOGC=30
 
 all: build test go-mod-tidy
 test: deps lint
-	$(VGO) test $(TESTED_INTERNALS) ./cmd/... -cover -coverprofile=coverage.txt -covermode=atomic -timeout=10s
+	$(VGO) test $(TESTED_INTERNALS) $(TESTED_CMD) -cover -coverpkg $(COVERPKG_INTERNALS)$(COVERPKG_CMD) -coverprofile=coverage.txt -covermode=atomic -timeout=10s
 coverage.html:
 	$(VGO) tool cover -html=coverage.txt
 coverage: test coverage.html
@@ -37,6 +40,7 @@ mocks: mockery ${GOFILES}
 	${MOCKERY} --case underscore --dir internal/fabric/client --name RPCClient --output mocks/fabric/client --outpkg mockfabric
 	${MOCKERY} --case underscore --dir internal/fabric/client --name IdentityClient --output mocks/fabric/client --outpkg mockfabric
 	${MOCKERY} --case underscore --dir internal/kvstore --name KVStore --output mocks/kvstore --outpkg mockkvstore
+	${MOCKERY} --case underscore --dir internal/kvstore --name KVIterator --output mocks/kvstore --outpkg mockkvstore
 	${MOCKERY} --case underscore --dir internal/rest/async --name AsyncDispatcher --output mocks/rest/async --outpkg mockasync
 	${MOCKERY} --case underscore --dir internal/rest/receipt --name ReceiptStore --output mocks/rest/receipt --outpkg mockreceipt
 	${MOCKERY} --case underscore --dir internal/rest/receipt/api --name ReceiptStorePersistence --output mocks/rest/receipt/api --outpkg mockreceiptapi

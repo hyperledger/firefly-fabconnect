@@ -451,7 +451,7 @@ components:
         retryTimeoutSec:
           type: integer
           description: total amount of time (in seconds) to retry a failed event delivery
-        blockedReryDelaySec:
+        blockedRetryDelaySec:
           type: integer
           description: amount of time (in seconds) to wait before retrying a failed delivery
         timestamps:

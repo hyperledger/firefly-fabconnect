@@ -41,6 +41,13 @@ const (
 	DistributionModeWLD       DistributionMode = "workloadDistribution"
 )
 
+type EventStreamType string
+
+const (
+	EventStreamTypeWebhook   EventStreamType = "webhook"
+	EventStreamTypeWebsocket EventStreamType = "websocket"
+)
+
 const (
 	// FromBlockNewest is the special string that means subscribe from the current block
 	FromBlockNewest = "newest"
@@ -63,14 +70,14 @@ type StreamInfo struct {
 	eventsapi.TimeSorted
 	ID                   string               `json:"id"`
 	Name                 string               `json:"name,omitempty"`
-	Path                 string               `json:"path"`
-	Suspended            bool                 `json:"suspended"`
-	Type                 string               `json:"type,omitempty"`
+	Path                 string               `json:"path,omitempty"`
+	Suspended            bool                 `json:"suspended,omitempty"`
+	Type                 EventStreamType      `json:"type"`
 	BatchSize            uint64               `json:"batchSize,omitempty"`
 	BatchTimeoutMS       uint64               `json:"batchTimeoutMS,omitempty"`
 	ErrorHandling        string               `json:"errorHandling,omitempty"`
 	RetryTimeoutSec      uint64               `json:"retryTimeoutSec,omitempty"`
-	BlockedRetryDelaySec uint64               `json:"blockedReryDelaySec,omitempty"`
+	BlockedRetryDelaySec uint64               `json:"blockedRetryDelaySec,omitempty"`
 	Webhook              *webhookActionInfo   `json:"webhook,omitempty"`
 	WebSocket            *webSocketActionInfo `json:"websocket,omitempty"`
 	Timestamps           bool                 `json:"timestamps,omitempty"` // Include block timestamps in the events generated
@@ -136,6 +143,14 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 		return nil, errors.Errorf(errors.EventStreamsNoID)
 	}
 
+	if strings.ToLower(string(spec.Type)) == string(EventStreamTypeWebhook) {
+		spec.Type = EventStreamTypeWebhook
+	} else if strings.ToLower(string(spec.Type)) == string(EventStreamTypeWebsocket) {
+		spec.Type = EventStreamTypeWebsocket
+	} else {
+		return nil, errors.Errorf(errors.EventStreamsInvalidActionType, spec.Type)
+	}
+
 	if spec.BatchSize == 0 {
 		spec.BatchSize = 1
 	} else if spec.BatchSize > MaxBatchSize {
@@ -179,14 +194,12 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 		a.pollingInterval = 10 * time.Millisecond
 	}
 
-	spec.Type = strings.ToLower(spec.Type)
 	switch spec.Type {
-	case "webhook":
+	case EventStreamTypeWebhook:
 		if a.action, err = newWebhookAction(a, spec.Webhook); err != nil {
 			return nil, err
 		}
-	case "websocket":
-
+	case EventStreamTypeWebsocket:
 		if spec.WebSocket != nil {
 			if err := validateWebSocket(spec.WebSocket); err != nil {
 				return nil, err
@@ -196,8 +209,6 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 		if a.action, err = newWebSocketAction(a, spec.WebSocket); err != nil {
 			return nil, err
 		}
-	default:
-		return nil, errors.Errorf(errors.EventStreamsInvalidActionType, spec.Type)
 	}
 
 	a.startEventHandlers(false)

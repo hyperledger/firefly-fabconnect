@@ -77,13 +77,18 @@ func NewRESTGateway(config *conf.RESTGatewayConf) *RESTGateway {
 		failedMsgs:  make(map[string]error),
 	}
 	g.processor = tx.NewTxProcessor(g.config)
-	g.syncDispatcher = restsync.NewSyncDispatcher(g.processor)
 	g.receiptStore = receipt.NewReceiptStore(g.config)
-	g.asyncDispatcher = restasync.NewAsyncDispatcher(g.config, g.processor, g.receiptStore)
 	return g
 }
 
 func (g *RESTGateway) Init() error {
+	g.syncDispatcher = restsync.NewSyncDispatcher(g.processor)
+	g.asyncDispatcher = restasync.NewAsyncDispatcher(g.config, g.processor, g.receiptStore)
+	err := g.asyncDispatcher.ValidateConf()
+	if err != nil {
+		return err
+	}
+
 	rpcClient, identityClient, err := client.RPCConnect(g.config.RPC, g.config.MaxTXWaitTime)
 	if err != nil {
 		return err
@@ -94,7 +99,7 @@ func (g *RESTGateway) Init() error {
 	ws := ws.NewWebSocketServer()
 	g.ws = ws
 
-	err = g.receiptStore.Init(ws, nil)
+	err = g.receiptStore.Init(ws)
 	if err != nil {
 		return err
 	}
@@ -124,8 +129,7 @@ func (g *RESTGateway) ValidateConf() error {
 	if g.config.HTTP.LocalAddr == "" {
 		g.config.HTTP.LocalAddr = "0.0.0.0"
 	}
-	err := g.asyncDispatcher.ValidateConf()
-	return err
+	return nil
 }
 
 // Start kicks off the HTTP listener and router

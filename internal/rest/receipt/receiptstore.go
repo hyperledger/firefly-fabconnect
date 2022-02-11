@@ -44,7 +44,7 @@ const (
 var uuidCharsVerifier, _ = regexp.Compile("^[0-9a-zA-Z-]+$")
 
 type ReceiptStore interface {
-	Init(ws.WebSocketChannels, api.ReceiptStorePersistence) error
+	Init(ws.WebSocketChannels, ...api.ReceiptStorePersistence) error
 	ValidateConf() error
 	ProcessReceipt(msgBytes []byte)
 	GetReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params)
@@ -86,11 +86,11 @@ func (r *receiptStore) ValidateConf() error {
 	return r.persistence.ValidateConf()
 }
 
-func (r *receiptStore) Init(ws ws.WebSocketChannels, persistence api.ReceiptStorePersistence) error {
+func (r *receiptStore) Init(ws ws.WebSocketChannels, mocked ...api.ReceiptStorePersistence) error {
 	r.ws = ws
-	if persistence != nil {
+	if mocked != nil {
 		// only used in test code to pass in a mocked impl
-		r.persistence = persistence
+		r.persistence = mocked[0]
 		return nil
 	} else {
 		// the regular runtime does this

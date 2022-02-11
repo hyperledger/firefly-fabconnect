@@ -53,7 +53,7 @@ type ResetRequest struct {
 
 // SubscriptionManager provides REST APIs for managing events
 type SubscriptionManager interface {
-	Init() error
+	Init(mocked ...kvstore.KVStore) error
 	AddStream(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*StreamInfo, *restutil.RestError)
 	Streams(res http.ResponseWriter, req *http.Request, params httprouter.Params) []*StreamInfo
 	StreamByID(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*StreamInfo, *restutil.RestError)
@@ -101,6 +101,22 @@ func NewSubscriptionManager(config *conf.EventstreamConf, rpc client.RPCClient, 
 		config.PollingIntervalSec = 1
 	}
 	return sm
+}
+
+func (s *subscriptionMGR) Init(mocked ...kvstore.KVStore) error {
+	if mocked != nil {
+		// only used in tests to pass in a mocked impl
+		s.db = mocked[0]
+	} else {
+		s.db = kvstore.NewLDBKeyValueStore(s.config.LevelDB.Path)
+		err := s.db.Init()
+		if err != nil {
+			return errors.Errorf(errors.EventStreamsDBLoad, s.config.LevelDB.Path, err)
+		}
+	}
+	s.recoverStreams()
+	s.recoverSubscriptions()
+	return nil
 }
 
 // StreamByID used externally to get serializable details
@@ -232,10 +248,6 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 	return &spec, nil
 }
 
-func (s *subscriptionMGR) getConfig() *conf.EventstreamConf {
-	return s.config
-}
-
 // ResetSubscription restarts the steam from the specified block
 func (s *subscriptionMGR) ResetSubscription(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*map[string]string, *restutil.RestError) {
 	id := params.ByName("subscriptionId")
@@ -272,6 +284,10 @@ func (s *subscriptionMGR) DeleteSubscription(res http.ResponseWriter, req *http.
 	result["id"] = sub.info.ID
 	result["deleted"] = "true"
 	return &result, nil
+}
+
+func (s *subscriptionMGR) getConfig() *conf.EventstreamConf {
+	return s.config
 }
 
 func (s *subscriptionMGR) getStreams() []*StreamInfo {
@@ -485,17 +501,6 @@ func (s *subscriptionMGR) deleteCheckpoint(streamID string) {
 	if err != nil {
 		log.Errorf("Failed to delete checkpoint from database. %s", err)
 	}
-}
-
-func (s *subscriptionMGR) Init() error {
-	s.db = kvstore.NewLDBKeyValueStore(s.config.LevelDB.Path)
-	err := s.db.Init()
-	if err != nil {
-		return errors.Errorf(errors.EventStreamsDBLoad, s.config.LevelDB.Path, err)
-	}
-	s.recoverStreams()
-	s.recoverSubscriptions()
-	return nil
 }
 
 func (s *subscriptionMGR) recoverStreams() {

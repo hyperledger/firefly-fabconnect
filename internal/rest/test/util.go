@@ -27,7 +27,8 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 )
 
-var testConfigJSON = `{
+func Setup() (string, *conf.RESTGatewayConf) {
+	var testConfigJSON = `{
   "maxInFlight": 10,
   "maxTXWaitTime": 60,
   "sendConcurrency": 25,
@@ -48,7 +49,7 @@ var testConfigJSON = `{
     "configPath": "/test-config-path"
   }
 }`
-var testConfigJSONBad = `{
+	var testConfigJSONBad = `{
   "maxInFlight": "abc",
   "maxTXWaitTime": 60,
   "sendConcurrency": 25,
@@ -68,7 +69,7 @@ var testConfigJSONBad = `{
     "configPath": "/test-config-path"
   }
 }`
-var testRPCConfig = `name: "test profile"
+	var testRPCConfig = `name: "test profile"
 client:
   organization: org1
   credentialStore:
@@ -105,7 +106,7 @@ certificateAuthorities:
       path: /tmp-cert
     caName: ca-org1
 `
-var testCert = `-----BEGIN CERTIFICATE-----
+	var testCert = `-----BEGIN CERTIFICATE-----
 MIIGZzCCBU+gAwIBAgIQA6UoMhKxyLpFA0uSvxPu6zANBgkqhkiG9w0BAQsFADBG
 MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRUwEwYDVQQLEwxTZXJ2ZXIg
 Q0EgMUIxDzANBgNVBAMTBkFtYXpvbjAeFw0yMTA2MTgwMDAwMDBaFw0yMjA3MTcy
@@ -144,7 +145,6 @@ J4OVv51lNtDLT9k=
 -----END CERTIFICATE-----
 `
 
-func Setup() (string, *conf.RESTGatewayConf) {
 	tmpdir, _ := ioutil.TempDir("", "restgateway_test")
 
 	// set up CA certs
@@ -165,9 +165,9 @@ func Setup() (string, *conf.RESTGatewayConf) {
 	testConfigJSON = strings.Replace(testConfigJSON, "/test-config-path", ccpPath, 1)
 	// setup receipt store
 	receiptStorePath := path.Join(tmpdir, "receipts")
-	// if _, err := os.Stat(receiptStorePath); os.IsNotExist(err) {
-	// 	_ = os.Mkdir(receiptStorePath, 0777)
-	// }
+	if _, err := os.Stat(receiptStorePath); os.IsNotExist(err) {
+		_ = os.Mkdir(receiptStorePath, 0777)
+	}
 	testConfigJSON = strings.Replace(testConfigJSON, "/test-receipt-path", receiptStorePath, 1)
 	// write the config file
 	_ = ioutil.WriteFile(path.Join(tmpdir, "config.json"), []byte(testConfigJSON), 0644)
