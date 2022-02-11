@@ -37,6 +37,7 @@ mockery: .ALWAYS
 	go get github.com/vektra/mockery/cmd/mockery
 mocks: mockery ${GOFILES}
 	$(eval MOCKERY := $(shell go list -f '{{.Target}}' github.com/vektra/mockery/cmd/mockery))
+	${MOCKERY} --case underscore --dir internal/events --name SubscriptionManager --output mocks/events --outpkg mockevents
 	${MOCKERY} --case underscore --dir internal/fabric/client --name RPCClient --output mocks/fabric/client --outpkg mockfabric
 	${MOCKERY} --case underscore --dir internal/fabric/client --name IdentityClient --output mocks/fabric/client --outpkg mockfabric
 	${MOCKERY} --case underscore --dir internal/kvstore --name KVStore --output mocks/kvstore --outpkg mockkvstore

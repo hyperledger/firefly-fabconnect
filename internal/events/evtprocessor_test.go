@@ -26,8 +26,10 @@ func TestEventPayloadUnmarshaling(t *testing.T) {
 	assert := assert.New(t)
 	_, stream, svr, eventStream := newTestStreamForBatching(
 		&StreamInfo{
-			Name:    "testStream",
-			Webhook: &webhookActionInfo{},
+			Name: "testStream",
+			Webhook: &webhookActionInfo{
+				TLSkipHostVerify: &falseValue,
+			},
 		}, nil, 200)
 	defer svr.Close()
 	defer stream.stop()

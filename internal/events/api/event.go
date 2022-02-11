@@ -21,8 +21,8 @@ const (
 	BlockType_Config                 = "config"          // corresponds to blocks containing channel configurations and updates
 	EventPayloadType_Bytes           = "bytes"           // default data type of the event payload, no special processing is done before returning to the subscribing client
 	EventPayloadType_String          = "string"          // event payload will be an UTF-8 encoded string
-	EventPayloadType_StringifiedJSON = "stringifiedJSON" // event payload will be a structured map with UTF-8 encoded string values
-	EventPayloadType_JSON            = "json"            // equivalent to "stringifiedJSON"
+	EventPayloadType_JSON            = "json"            // event payload will be a structured map with UTF-8 encoded string values
+	EventPayloadType_StringifiedJSON = "stringifiedJSON" // equivalent to "json" (deprecated)
 )
 
 // persistedFilter is the part of the filter we record to storage
@@ -37,8 +37,6 @@ type persistedFilter struct {
 	BlockType   string `json:"blockType,omitempty"`
 	ChaincodeId string `json:"chaincodeId,omitempty"`
 	EventFilter string `json:"eventFilter,omitempty"`
-	Filter      string `json:"filter,omitempty"`
-	ToBlock     uint64 `json:"toBlock,omitempty"`
 }
 
 // SubscriptionInfo is the persisted data for the subscription

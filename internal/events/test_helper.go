@@ -16,6 +16,7 @@ package events
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -28,6 +29,7 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	mockkvstore "github.com/hyperledger/firefly-fabconnect/mocks/kvstore"
 	"github.com/stretchr/testify/mock"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 func tempdir(t *testing.T) string {
@@ -136,7 +138,7 @@ func newTestStreamForBatching(spec *StreamInfo, db kvstore.KVStore, status ...in
 	if spec.Type == "" {
 		spec.Type = "webhook"
 		spec.Webhook.URL = svr.URL
-		spec.Webhook.Headers = map[string]string{"x-my-header": "my-value"}
+		spec.Webhook.Headers = &map[string]string{"x-my-header": "my-value"}
 	}
 	sm := newTestSubscriptionManager()
 	sm.config.WebhooksAllowPrivateIPs = true
@@ -144,8 +146,10 @@ func newTestStreamForBatching(spec *StreamInfo, db kvstore.KVStore, status ...in
 	if db != nil {
 		sm.db = db
 	}
+	fmt.Printf("sm db type: %T\n", sm.db)
 	mockstore, ok := sm.db.(*mockkvstore.KVStore)
 	if ok {
+		mockstore.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
 		mockstore.On("Get", mock.Anything).Return([]byte(""), nil)
 		mockstore.On("Put", mock.Anything, mock.Anything).Return(nil)
 	}

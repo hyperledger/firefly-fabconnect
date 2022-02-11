@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -140,6 +141,33 @@ func (s *subscriptionMGR) AddStream(res http.ResponseWriter, req *http.Request, 
 	if err := json.NewDecoder(req.Body).Decode(&spec); err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf(errors.RESTGatewayEventStreamInvalid, err), 400)
 	}
+	st := strings.ToLower(spec.Type)
+	if st != EventStreamTypeWebhook && st != EventStreamTypeWebsocket {
+		return nil, restutil.NewRestError(fmt.Sprintf(errors.EventStreamsInvalidActionType, spec.Type), 400)
+	}
+	if st == EventStreamTypeWebhook {
+		spec.Type = EventStreamTypeWebhook
+		if err := validateWebhookConfig(spec.Webhook); err != nil {
+			return nil, restutil.NewRestError(err.Error(), 400)
+		}
+	} else {
+		spec.Type = EventStreamTypeWebsocket
+		if err := validateWebsocketConfig(spec.WebSocket); err != nil {
+			return nil, restutil.NewRestError(err.Error(), 400)
+		}
+	}
+	if spec.ErrorHandling != "" {
+		eh := strings.ToLower(spec.ErrorHandling)
+		if eh != ErrorHandlingBlock && eh != ErrorHandlingSkip {
+			return nil, restutil.NewRestError("Unknown errorHandling type. Must be an empty string, 'skip' or 'block'")
+		} else {
+			spec.ErrorHandling = eh
+		}
+	}
+	if spec.Suspended != nil {
+		return nil, restutil.NewRestError("Can not set 'suspended'")
+	}
+
 	if err := s.addStream(&spec); err != nil {
 		return nil, restutil.NewRestError(err.Error(), 500)
 	}
@@ -156,6 +184,26 @@ func (s *subscriptionMGR) UpdateStream(res http.ResponseWriter, req *http.Reques
 	var spec StreamInfo
 	if err := json.NewDecoder(req.Body).Decode(&spec); err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf(errors.RESTGatewayEventStreamInvalid, err), 400)
+	}
+	et := strings.ToLower(spec.Type)
+	if et == EventStreamTypeWebhook {
+		spec.Type = EventStreamTypeWebhook
+		if _, err = url.Parse(spec.Webhook.URL); err != nil {
+			return nil, restutil.NewRestError(errors.EventStreamsWebhookInvalidURL, 400)
+		}
+	} else if et == EventStreamTypeWebsocket {
+		spec.Type = EventStreamTypeWebsocket
+	}
+	if spec.ErrorHandling != "" {
+		eh := strings.ToLower(spec.ErrorHandling)
+		if eh != ErrorHandlingBlock && eh != ErrorHandlingSkip {
+			return nil, restutil.NewRestError("Unknown errorHandling type. Must be an empty string, 'skip' or 'block'", 400)
+		} else {
+			spec.ErrorHandling = eh
+		}
+	}
+	if spec.Suspended != nil {
+		return nil, restutil.NewRestError("Can not set 'suspended'")
 	}
 	updatedSpec, err := s.updateStream(stream, &spec)
 	if err != nil {
@@ -242,6 +290,20 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 	if spec.Stream == "" {
 		return nil, restutil.NewRestError(`Missing required parameter "stream"`, 400)
 	}
+	if spec.Signer == "" {
+		return nil, restutil.NewRestError(`Missing required parameter "signer"`, 400)
+	}
+	pt := spec.PayloadType
+	if pt != "" && pt != eventsapi.EventPayloadType_String && pt != eventsapi.EventPayloadType_JSON {
+		return nil, restutil.NewRestError(`Parameter "payloadType" must be an empty string, "string" or "json"`, 400)
+	}
+	bt := spec.Filter.BlockType
+	if bt != "" && bt != eventsapi.BlockType_TX && bt != eventsapi.BlockType_Config {
+		return nil, restutil.NewRestError(`Parameter "filter.blockType" must be an empty string, "tx" or "config"`, 400)
+	}
+	if err := validateFromBlock(spec.FromBlock); err != nil {
+		return nil, restutil.NewRestError(err.Error(), 400)
+	}
 	if err := s.addSubscription(&spec); err != nil {
 		return nil, restutil.NewRestError(err.Error(), 500)
 	}
@@ -258,6 +320,9 @@ func (s *subscriptionMGR) ResetSubscription(res http.ResponseWriter, req *http.R
 	var request ResetRequest
 	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf("Failed to parse request body. %s", err), 400)
+	}
+	if err := validateFromBlock(request.InitialBlock); err != nil {
+		return nil, restutil.NewRestError(err.Error(), 400)
 	}
 	err = s.resetSubscription(sub, request.InitialBlock)
 	if err != nil {
@@ -564,4 +629,17 @@ func (s *subscriptionMGR) Close() {
 		s.db.Close()
 	}
 	s.closed = true
+}
+
+func validateFromBlock(fromBlock string) error {
+	// from block property must be one of:
+	// - empty string (newest)
+	// - "newest"
+	// - "<a valid number>"
+	if fromBlock != "" && fromBlock != FromBlockNewest {
+		if _, err := strconv.Atoi(fromBlock); err != nil {
+			return fmt.Errorf("Invalid initial block: must be an integer, an empty string or 'newest'")
+		}
+	}
+	return nil
 }

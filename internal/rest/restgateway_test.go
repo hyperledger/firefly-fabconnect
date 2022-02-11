@@ -527,7 +527,7 @@ func TestEventsAPI(t *testing.T) {
 	result1 := make(map[string]interface{})
 	err = json.NewDecoder(resp.Body).Decode(&result1)
 	assert.Equal(200, resp.StatusCode)
-	assert.Equal(11, len(result1))
+	assert.Equal(13, len(result1))
 	assert.Equal(float64(1), result1["batchSize"])
 	assert.Equal(float64(5000), result1["batchTimeoutMS"])
 	assert.Equal("skip", result1["errorHandling"])
@@ -559,7 +559,7 @@ func TestEventsAPI(t *testing.T) {
 	result3 := make(map[string]interface{})
 	err = json.NewDecoder(resp.Body).Decode(&result3)
 	assert.Equal(200, resp.StatusCode)
-	assert.Equal(11, len(result3))
+	assert.Equal(13, len(result3))
 
 	// PATCH /eventstreams/:streamId success calls
 	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
@@ -575,7 +575,7 @@ func TestEventsAPI(t *testing.T) {
 	result4 := make(map[string]interface{})
 	err = json.NewDecoder(resp.Body).Decode(&result4)
 	assert.Equal(200, resp.StatusCode)
-	assert.Equal(11, len(result3))
+	assert.Equal(13, len(result3))
 	assert.Equal(float64(5), result4["batchSize"])
 	assert.Equal(float64(100), result4["batchTimeoutMS"]) // batch timeout lowered for the resume testing in later steps
 	assert.Equal("test-2", result4["name"])
@@ -655,6 +655,58 @@ func TestEventsAPI(t *testing.T) {
 	err = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid event stream specification: invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
+
+	// POST /eventstreams failure calls due to bad type
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"random\"}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Unknown action type 'random'", errorResp.Message)
+
+	// POST /eventstreams failure calls due to missing webhook url
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\"}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Must specify webhook.url for action type 'webhook'", errorResp.Message)
+
+	// POST /eventstreams failure calls due to bad webhook url
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\":badUrl\"}}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid URL in webhook action", errorResp.Message)
+
+	// POST /eventstreams failure calls due to bad websocket distribution mode
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"websocket\",\"websocket\":{\"topic\":\"apple\",\"distributionMode\":\"banana\"}}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid distribution mode 'banana'. Valid distribution modes are: 'workloadDistribution' and 'broadcast'.", errorResp.Message)
 
 	// POST /eventstream failure calls due to DB errors
 	mockedKV.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!")).Once()
@@ -767,6 +819,62 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Missing required parameter \"stream\"", errorResp.Message)
 
+	// POST /subscriptions failed calls due to missing stream
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = "{\"name\":\"sub-1\",\"channel\":\"channel-1\",\"stream\":\"test-1\",\"payloadType\":\"string\",\"filter\":{\"chaincodeId\":\"asset_transfer\"}}"
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Missing required parameter \"signer\"", errorResp.Message)
+
+	// POST /subscriptions failed calls due to bad "fromBlock" value
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = fmt.Sprintf("{\"name\":\"sub-1\",\"stream\":\"%s\",\"channel\":\"channel-1\",\"signer\":\"user1\",\"fromBlock\":\"0x10\"}", esID)
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
+
+	// POST /subscriptions failed calls due to bad "payloadType" value
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = fmt.Sprintf("{\"name\":\"sub-1\",\"stream\":\"%s\",\"channel\":\"channel-1\",\"signer\":\"user1\",\"payloadType\":\"badType\"}", esID)
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal(`Parameter "payloadType" must be an empty string, "string" or "json"`, errorResp.Message)
+
+	// POST /subscriptions failed calls due to bad "blockType" value
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = fmt.Sprintf("{\"name\":\"sub-1\",\"stream\":\"%s\",\"channel\":\"channel-1\",\"signer\":\"user1\",\"filter\":{\"blockType\":\"badBlockType\"}}", esID)
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal(`Parameter "filter.blockType" must be an empty string, "tx" or "config"`, errorResp.Message)
+
 	// GET /subscriptions success calls
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
 	req = &http.Request{
@@ -846,6 +954,19 @@ func TestEventsAPI(t *testing.T) {
 	err = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Failed to parse request body. invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
+
+	// POST /subscriptions/:subId/reset failed calls due to bad payload
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/%s/reset", g.config.HTTP.Port, subID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"0x10\"}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
 
 	// DELETE /subscriptions/:subId failed calls due to bad ID
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/badId", g.config.HTTP.Port))

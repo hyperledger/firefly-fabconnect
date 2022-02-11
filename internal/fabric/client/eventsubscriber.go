@@ -74,8 +74,6 @@ func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo,
 			blockfilter = headertypefilter.New(common.HeaderType_ENDORSER_TRANSACTION)
 		} else if blockType == eventsapi.BlockType_Config {
 			blockfilter = headertypefilter.New(common.HeaderType_CONFIG, common.HeaderType_CONFIG_UPDATE)
-		} else {
-			blockfilter = headertypefilter.New(common.HeaderType_ENDORSER_TRANSACTION)
 		}
 
 		reg, notifier, err := eventClient.RegisterBlockEvent(blockfilter)

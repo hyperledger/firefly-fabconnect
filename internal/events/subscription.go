@@ -49,7 +49,7 @@ func newSubscription(stream *eventStream, rpc client.RPCClient, i *eventsapi.Sub
 		ep:          newEvtProcessor(i.ID, stream),
 		filterStale: true,
 	}
-	i.Summary = fmt.Sprintf(`FromBlock=%s,Chaincode=%s,Filter=%s`, i.FromBlock, i.Filter.ChaincodeId, i.Filter.Filter)
+	i.Summary = fmt.Sprintf(`FromBlock=%s,Chaincode=%s,Filter=%s`, i.FromBlock, i.Filter.ChaincodeId, i.Filter.EventFilter)
 	// If a name was not provided by the end user, set it to the system generated summary
 	if i.Name == "" {
 		log.Debugf("No name provided for subscription, using auto-generated ID:%s", i.ID)
@@ -60,9 +60,6 @@ func newSubscription(stream *eventStream, rpc client.RPCClient, i *eventsapi.Sub
 }
 
 func restoreSubscription(stream *eventStream, rpc client.RPCClient, i *eventsapi.SubscriptionInfo) (*subscription, error) {
-	if i.GetID() == "" {
-		return nil, errors.Errorf(errors.EventStreamsNoID)
-	}
 	s := &subscription{
 		client:      rpc,
 		info:        i,
@@ -140,7 +137,7 @@ func (s *subscription) processNewEvents() {
 				EventName:     ccEvent.EventName,
 				Payload:       ccEvent.Payload,
 			}
-			if s.ep.stream.spec.Timestamps {
+			if *s.ep.stream.spec.Timestamps {
 				s.getEventTimestamp(event)
 			}
 			if err := s.ep.processEventEntry(s.info, event); err != nil {
