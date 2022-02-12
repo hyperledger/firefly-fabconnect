@@ -155,7 +155,9 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 	if spec.ErrorHandling == "" {
 		spec.ErrorHandling = DefaultErrorHandling
 	}
-	spec.Suspended = &falseValue
+	if spec.Suspended == nil {
+		spec.Suspended = &falseValue
+	}
 
 	a = &eventStream{
 		sm:                sm,
