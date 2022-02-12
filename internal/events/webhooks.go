@@ -51,6 +51,9 @@ func newWebhookAction(es *eventStream, spec *webhookActionInfo) (*webhookAction,
 	if spec.RequestTimeoutSec == 0 {
 		spec.RequestTimeoutSec = 120
 	}
+	if spec.TLSkipHostVerify == nil {
+		spec.TLSkipHostVerify = &falseValue
+	}
 	return &webhookAction{
 		es:   es,
 		spec: spec,
