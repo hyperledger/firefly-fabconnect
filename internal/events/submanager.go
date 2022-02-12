@@ -581,6 +581,15 @@ func (s *subscriptionMGR) recoverStreams() {
 				log.Errorf("Failed to recover stream '%s': %s", string(iStream.Value()), err)
 				continue
 			}
+			if streamInfo.Suspended == nil {
+				streamInfo.Suspended = &falseValue
+			}
+			if streamInfo.Timestamps == nil {
+				streamInfo.Timestamps = &falseValue
+			}
+			if streamInfo.Webhook != nil && streamInfo.Webhook.TLSkipHostVerify == nil {
+				streamInfo.Webhook.TLSkipHostVerify = &falseValue
+			}
 			stream, err := newEventStream(s, &streamInfo, s.wsChannels)
 			if err != nil {
 				log.Errorf("Failed to recover stream '%s': %s", streamInfo.ID, err)

@@ -76,7 +76,7 @@ func (s *subscription) setInitialBlockHeight(ctx context.Context) (uint64, error
 		if err != nil {
 			return 0, errors.Errorf(errors.EventStreamsSubscribeBadBlock)
 		}
-		log.Infof("%s: initial block height for subscription (latest block): %d", s.info.ID, fromBlock)
+		log.Infof("%s: initial block height for subscription: %d", s.info.ID, fromBlock)
 		return fromBlock, nil
 	}
 	result, err := s.client.QueryChainInfo(s.info.ChannelId, s.info.Signer)
@@ -85,7 +85,7 @@ func (s *subscription) setInitialBlockHeight(ctx context.Context) (uint64, error
 	}
 	i := result.BCI.Height
 	s.ep.initBlockHWM(i)
-	log.Infof("%s: initial block height for subscription (latest block): %d", s.info.ID, i)
+	log.Infof("%s: initial block height for subscription: %d", s.info.ID, i)
 	return i, nil
 }
 

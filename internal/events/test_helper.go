@@ -16,7 +16,6 @@ package events
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -146,7 +145,6 @@ func newTestStreamForBatching(spec *StreamInfo, db kvstore.KVStore, status ...in
 	if db != nil {
 		sm.db = db
 	}
-	fmt.Printf("sm db type: %T\n", sm.db)
 	mockstore, ok := sm.db.(*mockkvstore.KVStore)
 	if ok {
 		mockstore.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()

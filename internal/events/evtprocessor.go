@@ -70,18 +70,25 @@ func (ep *evtProcessor) processEventEntry(subInfo *api.SubscriptionInfo, entry *
 	if payloadType == "" {
 		payloadType = api.EventPayloadType_Bytes
 	}
-	switch payloadType {
-	case api.EventPayloadType_String:
-		entry.Payload = string(entry.Payload.([]byte))
-	case api.EventPayloadType_StringifiedJSON, api.EventPayloadType_JSON:
-		structuredMap := make(map[string]interface{})
-		err := json.Unmarshal(entry.Payload.([]byte), &structuredMap)
-		if err != nil {
-			log.Errorf("Failed to unmarshal event payload for [sub:%s,name:%s,block=%d]", entry.SubID, entry.EventName, entry.BlockNumber)
-		} else {
-			entry.Payload = structuredMap
+
+	// if the payload comes from the block decoder, it's already decoded into a map
+	// first check if it's still a byte array
+	payloadBytes, ok := entry.Payload.([]byte)
+	if ok {
+		switch payloadType {
+		case api.EventPayloadType_String:
+			entry.Payload = string(payloadBytes)
+		case api.EventPayloadType_StringifiedJSON, api.EventPayloadType_JSON:
+			structuredMap := make(map[string]interface{})
+			err := json.Unmarshal(payloadBytes, &structuredMap)
+			if err != nil {
+				log.Errorf("Failed to unmarshal event payload for [sub:%s,name:%s,block=%d]", entry.SubID, entry.EventName, entry.BlockNumber)
+			} else {
+				entry.Payload = structuredMap
+			}
 		}
 	}
+
 	result := eventData{
 		event:         entry,
 		batchComplete: ep.batchComplete,
