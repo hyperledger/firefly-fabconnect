@@ -36,7 +36,7 @@ import (
 const (
 	// when multiple websocket client are connected for the same topic, send events to all connected clients
 	DistributionModeBroadcast = "broadcast"
-	// when multiple websocket client are connected for the same topic, send events to only one of the connected clients
+	// when multiple websocket client are connected for the same topic, send each event to only one of the connected clients
 	DistributionModeWLD = "workloadDistribution"
 	// send events via a webhook endpoint
 	EventStreamTypeWebhook = "webhook"
@@ -82,10 +82,10 @@ type StreamInfo struct {
 }
 
 type webhookActionInfo struct {
-	URL               string             `json:"url,omitempty"`
-	Headers           *map[string]string `json:"headers,omitempty"`
-	TLSkipHostVerify  *bool              `json:"tlsSkipHostVerify,omitempty"`
-	RequestTimeoutSec uint32             `json:"requestTimeoutSec,omitempty"`
+	URL               string            `json:"url,omitempty"`
+	Headers           map[string]string `json:"headers,omitempty"`
+	TLSkipHostVerify  *bool             `json:"tlsSkipHostVerify,omitempty"`
+	RequestTimeoutSec uint32            `json:"requestTimeoutSec,omitempty"`
 }
 
 type webSocketActionInfo struct {

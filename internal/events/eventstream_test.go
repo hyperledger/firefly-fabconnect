@@ -879,7 +879,7 @@ func TestUpdateStream(t *testing.T) {
 		Name:                 "new-name",
 		Webhook: &webhookActionInfo{
 			URL:               "http://foo.url",
-			Headers:           &headers,
+			Headers:           headers,
 			TLSkipHostVerify:  &trueValue,
 			RequestTimeoutSec: 0,
 		},
@@ -893,7 +893,7 @@ func TestUpdateStream(t *testing.T) {
 	assert.Equal(uint64(5), updatedStream.BlockedRetryDelaySec)
 	assert.Equal(ErrorHandlingBlock, updatedStream.ErrorHandling)
 	assert.Equal("http://foo.url", updatedStream.Webhook.URL)
-	assert.Equal("val1", (*updatedStream.Webhook.Headers)["test-h1"])
+	assert.Equal("val1", updatedStream.Webhook.Headers["test-h1"])
 
 	assert.NoError(err)
 }
@@ -927,7 +927,7 @@ func TestUpdateStreamWithDefaults(t *testing.T) {
 	headers["test-h1"] = "val1"
 	updateSpec := &StreamInfo{
 		Webhook: &webhookActionInfo{
-			Headers:          &headers,
+			Headers:          headers,
 			TLSkipHostVerify: &trueValue,
 		},
 		Timestamps: &trueValue,
@@ -938,7 +938,7 @@ func TestUpdateStreamWithDefaults(t *testing.T) {
 	assert.Equal(uint64(5), updatedStream.BatchSize)
 	assert.Equal(ErrorHandlingSkip, updatedStream.ErrorHandling)
 	assert.Contains(updatedStream.Webhook.URL, "http://127.0.0.1") // test that the URL has not been overriden
-	assert.Equal("val1", (*updatedStream.Webhook.Headers)["test-h1"])
+	assert.Equal("val1", updatedStream.Webhook.Headers["test-h1"])
 
 	assert.NoError(err)
 }

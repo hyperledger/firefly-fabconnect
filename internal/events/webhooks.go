@@ -100,7 +100,7 @@ func (w *webhookAction) attemptBatch(batchNumber, attempt uint64, events []*api.
 	if err == nil {
 		var res *http.Response
 		req.Header.Set("Content-Type", "application/json")
-		for h, v := range *w.spec.Headers {
+		for h, v := range w.spec.Headers {
 			req.Header.Set(h, v)
 		}
 		res, err = netClient.Do(req)

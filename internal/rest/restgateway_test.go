@@ -479,12 +479,7 @@ func TestEventsAPI(t *testing.T) {
 	testRPC := fabtest.MockRPCClient("")
 	g.processor.Init(testRPC)
 	g.sm = events.NewSubscriptionManager(&g.config.Events, testRPC, nil)
-	mockedKV := &mockkvstore.KVStore{}
-	mockedItr := &mockkvstore.KVIterator{}
-	mockedItr.On("Release").Return()
-	mockedItr.On("Next").Return(false).Once() // called by recoverStreams() during Init()
-	mockedItr.On("Next").Return(false).Once() // called by recoverSubscriptions() during Init()
-	mockedKV.On("NewIterator").Return(mockedItr)
+	mockedKV := newMockKV()
 	_ = g.sm.Init(mockedKV)
 	g.router.subManager = g.sm
 	assert.NoError(err)
@@ -562,8 +557,10 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal(13, len(result3))
 
 	// PATCH /eventstreams/:streamId success calls
-	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
-	mockedKV.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
+	mockedKV1 := newMockKV()
+	_ = g.sm.Init(mockedKV1)
+	mockedKV1.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV1.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s", g.config.HTTP.Port, esID))
 	req = &http.Request{
 		URL:    url,
@@ -597,7 +594,9 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
 
 	// POST /eventstreams/:streamId/suspend success calls
-	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
+	mockedKV2 := newMockKV()
+	_ = g.sm.Init(mockedKV2)
+	mockedKV2.On("Put", mock.Anything, mock.Anything).Return(nil)
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s/suspend", g.config.HTTP.Port, esID))
 	req = &http.Request{
 		URL:    url,
@@ -627,8 +626,10 @@ func TestEventsAPI(t *testing.T) {
 
 	// POST /eventstreams/:streamId/resume success calls
 	time.Sleep(1 * time.Second) // sleep to allow event processor to be shutdown
-	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
-	mockedKV.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
+	mockedKV3 := newMockKV()
+	_ = g.sm.Init(mockedKV3)
+	mockedKV3.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV3.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s/resume", g.config.HTTP.Port, esID))
 	req = &http.Request{
 		URL:    url,
@@ -709,8 +710,10 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal("Invalid distribution mode 'banana'. Valid distribution modes are: 'workloadDistribution' and 'broadcast'.", errorResp.Message)
 
 	// POST /eventstream failure calls due to DB errors
-	mockedKV.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!")).Once()
-	mockedKV.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
+	mockedKV4 := newMockKV()
+	_ = g.sm.Init(mockedKV4)
+	mockedKV4.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
+	mockedKV4.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}")))
 	resp, err = http.DefaultClient.Do(req)
 	err = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -744,8 +747,10 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal("Invalid event stream specification: invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
 
 	// PATCH /eventstreams/:streamId failure calls due to DB errors
-	mockedKV.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!")).Once()
-	mockedKV.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
+	mockedKV5 := newMockKV()
+	_ = g.sm.Init(mockedKV5)
+	mockedKV5.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
+	mockedKV5.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"updated-name\"}")))
 	resp, err = http.DefaultClient.Do(req)
 	err = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -753,8 +758,10 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal("Failed to store stream: bang!", errorResp.Message)
 
 	// POST /subscriptions successful calls
-	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
-	mockedKV.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
+	mockedKV6 := newMockKV()
+	_ = g.sm.Init(mockedKV6)
+	mockedKV6.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV6.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
 	payload := fmt.Sprintf("{\"name\":\"sub-1\",\"stream\":\"%s\",\"channel\":\"channel-1\",\"signer\":\"user1\",\"payloadType\":\"string\",\"filter\":{\"chaincodeId\":\"asset_transfer\"}}", esID)
 	req = &http.Request{
@@ -777,8 +784,10 @@ func TestEventsAPI(t *testing.T) {
 	subID := result7["id"]
 
 	// POST /subscriptions failed calls due to non JSON payload
-	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
-	mockedKV.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
+	mockedKV7 := newMockKV()
+	_ = g.sm.Init(mockedKV7)
+	mockedKV7.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV7.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
 	req = &http.Request{
 		URL:    url,
@@ -914,7 +923,9 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal(10, len(result9))
 
 	// POST /subscriptions/:subId/reset success calls
-	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
+	mockedKV8 := newMockKV()
+	_ = g.sm.Init(mockedKV8)
+	mockedKV8.On("Put", mock.Anything, mock.Anything).Return(nil)
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/%s/reset", g.config.HTTP.Port, subID))
 	req = &http.Request{
 		URL:    url,
@@ -981,7 +992,9 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal("Subscription with ID 'badId' not found", errorResp.Message)
 
 	// DELETE /subscriptions/:subId success calls
-	mockedKV.On("Delete", mock.Anything).Return(nil).Once()
+	mockedKV9 := newMockKV()
+	_ = g.sm.Init(mockedKV9)
+	mockedKV9.On("Delete", mock.Anything).Return(nil)
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/%s", g.config.HTTP.Port, subID))
 	req = &http.Request{
 		URL:    url,
@@ -1008,7 +1021,9 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
 
 	// DELETE /eventstreams/:streamId failure calls due to DB errors
-	mockedKV.On("Delete", mock.Anything).Return(fmt.Errorf("bang!")).Once()
+	mockedKV10 := newMockKV()
+	_ = g.sm.Init(mockedKV10)
+	mockedKV10.On("Delete", mock.Anything).Return(fmt.Errorf("bang!"))
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s", g.config.HTTP.Port, esID))
 	req = &http.Request{
 		URL:    url,
@@ -1021,8 +1036,10 @@ func TestEventsAPI(t *testing.T) {
 	assert.Equal("bang!", errorResp.Message)
 
 	// DELETE /eventstreams/:streamId success calls
-	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
-	mockedKV.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
+	mockedKV11 := newMockKV()
+	_ = g.sm.Init(mockedKV11)
+	mockedKV11.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV11.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
 	req = &http.Request{
 		URL:    url,
@@ -1034,7 +1051,7 @@ func TestEventsAPI(t *testing.T) {
 	result12 := make(map[string]interface{})
 	err = json.NewDecoder(resp.Body).Decode(&result12)
 	esID = result12["id"]
-	mockedKV.On("Delete", mock.Anything).Return(nil).Twice() // once for stream, once for checkpoint
+	mockedKV11.On("Delete", mock.Anything).Return(nil).Twice() // once for stream, once for checkpoint
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s", g.config.HTTP.Port, esID))
 	req = &http.Request{
 		URL:    url,
@@ -1147,4 +1164,14 @@ func TestStartWithMissingUserStorePath(t *testing.T) {
 	g := NewRESTGateway(testConfig)
 	err := g.Init()
 	assert.EqualError(err, "User credentials store creation failed. User credentials store path is empty")
+}
+
+func newMockKV() *mockkvstore.KVStore {
+	mockedKV := &mockkvstore.KVStore{}
+	mockedItr := &mockkvstore.KVIterator{}
+	mockedItr.On("Release").Return()
+	mockedItr.On("Next").Return(false).Once() // called by recoverStreams() during Init()
+	mockedItr.On("Next").Return(false).Once() // called by recoverSubscriptions() during Init()
+	mockedKV.On("NewIterator").Return(mockedItr)
+	return mockedKV
 }

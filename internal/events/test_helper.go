@@ -138,7 +138,7 @@ func newTestStreamForBatching(spec *StreamInfo, db kvstore.KVStore, status ...in
 	if spec.Type == "" {
 		spec.Type = "webhook"
 		spec.Webhook.URL = svr.URL
-		spec.Webhook.Headers = &map[string]string{"x-my-header": "my-value"}
+		spec.Webhook.Headers = map[string]string{"x-my-header": "my-value"}
 	}
 	sm := newTestSubscriptionManager()
 	sm.config.WebhooksAllowPrivateIPs = true
