@@ -38,11 +38,11 @@ func newUserstore(configProvider core.ConfigProvider) (msp.UserStore, error) {
 		Path: clientConfig.CredentialStore.Path,
 	})
 	if err != nil {
-		return nil, errors.Errorf("Key-value store creation failed. Path: %s", clientConfig.CredentialStore.Path)
+		return nil, errors.Errorf("Key-value store creation failed. %s", clientConfig.CredentialStore.Path)
 	}
 	userStore, err := mspImpl.NewCertFileUserStore1(store)
 	if err != nil {
-		return nil, errors.Errorf("User credentials store creation failed. Path: %s", err)
+		return nil, errors.Errorf("User credentials store creation failed. %s", err)
 	}
 	return userStore, nil
 }

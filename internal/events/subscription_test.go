@@ -39,7 +39,7 @@ func TestCreateWebhookSub(t *testing.T) {
 
 	assert.Equal(s.info.ID, s1.info.ID)
 	assert.Equal("glastonbury", s1.info.Name)
-	assert.Equal("", s.info.Filter.Filter)
+	assert.Equal("", s.info.Filter.EventFilter)
 	assert.Equal("FromBlock=,Chaincode=,Filter=", s1.info.Summary)
 	assert.Equal("", s.info.Filter.BlockType)
 }
@@ -50,5 +50,5 @@ func TestRestoreSubscriptionMissingID(t *testing.T) {
 	testInfo := testSubInfo("")
 	testInfo.ID = ""
 	_, err := restoreSubscription(m.stream, nil, testInfo)
-	assert.EqualError(err, "No ID")
+	assert.NoError(err)
 }

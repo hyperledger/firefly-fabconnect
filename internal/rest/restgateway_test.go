@@ -35,13 +35,16 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/auth/authtest"
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/events"
 	fabtest "github.com/hyperledger/firefly-fabconnect/internal/fabric/test"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/test"
 	"github.com/hyperledger/firefly-fabconnect/internal/utils"
+	mockkvstore "github.com/hyperledger/firefly-fabconnect/mocks/kvstore"
 	mockreceipt "github.com/hyperledger/firefly-fabconnect/mocks/rest/receipt"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var lastPort = 9000
@@ -302,13 +305,16 @@ func TestReceiptsAPI(t *testing.T) {
 	testConfig.Events.LevelDB.Path = ""
 	testConfig.Receipts.LevelDB.Path = ""
 	g := NewRESTGateway(testConfig)
+	// set the mocked persistence before gateway Init() so the request handlers can use it
+	testStorePersistence := &mockreceipt.ReceiptStorePersistence{}
+	testStorePersistence.On("Init", mock.Anything, mock.Anything).Return(nil)
+	testStorePersistence.On("ValidateConf").Return(nil)
+	testStorePersistence.On("Close").Return()
+	_ = g.receiptStore.Init(nil, testStorePersistence)
 	err := g.Init()
 	assert.NoError(err)
 	testRPC := fabtest.MockRPCClient("")
 	g.processor.Init(testRPC)
-	testStorePersistence := &mockreceipt.ReceiptStorePersistence{}
-	testStorePersistence.On("Close").Return()
-	err = g.receiptStore.Init(nil, testStorePersistence)
 	assert.NoError(err)
 
 	lastPort++
@@ -335,7 +341,7 @@ func TestReceiptsAPI(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(200, resp.StatusCode)
 
-	// GET /receipts emptry return
+	// GET /receipts empty return
 	fakeReply1 := make([]map[string]interface{}, 0)
 	testStorePersistence.On("GetReceipts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&fakeReply1, nil).Once()
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts", g.config.HTTP.Port))
@@ -458,6 +464,608 @@ func TestReceiptsAPI(t *testing.T) {
 	auth.RegisterSecurityModule(nil)
 }
 
+func TestEventsAPI(t *testing.T) {
+	assert := assert.New(t)
+
+	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
+	testConfig.HTTP.Port = lastPort
+	testConfig.HTTP.LocalAddr = "127.0.0.1"
+	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
+	testConfig.Events.LevelDB.Path = ""
+	testConfig.Receipts.LevelDB.Path = ""
+	g := NewRESTGateway(testConfig)
+	err := g.Init()
+	assert.NoError(err)
+	testRPC := fabtest.MockRPCClient("")
+	g.processor.Init(testRPC)
+	g.sm = events.NewSubscriptionManager(&g.config.Events, testRPC, nil)
+	mockedKV := newMockKV()
+	_ = g.sm.Init(mockedKV)
+	g.router.subManager = g.sm
+	assert.NoError(err)
+
+	lastPort++
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err = g.Start()
+		wg.Done()
+	}()
+
+	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/status", g.config.HTTP.Port))
+	var resp *http.Response
+	header := http.Header{
+		"AUTHORIZATION": []string{"BeaRER testat"},
+	}
+	for i := 0; i < 5; i++ {
+		time.Sleep(200 * time.Millisecond)
+		req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
+		resp, err = http.DefaultClient.Do(req)
+		if err == nil && resp.StatusCode == 200 {
+			break
+		}
+	}
+	assert.NoError(err)
+	assert.Equal(200, resp.StatusCode)
+
+	// POST /eventstreams success calls
+	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
+	mockedKV.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req := &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result1 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result1)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(13, len(result1))
+	assert.Equal(float64(1), result1["batchSize"])
+	assert.Equal(float64(5000), result1["batchTimeoutMS"])
+	assert.Equal("skip", result1["errorHandling"])
+	assert.Equal(float64(1000), result1["timestampCacheSize"])
+	assert.Equal(float64(120), result1["webhook"].(map[string]interface{})["requestTimeoutSec"])
+	esID := result1["id"]
+
+	// GET /eventstreams success calls
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodGet,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result2 := make([]map[string]interface{}, 1)
+	err = json.NewDecoder(resp.Body).Decode(&result2)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(1, len(result2))
+
+	// GET /eventstreams/:streamId success calls
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s", g.config.HTTP.Port, esID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodGet,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result3 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result3)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(13, len(result3))
+
+	// PATCH /eventstreams/:streamId success calls
+	mockedKV1 := newMockKV()
+	_ = g.sm.Init(mockedKV1)
+	mockedKV1.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV1.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s", g.config.HTTP.Port, esID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPatch,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-2\",\"type\":\"webhook\",\"batchSize\":5,\"errorHandling\":\"block\",\"batchTimeoutMS\":100,\"webhook\":{\"url\":\"https://webhook.site/def\"}}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result4 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result4)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(13, len(result3))
+	assert.Equal(float64(5), result4["batchSize"])
+	assert.Equal(float64(100), result4["batchTimeoutMS"]) // batch timeout lowered for the resume testing in later steps
+	assert.Equal("test-2", result4["name"])
+	assert.Equal("block", result4["errorHandling"])
+	assert.Equal("https://webhook.site/def", result4["webhook"].(map[string]interface{})["url"])
+
+	// POST /eventstreams/:streamId/suspend failed calls due to bad ID
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/badId/suspend", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	var errorResp errors.RestErrMsg
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(404, resp.StatusCode)
+	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
+
+	// POST /eventstreams/:streamId/suspend success calls
+	mockedKV2 := newMockKV()
+	_ = g.sm.Init(mockedKV2)
+	mockedKV2.On("Put", mock.Anything, mock.Anything).Return(nil)
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s/suspend", g.config.HTTP.Port, esID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result5 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result5)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(esID, result5["id"])
+	assert.Equal("true", result5["suspended"])
+
+	// POST /eventstreams/:streamId/resume failed calls due to bad ID
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/badId/resume", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(404, resp.StatusCode)
+	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
+
+	// POST /eventstreams/:streamId/resume success calls
+	time.Sleep(1 * time.Second) // sleep to allow event processor to be shutdown
+	mockedKV3 := newMockKV()
+	_ = g.sm.Init(mockedKV3)
+	mockedKV3.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV3.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s/resume", g.config.HTTP.Port, esID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result6 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result6)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(esID, result6["id"])
+	assert.Equal("true", result6["resumed"])
+
+	// POST /eventstreams failure calls due to non-json payload
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("not json"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid event stream specification: invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
+
+	// POST /eventstreams failure calls due to bad type
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"random\"}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Unknown action type 'random'", errorResp.Message)
+
+	// POST /eventstreams failure calls due to missing webhook url
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\"}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Must specify webhook.url for action type 'webhook'", errorResp.Message)
+
+	// POST /eventstreams failure calls due to bad webhook url
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\":badUrl\"}}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid URL in webhook action", errorResp.Message)
+
+	// POST /eventstreams failure calls due to bad websocket distribution mode
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"websocket\",\"websocket\":{\"topic\":\"apple\",\"distributionMode\":\"banana\"}}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid distribution mode 'banana'. Valid distribution modes are: 'workloadDistribution' and 'broadcast'.", errorResp.Message)
+
+	// POST /eventstream failure calls due to DB errors
+	mockedKV4 := newMockKV()
+	_ = g.sm.Init(mockedKV4)
+	mockedKV4.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
+	mockedKV4.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
+	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}")))
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(500, resp.StatusCode)
+	assert.Equal("Failed to store stream: bang!", errorResp.Message)
+
+	// PATCH /eventstreams/:streamId failure calls due to invalid ID
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/badId", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPatch,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"updated-name\"}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(404, resp.StatusCode)
+	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
+
+	// PATCH /eventstreams/:streamId failure calls due to non-json payload
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s", g.config.HTTP.Port, esID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPatch,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("not json"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid event stream specification: invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
+
+	// PATCH /eventstreams/:streamId failure calls due to DB errors
+	mockedKV5 := newMockKV()
+	_ = g.sm.Init(mockedKV5)
+	mockedKV5.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
+	mockedKV5.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
+	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"updated-name\"}")))
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(500, resp.StatusCode)
+	assert.Equal("Failed to store stream: bang!", errorResp.Message)
+
+	// POST /subscriptions successful calls
+	mockedKV6 := newMockKV()
+	_ = g.sm.Init(mockedKV6)
+	mockedKV6.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV6.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload := fmt.Sprintf("{\"name\":\"sub-1\",\"stream\":\"%s\",\"channel\":\"channel-1\",\"signer\":\"user1\",\"payloadType\":\"string\",\"filter\":{\"chaincodeId\":\"asset_transfer\"}}", esID)
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result7 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result7)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(10, len(result7))
+	assert.Equal("channel-1", result7["channel"])
+	assert.Equal("user1", result7["signer"])
+	assert.Equal("string", result7["payloadType"])
+	assert.Equal("newest", result7["fromBlock"])
+	assert.Equal("tx", result7["filter"].(map[string]interface{})["blockType"])
+	assert.Equal(".*", result7["filter"].(map[string]interface{})["eventFilter"])
+	subID := result7["id"]
+
+	// POST /subscriptions failed calls due to non JSON payload
+	mockedKV7 := newMockKV()
+	_ = g.sm.Init(mockedKV7)
+	mockedKV7.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV7.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("non json"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid event subscription specification: invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
+
+	// POST /subscriptions failed calls due to missing channel ID
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = fmt.Sprintf("{\"name\":\"sub-1\",\"stream\":\"%s\",\"signer\":\"user1\",\"payloadType\":\"string\",\"filter\":{\"chaincodeId\":\"asset_transfer\"}}", esID)
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Missing required parameter \"channel\"", errorResp.Message)
+
+	// POST /subscriptions failed calls due to missing stream
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = "{\"name\":\"sub-1\",\"channel\":\"channel-1\",\"signer\":\"user1\",\"payloadType\":\"string\",\"filter\":{\"chaincodeId\":\"asset_transfer\"}}"
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Missing required parameter \"stream\"", errorResp.Message)
+
+	// POST /subscriptions failed calls due to missing stream
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = "{\"name\":\"sub-1\",\"channel\":\"channel-1\",\"stream\":\"test-1\",\"payloadType\":\"string\",\"filter\":{\"chaincodeId\":\"asset_transfer\"}}"
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Missing required parameter \"signer\"", errorResp.Message)
+
+	// POST /subscriptions failed calls due to bad "fromBlock" value
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = fmt.Sprintf("{\"name\":\"sub-1\",\"stream\":\"%s\",\"channel\":\"channel-1\",\"signer\":\"user1\",\"fromBlock\":\"0x10\"}", esID)
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
+
+	// POST /subscriptions failed calls due to bad "payloadType" value
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = fmt.Sprintf("{\"name\":\"sub-1\",\"stream\":\"%s\",\"channel\":\"channel-1\",\"signer\":\"user1\",\"payloadType\":\"badType\"}", esID)
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal(`Parameter "payloadType" must be an empty string, "string" or "json"`, errorResp.Message)
+
+	// POST /subscriptions failed calls due to bad "blockType" value
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	payload = fmt.Sprintf("{\"name\":\"sub-1\",\"stream\":\"%s\",\"channel\":\"channel-1\",\"signer\":\"user1\",\"filter\":{\"blockType\":\"badBlockType\"}}", esID)
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal(`Parameter "filter.blockType" must be an empty string, "tx" or "config"`, errorResp.Message)
+
+	// GET /subscriptions success calls
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodGet,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result8 := make([]map[string]interface{}, 1)
+	err = json.NewDecoder(resp.Body).Decode(&result8)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(1, len(result8))
+
+	// GET /subscriptions/:subId failed calls due to bad ID
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/badId", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodGet,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(404, resp.StatusCode)
+	assert.Equal("Subscription with ID 'badId' not found", errorResp.Message)
+
+	// GET /subscriptions/:subId success calls
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/%s", g.config.HTTP.Port, subID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodGet,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result9 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result9)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(10, len(result9))
+
+	// POST /subscriptions/:subId/reset success calls
+	mockedKV8 := newMockKV()
+	_ = g.sm.Init(mockedKV8)
+	mockedKV8.On("Put", mock.Anything, mock.Anything).Return(nil)
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/%s/reset", g.config.HTTP.Port, subID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"100\"}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result10 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result10)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(subID, result10["id"])
+	assert.Equal("true", result10["reset"])
+
+	// POST /subscriptions/:subId/reset failed calls due to bad ID
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/badId/reset", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"100\"}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(404, resp.StatusCode)
+	assert.Equal("Subscription with ID 'badId' not found", errorResp.Message)
+
+	// POST /subscriptions/:subId/reset failed calls due to bad payload
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/%s/reset", g.config.HTTP.Port, subID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("not json"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Failed to parse request body. invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
+
+	// POST /subscriptions/:subId/reset failed calls due to bad payload
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/%s/reset", g.config.HTTP.Port, subID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"0x10\"}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(400, resp.StatusCode)
+	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
+
+	// DELETE /subscriptions/:subId failed calls due to bad ID
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/badId", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodDelete,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(404, resp.StatusCode)
+	assert.Equal("Subscription with ID 'badId' not found", errorResp.Message)
+
+	// DELETE /subscriptions/:subId success calls
+	mockedKV9 := newMockKV()
+	_ = g.sm.Init(mockedKV9)
+	mockedKV9.On("Delete", mock.Anything).Return(nil)
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/%s", g.config.HTTP.Port, subID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodDelete,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result11 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result11)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(subID, result11["id"])
+	assert.Equal("true", result11["deleted"])
+
+	// DELETE /eventstreams/:streamId failure calls due to bad ID
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/badId", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodDelete,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(404, resp.StatusCode)
+	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
+
+	// DELETE /eventstreams/:streamId failure calls due to DB errors
+	mockedKV10 := newMockKV()
+	_ = g.sm.Init(mockedKV10)
+	mockedKV10.On("Delete", mock.Anything).Return(fmt.Errorf("bang!"))
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s", g.config.HTTP.Port, esID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodDelete,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(500, resp.StatusCode)
+	assert.Equal("bang!", errorResp.Message)
+
+	// DELETE /eventstreams/:streamId success calls
+	mockedKV11 := newMockKV()
+	_ = g.sm.Init(mockedKV11)
+	mockedKV11.On("Put", mock.Anything, mock.Anything).Return(nil)
+	mockedKV11.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-2\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}"))),
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result12 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result12)
+	esID = result12["id"]
+	mockedKV11.On("Delete", mock.Anything).Return(nil).Twice() // once for stream, once for checkpoint
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s", g.config.HTTP.Port, esID))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodDelete,
+		Header: header,
+	}
+	resp, err = http.DefaultClient.Do(req)
+	result13 := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&result13)
+	assert.Equal(200, resp.StatusCode)
+	assert.Equal(esID, result13["id"])
+	assert.Equal("true", result13["deleted"])
+}
+
 func TestStartStatusStopNoKafkaHandlerMissingToken(t *testing.T) {
 	assert := assert.New(t)
 
@@ -555,5 +1163,15 @@ func TestStartWithMissingUserStorePath(t *testing.T) {
 	testConfig.RPC.ConfigPath = ""
 	g := NewRESTGateway(testConfig)
 	err := g.Init()
-	assert.EqualError(err, "User credentials store creation failed. Path: User credentials store path is empty")
+	assert.EqualError(err, "User credentials store creation failed. User credentials store path is empty")
+}
+
+func newMockKV() *mockkvstore.KVStore {
+	mockedKV := &mockkvstore.KVStore{}
+	mockedItr := &mockkvstore.KVIterator{}
+	mockedItr.On("Release").Return()
+	mockedItr.On("Next").Return(false).Once() // called by recoverStreams() during Init()
+	mockedItr.On("Next").Return(false).Once() // called by recoverSubscriptions() during Init()
+	mockedKV.On("NewIterator").Return(mockedItr)
+	return mockedKV
 }

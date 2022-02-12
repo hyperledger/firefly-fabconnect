@@ -17,6 +17,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	log "github.com/sirupsen/logrus"
@@ -40,6 +42,17 @@ func newWebSocketAction(es *eventStream, spec *webSocketActionInfo) (*webSocketA
 		es:   es,
 		spec: spec,
 	}, nil
+}
+
+func validateWebsocketConfig(spec *webSocketActionInfo) error {
+	if spec.Topic == "" {
+		return fmt.Errorf("Missing required parameter 'websocket.topic'")
+	}
+	sd := spec.DistributionMode
+	if sd != "" && sd != DistributionModeBroadcast && sd != DistributionModeWLD {
+		return errors.Errorf(errors.EventStreamsInvalidDistributionMode, sd)
+	}
+	return nil
 }
 
 // attemptBatch attempts to deliver a batch over socket IO

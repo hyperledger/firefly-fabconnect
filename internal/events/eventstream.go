@@ -20,7 +20,6 @@ import (
 	"container/list"
 	"context"
 	"net"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -34,14 +33,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type DistributionMode string
-
 const (
-	DistributionModeBroadcast DistributionMode = "broadcast"
-	DistributionModeWLD       DistributionMode = "workloadDistribution"
-)
-
-const (
+	// when multiple websocket client are connected for the same topic, send events to all connected clients
+	DistributionModeBroadcast = "broadcast"
+	// when multiple websocket client are connected for the same topic, send each event to only one of the connected clients
+	DistributionModeWLD = "workloadDistribution"
+	// send events via a webhook endpoint
+	EventStreamTypeWebhook = "webhook"
+	// send events via a websocket connection
+	EventStreamTypeWebsocket = "websocket"
 	// FromBlockNewest is the special string that means subscribe from the current block
 	FromBlockNewest = "newest"
 	// ErrorHandlingBlock blocks the event stream until the handler can accept the event
@@ -50,43 +50,47 @@ const (
 	ErrorHandlingSkip = "skip"
 	// MaxBatchSize is the maximum that a user can specific for their batch size
 	MaxBatchSize = 1000
-	// DefaultExponentialBackoffInitial  is the initial delay for backoff retry
+
 	DefaultExponentialBackoffInitial = time.Duration(1) * time.Second
-	// DefaultExponentialBackoffFactor is the factor we use between retries
-	DefaultExponentialBackoffFactor = float64(2.0)
-	// DefaultTimestampCacheSize is the number of entries we will hold in a LRU cache for block timestamps
-	DefaultTimestampCacheSize = 1000
+	DefaultExponentialBackoffFactor  = float64(2.0)
+	DefaultTimestampCacheSize        = 1000
+	DefaultBlockedRetryDelaySec      = 30
+	DefaultBatchTimeoutMS            = 5000
+	DefaultErrorHandling             = ErrorHandlingSkip
 )
+
+var falseValue = false
+var trueValue = true
 
 // StreamInfo configures the stream to perform an action for each event
 type StreamInfo struct {
 	eventsapi.TimeSorted
 	ID                   string               `json:"id"`
 	Name                 string               `json:"name,omitempty"`
-	Path                 string               `json:"path"`
-	Suspended            bool                 `json:"suspended"`
-	Type                 string               `json:"type,omitempty"`
+	Path                 string               `json:"path,omitempty"`
+	Suspended            *bool                `json:"suspended,omitempty"`
+	Type                 string               `json:"type"`
 	BatchSize            uint64               `json:"batchSize,omitempty"`
 	BatchTimeoutMS       uint64               `json:"batchTimeoutMS,omitempty"`
 	ErrorHandling        string               `json:"errorHandling,omitempty"`
 	RetryTimeoutSec      uint64               `json:"retryTimeoutSec,omitempty"`
-	BlockedRetryDelaySec uint64               `json:"blockedReryDelaySec,omitempty"`
+	BlockedRetryDelaySec uint64               `json:"blockedRetryDelaySec,omitempty"`
 	Webhook              *webhookActionInfo   `json:"webhook,omitempty"`
 	WebSocket            *webSocketActionInfo `json:"websocket,omitempty"`
-	Timestamps           bool                 `json:"timestamps,omitempty"` // Include block timestamps in the events generated
+	Timestamps           *bool                `json:"timestamps,omitempty"` // Include block timestamps in the events generated
 	TimestampCacheSize   int                  `json:"timestampCacheSize,omitempty"`
 }
 
 type webhookActionInfo struct {
 	URL               string            `json:"url,omitempty"`
 	Headers           map[string]string `json:"headers,omitempty"`
-	TLSkipHostVerify  bool              `json:"tlsSkipHostVerify,omitempty"`
+	TLSkipHostVerify  *bool             `json:"tlsSkipHostVerify,omitempty"`
 	RequestTimeoutSec uint32            `json:"requestTimeoutSec,omitempty"`
 }
 
 type webSocketActionInfo struct {
-	Topic            string           `json:"topic,omitempty"`
-	DistributionMode DistributionMode `json:"distributionMode,omitempty"`
+	Topic            string `json:"topic,omitempty"`
+	DistributionMode string `json:"distributionMode,omitempty"`
 }
 
 // defined to allow mocking in tests
@@ -120,20 +124,15 @@ type eventStreamAction interface {
 	attemptBatch(batchNumber, attempt uint64, events []*eventsapi.EventEntry) error
 }
 
-func validateWebSocket(w *webSocketActionInfo) error {
-	if w.DistributionMode != "" && w.DistributionMode != DistributionModeBroadcast && w.DistributionMode != DistributionModeWLD {
-		return errors.Errorf(errors.EventStreamsInvalidDistributionMode, w.DistributionMode)
-	}
-	return nil
-}
-
 // newEventStream constructor verifies the action is correct, kicks
 // off the event batch processor, and blockHWM will be
 // initialied to that supplied (zero on initial, or the
 // value from the checkpoint)
 func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebSocketChannels) (a *eventStream, err error) {
-	if spec == nil || spec.GetID() == "" {
-		return nil, errors.Errorf(errors.EventStreamsNoID)
+	if strings.ToLower(spec.Type) == EventStreamTypeWebhook {
+		spec.Type = EventStreamTypeWebhook
+	} else if strings.ToLower(spec.Type) == EventStreamTypeWebsocket {
+		spec.Type = EventStreamTypeWebsocket
 	}
 
 	if spec.BatchSize == 0 {
@@ -142,18 +141,22 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 		spec.BatchSize = MaxBatchSize
 	}
 	if spec.BatchTimeoutMS == 0 {
-		spec.BatchTimeoutMS = 5000
+		spec.BatchTimeoutMS = DefaultBatchTimeoutMS
 	}
 	if spec.BlockedRetryDelaySec == 0 {
-		spec.BlockedRetryDelaySec = 30
+		spec.BlockedRetryDelaySec = DefaultBlockedRetryDelaySec
 	}
-	if strings.ToLower(spec.ErrorHandling) == ErrorHandlingBlock {
-		spec.ErrorHandling = ErrorHandlingBlock
-	} else {
-		spec.ErrorHandling = ErrorHandlingSkip
+	if spec.Timestamps == nil {
+		spec.Timestamps = &falseValue
 	}
 	if spec.TimestampCacheSize == 0 {
 		spec.TimestampCacheSize = DefaultTimestampCacheSize
+	}
+	if spec.ErrorHandling == "" {
+		spec.ErrorHandling = DefaultErrorHandling
+	}
+	if spec.Suspended == nil {
+		spec.Suspended = &falseValue
 	}
 
 	a = &eventStream{
@@ -179,25 +182,15 @@ func newEventStream(sm subscriptionManager, spec *StreamInfo, wsChannels ws.WebS
 		a.pollingInterval = 10 * time.Millisecond
 	}
 
-	spec.Type = strings.ToLower(spec.Type)
 	switch spec.Type {
-	case "webhook":
+	case EventStreamTypeWebhook:
 		if a.action, err = newWebhookAction(a, spec.Webhook); err != nil {
 			return nil, err
 		}
-	case "websocket":
-
-		if spec.WebSocket != nil {
-			if err := validateWebSocket(spec.WebSocket); err != nil {
-				return nil, err
-			}
-		}
-
+	case EventStreamTypeWebsocket:
 		if a.action, err = newWebSocketAction(a, spec.WebSocket); err != nil {
 			return nil, err
 		}
-	default:
-		return nil, errors.Errorf(errors.EventStreamsInvalidActionType, spec.Type)
 	}
 
 	a.startEventHandlers(false)
@@ -265,26 +258,29 @@ func (a *eventStream) update(newSpec *StreamInfo) (spec *StreamInfo, err error) 
 		return nil, errors.Errorf(errors.EventStreamsCannotUpdateType)
 	}
 	if a.spec.Type == "webhook" && newSpec.Webhook != nil {
-		if newSpec.Webhook.URL == "" {
-			return nil, errors.Errorf(errors.EventStreamsWebhookNoURL)
+		if newSpec.Webhook.RequestTimeoutSec != 0 {
+			a.spec.Webhook.RequestTimeoutSec = 120
 		}
-		if _, err = url.Parse(newSpec.Webhook.URL); err != nil {
-			return nil, errors.Errorf(errors.EventStreamsWebhookInvalidURL)
+		if newSpec.Webhook.URL != "" {
+			a.spec.Webhook.URL = newSpec.Webhook.URL
 		}
-		if newSpec.Webhook.RequestTimeoutSec == 0 {
-			newSpec.Webhook.RequestTimeoutSec = 120
+		if newSpec.Webhook.RequestTimeoutSec != 0 {
+			a.spec.Webhook.RequestTimeoutSec = newSpec.Webhook.RequestTimeoutSec
 		}
-		a.spec.Webhook.URL = newSpec.Webhook.URL
-		a.spec.Webhook.RequestTimeoutSec = newSpec.Webhook.RequestTimeoutSec
-		a.spec.Webhook.TLSkipHostVerify = newSpec.Webhook.TLSkipHostVerify
-		a.spec.Webhook.Headers = newSpec.Webhook.Headers
+		if newSpec.Webhook.TLSkipHostVerify != nil {
+			a.spec.Webhook.TLSkipHostVerify = newSpec.Webhook.TLSkipHostVerify
+		}
+		if newSpec.Webhook.Headers != nil {
+			a.spec.Webhook.Headers = newSpec.Webhook.Headers
+		}
 	}
 	if a.spec.Type == "websocket" && newSpec.WebSocket != nil {
-		a.spec.WebSocket.Topic = newSpec.WebSocket.Topic
-		if err := validateWebSocket(newSpec.WebSocket); err != nil {
-			return nil, err
+		if newSpec.WebSocket.Topic != "" {
+			a.spec.WebSocket.Topic = newSpec.WebSocket.Topic
 		}
-		a.spec.WebSocket.DistributionMode = newSpec.WebSocket.DistributionMode
+		if newSpec.WebSocket.DistributionMode != "" {
+			a.spec.WebSocket.DistributionMode = newSpec.WebSocket.DistributionMode
+		}
 	}
 
 	if a.spec.BatchSize != newSpec.BatchSize && newSpec.BatchSize != 0 && newSpec.BatchSize < MaxBatchSize {
@@ -296,15 +292,13 @@ func (a *eventStream) update(newSpec *StreamInfo) (spec *StreamInfo, err error) 
 	if a.spec.BlockedRetryDelaySec != newSpec.BlockedRetryDelaySec && newSpec.BlockedRetryDelaySec != 0 {
 		a.spec.BlockedRetryDelaySec = newSpec.BlockedRetryDelaySec
 	}
-	if strings.ToLower(newSpec.ErrorHandling) == ErrorHandlingBlock {
-		a.spec.ErrorHandling = ErrorHandlingBlock
-	} else {
-		a.spec.ErrorHandling = ErrorHandlingSkip
+	if newSpec.ErrorHandling != "" && a.spec.ErrorHandling != newSpec.ErrorHandling {
+		a.spec.ErrorHandling = newSpec.ErrorHandling
 	}
 	if newSpec.Name != "" && a.spec.Name != newSpec.Name {
 		a.spec.Name = newSpec.Name
 	}
-	if a.spec.Timestamps != newSpec.Timestamps {
+	if newSpec.Timestamps != nil {
 		a.spec.Timestamps = newSpec.Timestamps
 	}
 	a.postUpdateStream()
@@ -334,7 +328,7 @@ func (a *eventStream) stop() {
 // suspend only stops the dispatcher, pushing back as if we're in blocking mode
 func (a *eventStream) suspend() {
 	a.batchCond.L.Lock()
-	a.spec.Suspended = true
+	a.spec.Suspended = &trueValue
 	a.batchCond.Broadcast()
 	a.batchCond.L.Unlock()
 }
@@ -344,9 +338,9 @@ func (a *eventStream) resume() error {
 	a.batchCond.L.Lock()
 	defer a.batchCond.L.Unlock()
 	if !a.processorDone || !a.pollerDone {
-		return errors.Errorf(errors.EventStreamsResumeActive, a.spec.Suspended)
+		return errors.Errorf(errors.EventStreamsResumeActive, *a.spec.Suspended)
 	}
-	a.spec.Suspended = false
+	a.spec.Suspended = &falseValue
 	a.processorDone = false
 	a.pollerDone = false
 
@@ -529,7 +523,7 @@ func (a *eventStream) batchDispatcher() {
 }
 
 func (a *eventStream) suspendOrStop() bool {
-	return a.spec.Suspended || a.stopped
+	return *a.spec.Suspended || a.stopped
 }
 
 // batchProcessor picks up batches from the batchDispatcher, and performs the blocking

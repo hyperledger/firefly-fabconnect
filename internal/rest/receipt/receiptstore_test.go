@@ -28,8 +28,10 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func newReceiptsTestStore(replyCallback func(message interface{})) (*receiptStore, *memoryReceipts) {
+func newReceiptsTestStore() (*receiptStore, *memoryReceipts) {
 	_, testConfig := test.Setup()
+	testConfig.Receipts.LevelDB.Path = ""
+	testConfig.Receipts.MongoDB.URL = ""
 	r := NewReceiptStore(testConfig).(*receiptStore)
 	p := newMemoryReceipts(&testConfig.Receipts)
 	r.persistence = p
@@ -39,7 +41,7 @@ func newReceiptsTestStore(replyCallback func(message interface{})) (*receiptStor
 func TestReplyProcessorWithValidReply(t *testing.T) {
 	assert := assert.New(t)
 
-	r, p := newReceiptsTestStore(nil)
+	r, p := newReceiptsTestStore()
 
 	replyMsg := &messages.TransactionReceipt{}
 	replyMsg.Headers.MsgType = messages.MsgTypeTransactionSuccess
@@ -58,12 +60,12 @@ func TestReplyProcessorWithValidReply(t *testing.T) {
 }
 
 func TestReplyProcessorWithInvalidReplySwallowsErr(t *testing.T) {
-	r, _ := newReceiptsTestStore(nil)
+	r, _ := newReceiptsTestStore()
 	r.ProcessReceipt([]byte("!json"))
 }
 
 func TestReplyProcessorWithPeristenceErrorPanics(t *testing.T) {
-	r, _ := newReceiptsTestStore(nil)
+	r, _ := newReceiptsTestStore()
 	r.config.RetryTimeoutMS = 0
 	p := &mockreceiptapi.ReceiptStorePersistence{}
 	p.On("AddReceipt", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
@@ -85,7 +87,7 @@ func TestReplyProcessorWithPeristenceErrorPanics(t *testing.T) {
 
 func TestReplyProcessorWithPeristenceErrorDuplicateSwallows(t *testing.T) {
 	existing := map[string]interface{}{"some": "existing"}
-	r, _ := newReceiptsTestStore(nil)
+	r, _ := newReceiptsTestStore()
 	r.config.RetryTimeoutMS = 0
 	p := &mockreceiptapi.ReceiptStorePersistence{}
 	p.On("AddReceipt", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
@@ -109,7 +111,7 @@ func TestReplyProcessorWithPeristenceErrorDuplicateSwallows(t *testing.T) {
 func TestReplyProcessorWithErrorReply(t *testing.T) {
 	assert := assert.New(t)
 
-	r, p := newReceiptsTestStore(nil)
+	r, p := newReceiptsTestStore()
 
 	replyMsg := &messages.ErrorReply{}
 	replyMsg.Headers.MsgType = messages.MsgTypeError
@@ -132,7 +134,7 @@ func TestReplyProcessorWithErrorReply(t *testing.T) {
 func TestReplyProcessorMissingHeaders(t *testing.T) {
 	assert := assert.New(t)
 
-	r, p := newReceiptsTestStore(nil)
+	r, p := newReceiptsTestStore()
 
 	emptyMsg := make(map[string]interface{})
 	msgBytes, _ := json.Marshal(&emptyMsg)
@@ -144,7 +146,7 @@ func TestReplyProcessorMissingHeaders(t *testing.T) {
 func TestReplyProcessorMissingRequestId(t *testing.T) {
 	assert := assert.New(t)
 
-	r, p := newReceiptsTestStore(nil)
+	r, p := newReceiptsTestStore()
 
 	replyMsg := &messages.ErrorReply{}
 	replyMsgBytes, _ := json.Marshal(&replyMsg)
@@ -157,7 +159,7 @@ func TestReplyProcessorMissingRequestId(t *testing.T) {
 func TestReplyProcessorInsertError(t *testing.T) {
 	assert := assert.New(t)
 
-	r, p := newReceiptsTestStore(nil)
+	r, p := newReceiptsTestStore()
 
 	replyMsg := &messages.ErrorReply{}
 	replyMsg.Headers.ReqID = utils.UUIDv4()
@@ -169,10 +171,7 @@ func TestReplyProcessorInsertError(t *testing.T) {
 }
 
 func TestSendReplyBroadcast(t *testing.T) {
-	assert := assert.New(t)
-	r, _ := newReceiptsTestStore(func(message interface{}) {
-		assert.NotNil(message)
-	})
+	r, _ := newReceiptsTestStore()
 	ws := &mockws.WebSocketChannels{}
 	ws.On("SendReply", mock.Anything).Return()
 	r.ws = ws
@@ -189,36 +188,42 @@ func TestSendReplyBroadcast(t *testing.T) {
 	ws.AssertCalled(t, "SendReply", mock.Anything)
 }
 
-// func TestGetRepliesCustomFiltersISO(t *testing.T) {
-// 	assert := assert.New(t)
-// 	_, p, ts := newReceiptsTestServer()
-// 	defer ts.Close()
+// memory store tests
+func TestMemStoreCustomFiltersISO(t *testing.T) {
+	assert := assert.New(t)
+	r, p := newReceiptsTestStore()
+	defer r.Close()
 
-// 	for i := 0; i < 20; i++ {
-// 		fakeReply := make(map[string]interface{})
-// 		fakeReply["_id"] = fmt.Sprintf("reply%d", i)
-// 		p.AddReceipt("_id", &fakeReply)
-// 	}
+	_, err := p.GetReceipts(0, 10, []string{"abc"}, 100, "1234", "5678", "2019-01-01T00:00:00Z")
+	assert.ErrorContains(err, "Memory receipts do not support filtering")
+}
 
-// 	status, resObj, httpErr := testGETObject(ts, "/replies?from=abc&to=bcd&since=2019-01-01T00:00:00Z")
-// 	assert.NoError(httpErr)
-// 	assert.Equal(500, status)
-// 	assert.Regexp("Error querying replies.*Memory receipts do not support filtering", resObj["error"])
-// }
+func TestMemStoreCustomFiltersTS(t *testing.T) {
+	assert := assert.New(t)
+	r, p := newReceiptsTestStore()
+	defer r.Close()
 
-// func TestGetRepliesCustomFiltersTS(t *testing.T) {
-// 	assert := assert.New(t)
-// 	_, p, ts := newReceiptsTestServer()
-// 	defer ts.Close()
+	_, err := p.GetReceipts(0, 10, []string{"abc"}, 100, "1234", "5678", "1580435959")
+	assert.ErrorContains(err, "Memory receipts do not support filtering")
+}
 
-// 	for i := 0; i < 20; i++ {
-// 		fakeReply := make(map[string]interface{})
-// 		fakeReply["_id"] = fmt.Sprintf("reply%d", i)
-// 		p.AddReceipt("_id", &fakeReply)
-// 	}
+func TestMemStoreLimit(t *testing.T) {
+	assert := assert.New(t)
+	r, p := newReceiptsTestStore()
+	defer r.Close()
 
-// 	status, resObj, httpErr := testGETObject(ts, "/replies?from=abc&to=bcd&since=1580435959")
-// 	assert.NoError(httpErr)
-// 	assert.Equal(500, status)
-// 	assert.Regexp("Error querying replies.*Memory receipts do not support filtering", resObj["error"])
-// }
+	for i := 0; i < 20; i++ {
+		fakeReply := make(map[string]interface{})
+		fakeReply["_id"] = fmt.Sprintf("reply%d", i)
+		_ = p.AddReceipt("_id", &fakeReply)
+	}
+
+	result1, err := p.GetReceipts(0, 10, []string{}, 0, "", "", "")
+	assert.NoError(err)
+	assert.Equal("reply19", (*result1)[0]["_id"])
+	assert.Equal("reply10", (*result1)[9]["_id"])
+
+	result2, err := p.GetReceipt("reply5")
+	assert.NoError(err)
+	assert.Equal("reply5", (*result2)["_id"])
+}

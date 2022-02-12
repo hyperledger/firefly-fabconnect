@@ -170,8 +170,6 @@ const (
 
 	// EventStreamsDBLoad failed to init DB
 	EventStreamsDBLoad = "Failed to open DB at %s: %s"
-	// EventStreamsNoID attempt to create an event stream/sub without an ID
-	EventStreamsNoID = "No ID"
 	// EventStreamsInvalidActionType unknown action type
 	EventStreamsInvalidActionType = "Unknown action type '%s'"
 	// EventStreamsWebhookNoURL attempt to create a Webhook event stream without a URL

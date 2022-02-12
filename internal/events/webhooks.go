@@ -37,15 +37,22 @@ type webhookAction struct {
 	spec *webhookActionInfo
 }
 
-func newWebhookAction(es *eventStream, spec *webhookActionInfo) (*webhookAction, error) {
+func validateWebhookConfig(spec *webhookActionInfo) error {
 	if spec == nil || spec.URL == "" {
-		return nil, errors.Errorf(errors.EventStreamsWebhookNoURL)
+		return errors.Errorf(errors.EventStreamsWebhookNoURL)
 	}
 	if _, err := url.Parse(spec.URL); err != nil {
-		return nil, errors.Errorf(errors.EventStreamsWebhookInvalidURL)
+		return errors.Errorf(errors.EventStreamsWebhookInvalidURL)
 	}
+	return nil
+}
+
+func newWebhookAction(es *eventStream, spec *webhookActionInfo) (*webhookAction, error) {
 	if spec.RequestTimeoutSec == 0 {
 		spec.RequestTimeoutSec = 120
+	}
+	if spec.TLSkipHostVerify == nil {
+		spec.TLSkipHostVerify = &falseValue
 	}
 	return &webhookAction{
 		es:   es,
@@ -81,7 +88,7 @@ func (w *webhookAction) attemptBatch(batchNumber, attempt uint64, events []*api.
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 	transport.TLSClientConfig = &tls.Config{
-		InsecureSkipVerify: w.spec.TLSkipHostVerify,
+		InsecureSkipVerify: *w.spec.TLSkipHostVerify,
 	}
 	netClient := &http.Client{
 		Timeout:   time.Duration(w.spec.RequestTimeoutSec) * time.Second,

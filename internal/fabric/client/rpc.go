@@ -36,7 +36,7 @@ func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClie
 	configProvider := config.FromFile(c.ConfigPath)
 	userStore, err := newUserstore(configProvider)
 	if err != nil {
-		return nil, nil, errors.Errorf("User credentials store creation failed. Path: %s", err)
+		return nil, nil, errors.Errorf("User credentials store creation failed. %s", err)
 	}
 	identityClient, err := newIdentityClient(configProvider, userStore)
 	if err != nil {
