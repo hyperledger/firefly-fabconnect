@@ -288,7 +288,7 @@ func (w *idClientWrapper) Revoke(res http.ResponseWriter, req *http.Request, par
 	}
 
 	result := identity.RevokeResponse{
-		CRL: response.CRL,
+		CRL: string(response.CRL),
 	}
 	if len(response.RevokedCerts) > 0 {
 		result.RevokedCerts = []map[string]string{}
@@ -356,7 +356,7 @@ func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params
 		ecert := si.EnrollmentCertificate()
 		mspId := si.Identifier().MSPID
 		newId.MSPID = mspId
-		newId.EnrollmentCert = ecert
+		newId.EnrollmentCert = string(ecert)
 	}
 	newId.Organization = w.identityConfig.Client().Organization
 
@@ -366,7 +366,7 @@ func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params
 		return nil, restutil.NewRestError(err.Error(), 500)
 	}
 
-	newId.CACert = cacert
+	newId.CACert = string(cacert)
 	return &newId, nil
 }
 

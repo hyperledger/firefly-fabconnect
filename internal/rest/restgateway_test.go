@@ -352,7 +352,7 @@ func TestIdentitiesEndpoints(t *testing.T) {
 				"serial": "32dab6b472be927866dedf54f6aaceccbed4826f",
 			},
 		},
-		CRL: []byte("crl"),
+		CRL: "crl",
 	}
 
 	// POST /identities/:id/revoke
