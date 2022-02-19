@@ -37,9 +37,12 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/events"
 	fabtest "github.com/hyperledger/firefly-fabconnect/internal/fabric/test"
+	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/test"
 	"github.com/hyperledger/firefly-fabconnect/internal/utils"
+	mockfabric "github.com/hyperledger/firefly-fabconnect/mocks/fabric/client"
 	mockkvstore "github.com/hyperledger/firefly-fabconnect/mocks/kvstore"
+	mockidentity "github.com/hyperledger/firefly-fabconnect/mocks/rest/identity"
 	mockreceipt "github.com/hyperledger/firefly-fabconnect/mocks/rest/receipt"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
@@ -66,71 +69,53 @@ func teardown() {
 	test.Teardown(tmpdir)
 }
 
-func TestNewRESTGateway(t *testing.T) {
+func newTestGateway(t *testing.T, mockDB ...bool) (*assert.Assertions, *RESTGateway, *sync.WaitGroup, *mockreceipt.ReceiptStorePersistence, *mockfabric.RPCClient, *mockidentity.IdentityClient) {
 	assert := assert.New(t)
-	testConfig.HTTP.LocalAddr = "127.0.0.1"
-	g := NewRESTGateway(testConfig)
-	assert.Equal("127.0.0.1", g.config.HTTP.LocalAddr)
-}
-
-func TestStartStatusStopNoKafkaHandlerAccessToken(t *testing.T) {
-	assert := assert.New(t)
-
 	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
 	testConfig.HTTP.Port = lastPort
 	testConfig.HTTP.LocalAddr = "127.0.0.1"
 	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
-	g := NewRESTGateway(testConfig)
-	err := g.Init()
-	assert.NoError(err)
-
-	lastPort++
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		err = g.Start()
-		wg.Done()
-	}()
-
-	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/status", g.config.HTTP.Port))
-	var resp *http.Response
-	for i := 0; i < 5; i++ {
-		time.Sleep(200 * time.Millisecond)
-		req := &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
-			"AUTHORIZATION": []string{"BeaRER testat"},
-		}}
-		resp, err = http.DefaultClient.Do(req)
-		if err == nil && resp.StatusCode == 200 {
-			break
+	var mockReceipts bool
+	var mockSubmgr bool
+	var mockIdentity bool
+	if len(mockDB) > 0 {
+		if mockDB[0] {
+			mockReceipts = true
+		}
+		if len(mockDB) > 1 && mockDB[1] {
+			mockSubmgr = true
+		}
+		if len(mockDB) > 2 && mockDB[2] {
+			mockIdentity = true
 		}
 	}
-	assert.NoError(err)
-	assert.Equal(200, resp.StatusCode)
-	var statusResp statusMsg
-	err = json.NewDecoder(resp.Body).Decode(&statusResp)
-	assert.Equal(true, statusResp.OK)
-
-	g.srv.Close()
-	wg.Wait()
-	assert.EqualError(err, "http: Server closed")
-
-	auth.RegisterSecurityModule(nil)
-
-}
-
-func TestQueryEndpoints(t *testing.T) {
-	assert := assert.New(t)
-
-	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
-
-	testConfig.HTTP.Port = lastPort
-	testConfig.HTTP.LocalAddr = "127.0.0.1"
-	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
+	if mockReceipts {
+		testConfig.Receipts.LevelDB.Path = ""
+	}
+	if mockSubmgr {
+		testConfig.Events.LevelDB.Path = ""
+	}
 	g := NewRESTGateway(testConfig)
+	testStorePersistence := &mockreceipt.ReceiptStorePersistence{}
+	if mockReceipts {
+		// set the mocked persistence before gateway Init() so the request handlers can use it
+		testStorePersistence.On("Init", mock.Anything, mock.Anything).Return(nil)
+		testStorePersistence.On("ValidateConf").Return(nil)
+		testStorePersistence.On("Close").Return()
+		_ = g.receiptStore.Init(nil, testStorePersistence)
+	}
 	err := g.Init()
+	assert.NoError(err)
+
 	testRPC := fabtest.MockRPCClient("")
 	g.processor.Init(testRPC)
-	assert.NoError(err)
+
+	testIdentityClient := &mockidentity.IdentityClient{}
+	if mockIdentity {
+		testRouter := newRouter(g.syncDispatcher, g.asyncDispatcher, testIdentityClient, g.sm, g.ws)
+		testRouter.addRoutes()
+		g.router = testRouter
+	}
 
 	lastPort++
 	var wg sync.WaitGroup
@@ -158,43 +143,275 @@ func TestQueryEndpoints(t *testing.T) {
 	result := utils.DecodePayload(bodyBytes).(map[string]interface{})
 	rr := result["result"].(map[string]interface{})
 	assert.Equal(float64(10), rr["height"])
+	return assert, g, &wg, testStorePersistence, testRPC, testIdentityClient
+}
 
-	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/chainInfo", g.config.HTTP.Port))
-	req := &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
+func TestNewRESTGateway(t *testing.T) {
+	assert := assert.New(t)
+	testConfig.HTTP.LocalAddr = "127.0.0.1"
+	g := NewRESTGateway(testConfig)
+	assert.Equal("127.0.0.1", g.config.HTTP.LocalAddr)
+}
+
+func TestIdentitiesEndpointsErrorHandling(t *testing.T) {
+	assert, g, wg, _, _, _ := newTestGateway(t)
+	header := http.Header{
 		"authorization": []string{"bearer testat"},
-	}}
-	resp, err = http.DefaultClient.Do(req)
+	}
+
+	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/identities", g.config.HTTP.Port))
+	req := &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{}`))),
+	}
+	resp, _ := http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"missing required parameter \\\"name\\\"\"}", string(bodyBytes))
+
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`not json`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"failed to decode JSON payload: invalid character 'o' in literal null (expecting 'u')\"}", string(bodyBytes))
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities/user1", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPut,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`not json`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"failed to decode JSON payload: invalid character 'o' in literal null (expecting 'u')\"}", string(bodyBytes))
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities/user1/enroll", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`not json`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"failed to decode JSON payload: invalid character 'o' in literal null (expecting 'u')\"}", string(bodyBytes))
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities/user1/enroll", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{}`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"missing required parameter \\\"secret\\\"\"}", string(bodyBytes))
+
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities/user1/reenroll", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`not json`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	assert.Equal("{\"error\":\"failed to decode JSON payload: invalid character 'o' in literal null (expecting 'u')\"}", string(bodyBytes))
+
+	g.srv.Close()
+	wg.Wait()
+	auth.RegisterSecurityModule(nil)
+}
+
+func TestIdentitiesEndpoints(t *testing.T) {
+	assert, g, wg, _, _, testIdentityClient := newTestGateway(t, false, false, true)
+	header := http.Header{
+		"authorization": []string{"bearer testat"},
+	}
+
+	mockResult := &identity.Identity{
+		MaxEnrollments: -1,
+		Attributes: map[string]string{
+			"org": "acme",
+		},
+	}
+	mockResult.Name = "user1"
+
+	// GET /identities
+	testIdentityClient.On("List", mock.Anything, mock.Anything, mock.Anything).Return([]*identity.Identity{mockResult}, nil).Once()
+	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/identities", g.config.HTTP.Port))
+	req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
+	resp, _ := http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	result := utils.DecodePayload(bodyBytes).([]interface{})
+	assert.Equal(1, len(result))
+
+	// GET /identities/:id
+	testIdentityClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(mockResult, nil).Once()
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities/user1", g.config.HTTP.Port))
+	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result1 := utils.DecodePayload(bodyBytes).(map[string]interface{})
+	assert.Equal(6, len(result1))
+	assert.Equal("acme", result1["attributes"].(map[string]interface{})["org"])
+
+	mockResult1 := &identity.RegisterResponse{
+		Name:   "user1",
+		Secret: "supersecret",
+	}
+
+	// POST /identities
+	testIdentityClient.On("Register", mock.Anything, mock.Anything, mock.Anything).Return(mockResult1, nil).Once()
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"name":"user1"}`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result2 := utils.DecodePayload(bodyBytes).(map[string]interface{})
+	assert.Equal(2, len(result2))
+	assert.Equal("user1", result2["name"])
+	assert.Equal("supersecret", result2["secret"])
+
+	// PUT /identities/:id
+	testIdentityClient.On("Modify", mock.Anything, mock.Anything, mock.Anything).Return(mockResult1, nil).Once()
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities/user1", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPut,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"name":"user1","attributes":{"org":"beta"}}`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result3 := utils.DecodePayload(bodyBytes).(map[string]interface{})
+	assert.Equal(2, len(result3))
+	assert.Equal("user1", result3["name"])
+
+	mockResult2 := &identity.IdentityResponse{
+		Name:    "user1",
+		Success: true,
+	}
+
+	// POST /identities/:id/enroll
+	testIdentityClient.On("Enroll", mock.Anything, mock.Anything, mock.Anything).Return(mockResult2, nil).Once()
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities/user1/enroll", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"secret":"user1"}`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result4 := utils.DecodePayload(bodyBytes).(map[string]interface{})
+	assert.Equal(2, len(result4))
+	assert.Equal("user1", result4["name"])
+
+	// POST /identities/:id/enroll
+	testIdentityClient.On("Reenroll", mock.Anything, mock.Anything, mock.Anything).Return(mockResult2, nil).Once()
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities/user1/reenroll", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"name":"user1"}`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result5 := utils.DecodePayload(bodyBytes).(map[string]interface{})
+	assert.Equal(2, len(result5))
+	assert.Equal("user1", result5["name"])
+
+	mockResult3 := &identity.RevokeResponse{
+		RevokedCerts: []map[string]string{
+			{
+				"aki":    "d9925622f0d513c1c6a776f60b79895a785ba9ee",
+				"serial": "32dab6b472be927866dedf54f6aaceccbed4826f",
+			},
+		},
+		CRL: []byte("crl"),
+	}
+
+	// POST /identities/:id/revoke
+	testIdentityClient.On("Revoke", mock.Anything, mock.Anything, mock.Anything).Return(mockResult3, nil).Once()
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/identities/user1/revoke", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodPost,
+		Header: header,
+		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"name":"user1"}`))),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result6 := utils.DecodePayload(bodyBytes).(map[string]interface{})
+	assert.Equal(2, len(result6))
+	assert.Equal(1, len(result6["revokedCerts"].([]interface{})))
+	cert := result6["revokedCerts"].([]interface{})[0]
+	assert.Equal("d9925622f0d513c1c6a776f60b79895a785ba9ee", cert.(map[string]interface{})["aki"])
+
+	g.srv.Close()
+	wg.Wait()
+	auth.RegisterSecurityModule(nil)
+}
+
+func TestQueryEndpoints(t *testing.T) {
+	assert, g, wg, _, _, _ := newTestGateway(t)
+	header := http.Header{
+		"authorization": []string{"bearer testat"},
+	}
+
+	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/chainInfo", g.config.HTTP.Port))
+	req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
+	resp, _ := http.DefaultClient.Do(req)
+	assert.Equal(400, resp.StatusCode)
+	bodyBytes, _ := io.ReadAll(resp.Body)
 	assert.Equal("{\"error\":\"Must specify the channel\"}", string(bodyBytes))
 
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/chainInfo?fly-channel=default-channel", g.config.HTTP.Port))
-	req = &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
-		"authorization": []string{"bearer testat"},
-	}}
-	resp, err = http.DefaultClient.Do(req)
+	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
 	assert.Equal("{\"error\":\"Must specify the signer\"}", string(bodyBytes))
 
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/transactions/3144a3ad43dcc11374832bbb71561320de81fd80d69cc8e26a9ea7d3240a5e84?fly-channel=default-channel&fly-signer=user1", g.config.HTTP.Port))
-	req = &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
-		"authorization": []string{"bearer testat"},
-	}}
-	resp, err = http.DefaultClient.Do(req)
+	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
-	result = utils.DecodePayload(bodyBytes).(map[string]interface{})
-	rr = result["result"].(map[string]interface{})
+	result := utils.DecodePayload(bodyBytes).(map[string]interface{})
+	rr := result["result"].(map[string]interface{})
 	tx := rr["transaction"].(map[string]interface{})
 	assert.Equal("3144a3ad43dcc11374832bbb71561320de81fd80d69cc8e26a9ea7d3240a5e84", tx["tx_id"])
 	assert.Equal(float64(1000000), tx["timestamp"])
 
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/blocks/20?fly-channel=default-channel&fly-signer=user1", g.config.HTTP.Port))
-	req = &http.Request{URL: url, Method: http.MethodGet, Header: http.Header{
-		"authorization": []string{"bearer testat"},
-	}}
-	resp, err = http.DefaultClient.Do(req)
+	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
 	result = utils.DecodePayload(bodyBytes).(map[string]interface{})
@@ -206,28 +423,28 @@ func TestQueryEndpoints(t *testing.T) {
 	req = &http.Request{
 		URL:    url,
 		Method: http.MethodPost,
-		Header: http.Header{"authorization": []string{"bearer testat"}},
+		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
 	assert.Equal("{\"error\":\"Must specify target chaincode function\"}", string(bodyBytes))
 
 	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"func\":\"\"}")))
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
 	assert.Equal("{\"error\":\"Target chaincode function must not be empty\"}", string(bodyBytes))
 
 	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"func\":\"CreateAsset\"}")))
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
 	assert.Equal("{\"error\":\"must specify args\"}", string(bodyBytes))
 
 	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"func\":\"CreateAsset\",\"args\":[]}")))
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
 	result = utils.DecodePayload(bodyBytes).(map[string]interface{})
@@ -237,125 +454,30 @@ func TestQueryEndpoints(t *testing.T) {
 
 	g.srv.Close()
 	wg.Wait()
-	assert.EqualError(err, "http: Server closed")
-
-	auth.RegisterSecurityModule(nil)
-
-}
-
-func TestEventstreamAPIErrors(t *testing.T) {
-	assert := assert.New(t)
-
-	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
-	testConfig.HTTP.Port = lastPort
-	testConfig.HTTP.LocalAddr = "127.0.0.1"
-	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
-	testConfig.Events.LevelDB.Path = tmpdir
-	g := NewRESTGateway(testConfig)
-	err := g.Init()
-	testRPC := fabtest.MockRPCClient("")
-	g.processor.Init(testRPC)
-	assert.NoError(err)
-
-	lastPort++
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		err = g.Start()
-		wg.Done()
-	}()
-
-	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/status", g.config.HTTP.Port))
-	var resp *http.Response
-	header := http.Header{
-		"AUTHORIZATION": []string{"BeaRER testat"},
-	}
-	for i := 0; i < 5; i++ {
-		time.Sleep(200 * time.Millisecond)
-		req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
-		resp, err = http.DefaultClient.Do(req)
-		if err == nil && resp.StatusCode == 200 {
-			break
-		}
-	}
-	assert.NoError(err)
-	assert.Equal(200, resp.StatusCode)
-
-	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/badId", g.config.HTTP.Port))
-	req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
-	var errorResp errors.RestErrMsg
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
-	assert.Equal(404, resp.StatusCode)
-	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
-
-	g.srv.Close()
-	wg.Wait()
-	assert.EqualError(err, "http: Server closed")
 	auth.RegisterSecurityModule(nil)
 }
 
 func TestReceiptsAPI(t *testing.T) {
-	assert := assert.New(t)
-
-	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
-	testConfig.HTTP.Port = lastPort
-	testConfig.HTTP.LocalAddr = "127.0.0.1"
-	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
-	testConfig.Events.LevelDB.Path = ""
-	testConfig.Receipts.LevelDB.Path = ""
-	g := NewRESTGateway(testConfig)
-	// set the mocked persistence before gateway Init() so the request handlers can use it
-	testStorePersistence := &mockreceipt.ReceiptStorePersistence{}
-	testStorePersistence.On("Init", mock.Anything, mock.Anything).Return(nil)
-	testStorePersistence.On("ValidateConf").Return(nil)
-	testStorePersistence.On("Close").Return()
-	_ = g.receiptStore.Init(nil, testStorePersistence)
-	err := g.Init()
-	assert.NoError(err)
-	testRPC := fabtest.MockRPCClient("")
-	g.processor.Init(testRPC)
-	assert.NoError(err)
-
-	lastPort++
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		err = g.Start()
-		wg.Done()
-	}()
-
-	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/status", g.config.HTTP.Port))
-	var resp *http.Response
+	assert, g, wg, testStorePersistence, _, _ := newTestGateway(t, true)
 	header := http.Header{
 		"AUTHORIZATION": []string{"BeaRER testat"},
 	}
-	for i := 0; i < 5; i++ {
-		time.Sleep(200 * time.Millisecond)
-		req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
-		resp, err = http.DefaultClient.Do(req)
-		if err == nil && resp.StatusCode == 200 {
-			break
-		}
-	}
-	assert.NoError(err)
-	assert.Equal(200, resp.StatusCode)
 
 	// GET /receipts empty return
 	fakeReply1 := make([]map[string]interface{}, 0)
 	testStorePersistence.On("GetReceipts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&fakeReply1, nil).Once()
-	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts", g.config.HTTP.Port))
+	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/receipts", g.config.HTTP.Port))
 	req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ := http.DefaultClient.Do(req)
 	result1 := make([]map[string]interface{}, 0)
-	err = json.NewDecoder(resp.Body).Decode(&result1)
+	_ = json.NewDecoder(resp.Body).Decode(&result1)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(0, len(result1))
 
 	// GET /receipts returns with default limit
 	var fakeReplies []map[string]interface{}
 	testStorePersistence.On("GetReceipts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&fakeReplies, nil).Once()
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
 	defaultReceiptLimit := 10 // from the package internal/rest/receipt
 	testStorePersistence.AssertCalled(t, "GetReceipts", 0, defaultReceiptLimit, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -364,40 +486,40 @@ func TestReceiptsAPI(t *testing.T) {
 	testStorePersistence.On("GetReceipts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&fakeReplies, nil).Once()
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts?skip=5&limit=20", g.config.HTTP.Port))
 	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
 	testStorePersistence.AssertCalled(t, "GetReceipts", 5, 20, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	// GET /receipts error on bad limit parameters
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts?limit=bad&skip=10", g.config.HTTP.Port))
 	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	var errorResp errors.RestErrMsg
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid 'limit' query parameter", errorResp.Message)
 
 	// GET /receipts error on excessive limit parameters
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts?limit=1000&skip=10", g.config.HTTP.Port))
 	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Maximum limit is 100", errorResp.Message)
 
 	// GET /receipts error on bad skip parameters
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts?limit=10&skip=bad", g.config.HTTP.Port))
 	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid 'skip' query parameter", errorResp.Message)
 
 	// GET /receipts error on bad filtering parameters
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts?from=abc&to=bcd&since=badness", g.config.HTTP.Port))
 	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("since cannot be parsed as RFC3339 or millisecond timestamp", errorResp.Message)
 
@@ -405,16 +527,16 @@ func TestReceiptsAPI(t *testing.T) {
 	testStorePersistence.On("GetReceipts", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("bang!")).Once()
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts", g.config.HTTP.Port))
 	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(500, resp.StatusCode)
 	assert.Equal("Error querying replies: bang!", errorResp.Message)
 
 	// GET /receipts error on invalid query parameters
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts?id=!!!", g.config.HTTP.Port))
 	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid 'id' query parameter", errorResp.Message)
 
@@ -425,9 +547,9 @@ func TestReceiptsAPI(t *testing.T) {
 	testStorePersistence.On("GetReceipt", mock.Anything).Return(&fakeReply2, nil).Once()
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts/b59d7c35-189b-44bd-a490-9cb472466f19", g.config.HTTP.Port))
 	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result)
+	_ = json.NewDecoder(resp.Body).Decode(&result)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal("value1", result["field1"])
 
@@ -435,15 +557,15 @@ func TestReceiptsAPI(t *testing.T) {
 	testStorePersistence.On("GetReceipt", mock.Anything).Return(nil, fmt.Errorf("not found!")).Once()
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/receipts/badId", g.config.HTTP.Port))
 	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(500, resp.StatusCode)
 	assert.Equal("Error querying reply: not found!", errorResp.Message)
 
 	// GET /receipt/:receiptId 404 error on DB query not found
 	testStorePersistence.On("GetReceipt", mock.Anything).Return(nil, nil).Once()
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(404, resp.StatusCode)
 
 	// GET /receipt/:receiptId 500 error on invalid DB return
@@ -453,74 +575,40 @@ func TestReceiptsAPI(t *testing.T) {
 	unserializable[true] = "not for json"
 	fakeReply3["badness"] = unserializable
 	testStorePersistence.On("GetReceipt", mock.Anything).Return(&fakeReply3, nil).Once()
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(500, resp.StatusCode)
 	assert.Equal("Error serializing response", errorResp.Message)
 
 	g.srv.Close()
 	wg.Wait()
-	assert.EqualError(err, "http: Server closed")
 	auth.RegisterSecurityModule(nil)
 }
 
 func TestEventsAPI(t *testing.T) {
-	assert := assert.New(t)
-
-	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
-	testConfig.HTTP.Port = lastPort
-	testConfig.HTTP.LocalAddr = "127.0.0.1"
-	testConfig.RPC.ConfigPath = path.Join(tmpdir, "ccp.yml")
-	testConfig.Events.LevelDB.Path = ""
-	testConfig.Receipts.LevelDB.Path = ""
-	g := NewRESTGateway(testConfig)
-	err := g.Init()
-	assert.NoError(err)
-	testRPC := fabtest.MockRPCClient("")
-	g.processor.Init(testRPC)
+	assert, g, wg, _, testRPC, _ := newTestGateway(t, false, true)
 	g.sm = events.NewSubscriptionManager(&g.config.Events, testRPC, nil)
-	mockedKV := newMockKV()
-	_ = g.sm.Init(mockedKV)
 	g.router.subManager = g.sm
-	assert.NoError(err)
 
-	lastPort++
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		err = g.Start()
-		wg.Done()
-	}()
-
-	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/status", g.config.HTTP.Port))
-	var resp *http.Response
 	header := http.Header{
 		"AUTHORIZATION": []string{"BeaRER testat"},
 	}
-	for i := 0; i < 5; i++ {
-		time.Sleep(200 * time.Millisecond)
-		req := &http.Request{URL: url, Method: http.MethodGet, Header: header}
-		resp, err = http.DefaultClient.Do(req)
-		if err == nil && resp.StatusCode == 200 {
-			break
-		}
-	}
-	assert.NoError(err)
-	assert.Equal(200, resp.StatusCode)
 
+	mockedKV := newMockKV()
+	_ = g.sm.Init(mockedKV)
 	// POST /eventstreams success calls
 	mockedKV.On("Put", mock.Anything, mock.Anything).Return(nil).Once()
 	mockedKV.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound).Once()
-	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
+	url, _ := url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
 	req := &http.Request{
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ := http.DefaultClient.Do(req)
 	result1 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result1)
+	_ = json.NewDecoder(resp.Body).Decode(&result1)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(13, len(result1))
 	assert.Equal(float64(1), result1["batchSize"])
@@ -537,9 +625,9 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodGet,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result2 := make([]map[string]interface{}, 1)
-	err = json.NewDecoder(resp.Body).Decode(&result2)
+	_ = json.NewDecoder(resp.Body).Decode(&result2)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(1, len(result2))
 
@@ -550,11 +638,24 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodGet,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result3 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result3)
+	_ = json.NewDecoder(resp.Body).Decode(&result3)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(13, len(result3))
+
+	// GET /eventstreams/:streamId success calls
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/badId", g.config.HTTP.Port))
+	req = &http.Request{
+		URL:    url,
+		Method: http.MethodGet,
+		Header: header,
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	var errorResp errors.RestErrMsg
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
+	assert.Equal(404, resp.StatusCode)
+	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
 
 	// PATCH /eventstreams/:streamId success calls
 	mockedKV1 := newMockKV()
@@ -568,9 +669,9 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-2\",\"type\":\"webhook\",\"batchSize\":5,\"errorHandling\":\"block\",\"batchTimeoutMS\":100,\"webhook\":{\"url\":\"https://webhook.site/def\"}}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result4 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result4)
+	_ = json.NewDecoder(resp.Body).Decode(&result4)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(13, len(result3))
 	assert.Equal(float64(5), result4["batchSize"])
@@ -587,9 +688,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	var errorResp errors.RestErrMsg
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(404, resp.StatusCode)
 	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
 
@@ -604,9 +704,9 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result5 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result5)
+	_ = json.NewDecoder(resp.Body).Decode(&result5)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(esID, result5["id"])
 	assert.Equal("true", result5["suspended"])
@@ -619,8 +719,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(404, resp.StatusCode)
 	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
 
@@ -637,9 +737,9 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result6 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result6)
+	_ = json.NewDecoder(resp.Body).Decode(&result6)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(esID, result6["id"])
 	assert.Equal("true", result6["resumed"])
@@ -652,8 +752,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("not json"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid event stream specification: invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
 
@@ -665,8 +765,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"random\"}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Unknown action type 'random'", errorResp.Message)
 
@@ -678,8 +778,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\"}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Must specify webhook.url for action type 'webhook'", errorResp.Message)
 
@@ -691,8 +791,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\":badUrl\"}}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid URL in webhook action", errorResp.Message)
 
@@ -704,8 +804,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"websocket\",\"websocket\":{\"topic\":\"apple\",\"distributionMode\":\"banana\"}}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid distribution mode 'banana'. Valid distribution modes are: 'workloadDistribution' and 'broadcast'.", errorResp.Message)
 
@@ -715,8 +815,8 @@ func TestEventsAPI(t *testing.T) {
 	mockedKV4.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
 	mockedKV4.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}")))
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(500, resp.StatusCode)
 	assert.Equal("Failed to store stream: bang!", errorResp.Message)
 
@@ -728,8 +828,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"updated-name\"}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(404, resp.StatusCode)
 	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
 
@@ -741,8 +841,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("not json"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid event stream specification: invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
 
@@ -752,8 +852,8 @@ func TestEventsAPI(t *testing.T) {
 	mockedKV5.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
 	mockedKV5.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"updated-name\"}")))
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(500, resp.StatusCode)
 	assert.Equal("Failed to store stream: bang!", errorResp.Message)
 
@@ -770,9 +870,9 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result7 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result7)
+	_ = json.NewDecoder(resp.Body).Decode(&result7)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(10, len(result7))
 	assert.Equal("channel-1", result7["channel"])
@@ -795,8 +895,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("non json"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid event subscription specification: invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
 
@@ -809,8 +909,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Missing required parameter \"channel\"", errorResp.Message)
 
@@ -823,8 +923,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Missing required parameter \"stream\"", errorResp.Message)
 
@@ -837,8 +937,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Missing required parameter \"signer\"", errorResp.Message)
 
@@ -851,8 +951,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
 
@@ -865,8 +965,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal(`Parameter "payloadType" must be an empty string, "string" or "json"`, errorResp.Message)
 
@@ -879,8 +979,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal(`Parameter "filter.blockType" must be an empty string, "tx" or "config"`, errorResp.Message)
 
@@ -891,9 +991,9 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodGet,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result8 := make([]map[string]interface{}, 1)
-	err = json.NewDecoder(resp.Body).Decode(&result8)
+	_ = json.NewDecoder(resp.Body).Decode(&result8)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(1, len(result8))
 
@@ -904,8 +1004,8 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodGet,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(404, resp.StatusCode)
 	assert.Equal("Subscription with ID 'badId' not found", errorResp.Message)
 
@@ -916,9 +1016,9 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodGet,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result9 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result9)
+	_ = json.NewDecoder(resp.Body).Decode(&result9)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(10, len(result9))
 
@@ -933,9 +1033,9 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"100\"}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result10 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result10)
+	_ = json.NewDecoder(resp.Body).Decode(&result10)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(subID, result10["id"])
 	assert.Equal("true", result10["reset"])
@@ -948,8 +1048,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"100\"}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(404, resp.StatusCode)
 	assert.Equal("Subscription with ID 'badId' not found", errorResp.Message)
 
@@ -961,8 +1061,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("not json"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Failed to parse request body. invalid character 'o' in literal null (expecting 'u')", errorResp.Message)
 
@@ -974,8 +1074,8 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"0x10\"}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
 	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
 
@@ -986,8 +1086,8 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodDelete,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(404, resp.StatusCode)
 	assert.Equal("Subscription with ID 'badId' not found", errorResp.Message)
 
@@ -1001,9 +1101,9 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodDelete,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result11 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result11)
+	_ = json.NewDecoder(resp.Body).Decode(&result11)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(subID, result11["id"])
 	assert.Equal("true", result11["deleted"])
@@ -1015,8 +1115,8 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodDelete,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(404, resp.StatusCode)
 	assert.Equal("Stream with ID 'badId' not found", errorResp.Message)
 
@@ -1030,14 +1130,15 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodDelete,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	resp, _ = http.DefaultClient.Do(req)
+	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(500, resp.StatusCode)
 	assert.Equal("bang!", errorResp.Message)
 
 	// DELETE /eventstreams/:streamId success calls
 	mockedKV11 := newMockKV()
 	_ = g.sm.Init(mockedKV11)
+	mockedKV11.On("Close").Return(nil)
 	mockedKV11.On("Put", mock.Anything, mock.Anything).Return(nil)
 	mockedKV11.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams", g.config.HTTP.Port))
@@ -1047,9 +1148,9 @@ func TestEventsAPI(t *testing.T) {
 		Header: header,
 		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-2\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}"))),
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result12 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result12)
+	_ = json.NewDecoder(resp.Body).Decode(&result12)
 	esID = result12["id"]
 	mockedKV11.On("Delete", mock.Anything).Return(nil).Twice() // once for stream, once for checkpoint
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/eventstreams/%s", g.config.HTTP.Port, esID))
@@ -1058,12 +1159,16 @@ func TestEventsAPI(t *testing.T) {
 		Method: http.MethodDelete,
 		Header: header,
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
 	result13 := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&result13)
+	_ = json.NewDecoder(resp.Body).Decode(&result13)
 	assert.Equal(200, resp.StatusCode)
 	assert.Equal(esID, result13["id"])
 	assert.Equal("true", result13["deleted"])
+
+	g.srv.Close()
+	wg.Wait()
+	auth.RegisterSecurityModule(nil)
 }
 
 func TestStartStatusStopNoKafkaHandlerMissingToken(t *testing.T) {
@@ -1106,8 +1211,6 @@ func TestStartStatusStopNoKafkaHandlerMissingToken(t *testing.T) {
 
 	g.srv.Close()
 	wg.Wait()
-	assert.EqualError(err, "http: Server closed")
-
 	auth.RegisterSecurityModule(nil)
 
 }

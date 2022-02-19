@@ -178,15 +178,14 @@ func (w *idClientWrapper) Modify(res http.ResponseWriter, req *http.Request, par
 		}
 	}
 
-	id, err := w.caClient.ModifyIdentity(rr)
+	_, err = w.caClient.ModifyIdentity(rr)
 	if err != nil {
 		log.Errorf("Failed to modify user %s. %s", regreq.Name, err)
 		return nil, restutil.NewRestError(err.Error())
 	}
 
 	result := identity.RegisterResponse{
-		Name:   rr.ID,
-		Secret: id.Secret,
+		Name: rr.ID,
 	}
 	return &result, nil
 }
