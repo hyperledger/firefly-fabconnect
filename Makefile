@@ -43,6 +43,7 @@ mocks: mockery ${GOFILES}
 	${MOCKERY} --case underscore --dir internal/kvstore --name KVStore --output mocks/kvstore --outpkg mockkvstore
 	${MOCKERY} --case underscore --dir internal/kvstore --name KVIterator --output mocks/kvstore --outpkg mockkvstore
 	${MOCKERY} --case underscore --dir internal/rest/async --name AsyncDispatcher --output mocks/rest/async --outpkg mockasync
+	${MOCKERY} --case underscore --dir internal/rest/identity --name IdentityClient --output mocks/rest/identity --outpkg mockidentity
 	${MOCKERY} --case underscore --dir internal/rest/receipt --name ReceiptStore --output mocks/rest/receipt --outpkg mockreceipt
 	${MOCKERY} --case underscore --dir internal/rest/receipt/api --name ReceiptStorePersistence --output mocks/rest/receipt/api --outpkg mockreceiptapi
 	${MOCKERY} --case underscore --dir internal/rest/sync --name SyncDispatcher --output mocks/rest/sync --outpkg mocksync

@@ -50,6 +50,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/identity"
+    put:
+      summary: Modify the existing signing identity
+      parameters:
+        - $ref: "#/components/parameters/username"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/identity_register_input"
+      responses:
+        201:
+          description: "Signing identity modified"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/identity_modify_output"
   /identities/{username}/enroll:
     post:
       summary: "Enroll the registered signing identity with the Fabric CA"
@@ -68,6 +85,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/identity_enroll_output"
+  /identities/{username}/reenroll:
+    post:
+      summary: "Re-enroll the registered signing identity with the Fabric CA"
+      parameters:
+        - $ref: "#/components/parameters/username"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/identity_reenroll_input"
+      responses:
+        200:
+          description: "Signing identity re-enrolled"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/identity_enroll_output"
+  /identities/{username}/revoke:
+    post:
+      summary: "Revoke the existing enrollment certificates for the registered signing identity with the Fabric CA"
+      parameters:
+        - $ref: "#/components/parameters/username"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/identity_revoke_input"
+      responses:
+        200:
+          description: "Signing identity certificates revoked"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/identity_revoke_output"
   /chaininfo:
     get:
       summary: Return information of the ledger for a specified channel
@@ -226,20 +279,34 @@ components:
     identity_prop_name:
       type: "string"
       description: "unique name/id of the signing identity"
+    identity_type:
+      type: "string"
+      description: "Type of identity. Default is 'client' if not specified in the request"
+      default: "client"
+      enum:
+        - client
+        - peer
+        - orderer
+        - user
+    identity_maxEnrollments:
+      type: integer
+      description: "Maximum number of times this identity can be enrolled"
+    identity_attributes:
+      type: object
+    identity_attribute_reqs:
+      type: object
+      description: The attributes to include in the certificate. They must have been defined for the identity during registration. If omitted, "hf.Affiliation", "hf.EnrollmentID", "hf.Type" will be added
     identity_register_input:
       type: "object"
       properties:
         name:
           $ref: "#/components/schemas/identity_prop_name"
         type:
-          type: "string"
-          description: "Type of identity. Default is 'client' if not specified in the request"
-          default: "client"
-          enum:
-            - client
-            - peer
-            - orderer
-            - user
+          $ref: "#/components/schemas/identity_type"
+        maxEnrollments:
+          $ref: "#/components/schemas/identity_maxEnrollments"
+        attributes:
+          $ref: "#/components/schemas/identity_attributes"
     identity_register_output:
       type: "object"
       properties:
@@ -247,17 +314,61 @@ components:
           $ref: "#/components/schemas/identity_prop_name"
         secret:
           type: "string"
+    identity_modify_input:
+      type: "object"
+      properties:
+        type:
+          $ref: "#/components/schemas/identity_type"
+        maxEnrollments:
+          $ref: "#/components/schemas/identity_maxEnrollments"
+        attributes:
+          $ref: "#/components/schemas/identity_attributes"
+    identity_modify_output:
+      type: "object"
+      properties:
+        name:
+          $ref: "#/components/schemas/identity_prop_name"
     identity_enroll_input:
       type: "object"
       properties:
         secret:
           type: "string"
           description: "Must be the enrollment secret returned in the response of the identity registration call"
+        attributes:
+          $ref: "#/components/schemas/identity_attribute_reqs"
+    identity_reenroll_input:
+      type: "object"
+      properties:
+        attributes:
+          $ref: "#/components/schemas/identity_attribute_reqs"
     identity_enroll_output:
       type: "object"
       properties:
         success:
           type: boolean
+    identity_revoke_input:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: See https://godoc.org/golang.org/x/crypto/ocsp for valid values.  The default value is 0 (ocsp.Unspecified)
+        generateCRL:
+          type: boolean
+          description: Whether to generate a CRL and return it in the response
+    identity_revoke_output:
+      type: object
+      properties:
+        revokedCerts:
+          type: array
+          items:
+            type: object
+            properties:
+              aki:
+                type: string
+              serial:
+                type: string
+        CRL:
+          type: string
     identity_summary:
       allOf:
         - $ref: "#/components/schemas/identity_register_input"
@@ -280,10 +391,10 @@ components:
               type: "string"
             enrollmentCert:
               type: "string"
-              description: "base64 encoded enrollment certificate for the signing identity. If missing, then the identity was only registered but not enrolled"
+              description: "Enrollment certificate for the signing identity. If missing, then the identity was only registered but not enrolled"
             caCert:
               type: "string"
-              description: "base64 encoded certificate of the issuing CA"
+              description: "Certificate of the issuing CA"
     input_headers:
       type: "object"
       properties:
