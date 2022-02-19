@@ -69,7 +69,10 @@ func (r *router) addRoutes() {
 	r.httpRouter.GET("/spec.yaml", r.serveSwagger)
 
 	r.httpRouter.POST("/identities", r.registerUser)
+	r.httpRouter.PUT("/identities/:username", r.modifyUser)
 	r.httpRouter.POST("/identities/:username/enroll", r.enrollUser)
+	r.httpRouter.POST("/identities/:username/reenroll", r.reenrollUser)
+	r.httpRouter.POST("/identities/:username/revoke", r.revokeUser)
 	r.httpRouter.GET("/identities", r.listUsers)
 	r.httpRouter.GET("/identities/:username", r.getUser)
 
@@ -196,10 +199,43 @@ func (r *router) registerUser(res http.ResponseWriter, req *http.Request, params
 	marshalAndReply(res, req, result)
 }
 
+func (r *router) modifyUser(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+
+	result, err := r.identityClient.Modify(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
 func (r *router) enrollUser(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 
 	result, err := r.identityClient.Enroll(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) reenrollUser(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+
+	result, err := r.identityClient.Reenroll(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+	marshalAndReply(res, req, result)
+}
+
+func (r *router) revokeUser(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+
+	result, err := r.identityClient.Revoke(res, req, params)
 	if err != nil {
 		errors.RestErrReply(res, req, err.Error, err.StatusCode)
 		return

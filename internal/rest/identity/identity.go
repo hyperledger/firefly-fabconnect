@@ -25,14 +25,15 @@ import (
 
 type Identity struct {
 	RegisterResponse
-	MaxEnrollments int    `json:"maxEnrollments"`
-	Type           string `json:"type"`
-	Affiliation    string `json:"affiliation"`
-	CAName         string `json:"caname"`
-	Organization   string `json:"organization,omitempty"`
-	MSPID          string `json:"mspId,omitempty"`
-	EnrollmentCert []byte `json:"enrollmentCert,omitempty"`
-	CACert         []byte `json:"caCert,omitempty"`
+	MaxEnrollments int               `json:"maxEnrollments"`
+	Type           string            `json:"type"`
+	Affiliation    string            `json:"affiliation"`
+	Attributes     map[string]string `json:"attributes"`
+	CAName         string            `json:"caname"`
+	Organization   string            `json:"organization,omitempty"`
+	MSPID          string            `json:"mspId,omitempty"`
+	EnrollmentCert []byte            `json:"enrollmentCert,omitempty"`
+	CACert         []byte            `json:"caCert,omitempty"`
 }
 
 type RegisterResponse struct {
@@ -41,11 +42,18 @@ type RegisterResponse struct {
 }
 
 type EnrollRequest struct {
-	Name    string `json:"name"`
-	Secret  string `json:"secret"`
-	CAName  string `json:"caname"`
-	Profile string `json:"profile"`
-	CSR     string `json:"csr"`
+	Name     string          `json:"name"`
+	Secret   string          `json:"secret"`
+	CAName   string          `json:"caname"`
+	Profile  string          `json:"profile"`
+	AttrReqs map[string]bool `json:"attributes"`
+}
+
+type RevokeRequest struct {
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
+	CAName string `json:"caname"`
+	GenCRL bool   `json:"generateCRL"`
 }
 
 type IdentityResponse struct {
@@ -53,9 +61,17 @@ type IdentityResponse struct {
 	Success bool   `json:"success"`
 }
 
+type RevokeResponse struct {
+	RevokedCerts []map[string]string `json:"revokedCerts"`
+	CRL          []byte              `json:"CRL"`
+}
+
 type IdentityClient interface {
 	Register(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*RegisterResponse, *restutil.RestError)
+	Modify(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*RegisterResponse, *restutil.RestError)
 	Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*IdentityResponse, *restutil.RestError)
+	Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*IdentityResponse, *restutil.RestError)
+	Revoke(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*RevokeResponse, *restutil.RestError)
 	List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*Identity, *restutil.RestError)
 	Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*Identity, *restutil.RestError)
 }

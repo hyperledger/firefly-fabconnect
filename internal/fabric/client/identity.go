@@ -133,6 +133,13 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 		CAName:         regreq.CAName,
 		Secret:         regreq.Secret,
 	}
+	if regreq.Attributes != nil {
+		rr.Attributes = []mspApi.Attribute{}
+		for key, value := range regreq.Attributes {
+			rr.Attributes = append(rr.Attributes, mspApi.Attribute{Name: key, Value: value})
+		}
+	}
+
 	secret, err := w.caClient.Register(rr)
 	if err != nil {
 		log.Errorf("Failed to register user %s. %s", regreq.Name, err)
@@ -142,6 +149,44 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 	result := identity.RegisterResponse{
 		Name:   rr.Name,
 		Secret: secret,
+	}
+	return &result, nil
+}
+
+func (w *idClientWrapper) Modify(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RegisterResponse, *restutil.RestError) {
+	username := params.ByName("username")
+	regreq := identity.Identity{}
+	decoder := json.NewDecoder(req.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&regreq)
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to decode JSON payload: %s", err), 400)
+	}
+
+	rr := &mspApi.IdentityRequest{
+		ID:             username,
+		Type:           regreq.Type,
+		MaxEnrollments: regreq.MaxEnrollments,
+		Affiliation:    regreq.Affiliation,
+		CAName:         regreq.CAName,
+		Secret:         regreq.Secret,
+	}
+	if regreq.Attributes != nil {
+		rr.Attributes = []mspApi.Attribute{}
+		for key, value := range regreq.Attributes {
+			rr.Attributes = append(rr.Attributes, mspApi.Attribute{Name: key, Value: value})
+		}
+	}
+
+	id, err := w.caClient.ModifyIdentity(rr)
+	if err != nil {
+		log.Errorf("Failed to modify user %s. %s", regreq.Name, err)
+		return nil, restutil.NewRestError(err.Error())
+	}
+
+	result := identity.RegisterResponse{
+		Name:   rr.ID,
+		Secret: id.Secret,
 	}
 	return &result, nil
 }
@@ -165,6 +210,12 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 		CAName:  enreq.CAName,
 		Profile: enreq.Profile,
 	}
+	if enreq.AttrReqs != nil {
+		input.AttrReqs = []*mspApi.AttributeRequest{}
+		for attr, optional := range enreq.AttrReqs {
+			input.AttrReqs = append(input.AttrReqs, &mspApi.AttributeRequest{Name: attr, Optional: optional})
+		}
+	}
 
 	err = w.caClient.Enroll(&input)
 	if err != nil {
@@ -175,6 +226,79 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 	result := identity.IdentityResponse{
 		Name:    enreq.Name,
 		Success: true,
+	}
+	return &result, nil
+}
+
+func (w *idClientWrapper) Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.IdentityResponse, *restutil.RestError) {
+	username := params.ByName("username")
+	enreq := identity.EnrollRequest{}
+	decoder := json.NewDecoder(req.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&enreq)
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to decode JSON payload: %s", err), 400)
+	}
+
+	input := mspApi.ReenrollmentRequest{
+		Name:    username,
+		CAName:  enreq.CAName,
+		Profile: enreq.Profile,
+	}
+	if enreq.AttrReqs != nil {
+		input.AttrReqs = []*mspApi.AttributeRequest{}
+		for attr, optional := range enreq.AttrReqs {
+			input.AttrReqs = append(input.AttrReqs, &mspApi.AttributeRequest{Name: attr, Optional: optional})
+		}
+	}
+
+	err = w.caClient.Reenroll(&input)
+	if err != nil {
+		log.Errorf("Failed to re-enroll user %s. %s", enreq.Name, err)
+		return nil, restutil.NewRestError(err.Error())
+	}
+
+	result := identity.IdentityResponse{
+		Name:    enreq.Name,
+		Success: true,
+	}
+	return &result, nil
+}
+
+func (w *idClientWrapper) Revoke(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RevokeResponse, *restutil.RestError) {
+	username := params.ByName("username")
+	enreq := identity.RevokeRequest{}
+	decoder := json.NewDecoder(req.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&enreq)
+	if err != nil {
+		return nil, restutil.NewRestError(fmt.Sprintf("failed to decode JSON payload: %s", err), 400)
+	}
+
+	input := mspApi.RevocationRequest{
+		Name:   username,
+		CAName: enreq.CAName,
+		Reason: enreq.Reason,
+		GenCRL: enreq.GenCRL,
+	}
+
+	response, err := w.caClient.Revoke(&input)
+	if err != nil {
+		log.Errorf("Failed to revoke certificate for user %s. %s", enreq.Name, err)
+		return nil, restutil.NewRestError(err.Error())
+	}
+
+	result := identity.RevokeResponse{
+		CRL: response.CRL,
+	}
+	if len(response.RevokedCerts) > 0 {
+		result.RevokedCerts = []map[string]string{}
+		for _, cert := range response.RevokedCerts {
+			entry := map[string]string{}
+			entry["aki"] = cert.AKI
+			entry["serial"] = cert.Serial
+			result.RevokedCerts = append(result.RevokedCerts, entry)
+		}
 	}
 	return &result, nil
 }
@@ -192,6 +316,12 @@ func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, param
 		newId.CAName = v.CAName
 		newId.Type = v.Type
 		newId.Affiliation = v.Affiliation
+		if len(v.Attributes) > 0 {
+			newId.Attributes = make(map[string]string, len(v.Attributes))
+			for _, attr := range v.Attributes {
+				newId.Attributes[attr.Name] = attr.Value
+			}
+		}
 		ret[i] = &newId
 	}
 	return ret, nil
@@ -209,6 +339,12 @@ func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params
 	newId.CAName = result.CAName
 	newId.Type = result.Type
 	newId.Affiliation = result.Affiliation
+	if len(result.Attributes) > 0 {
+		newId.Attributes = make(map[string]string, len(result.Attributes))
+		for _, attr := range result.Attributes {
+			newId.Attributes[attr.Name] = attr.Value
+		}
+	}
 
 	// the SDK identity manager does not persist the certificates
 	// we have to retrieve it from the identity manager
