@@ -32,8 +32,8 @@ type Identity struct {
 	CAName         string            `json:"caname"`
 	Organization   string            `json:"organization,omitempty"`
 	MSPID          string            `json:"mspId,omitempty"`
-	EnrollmentCert string            `json:"enrollmentCert,omitempty"`
-	CACert         string            `json:"caCert,omitempty"`
+	EnrollmentCert []byte            `json:"enrollmentCert,omitempty"`
+	CACert         []byte            `json:"caCert,omitempty"`
 }
 
 type RegisterResponse struct {
@@ -63,7 +63,7 @@ type IdentityResponse struct {
 
 type RevokeResponse struct {
 	RevokedCerts []map[string]string `json:"revokedCerts"`
-	CRL          string              `json:"CRL"`
+	CRL          []byte              `json:"CRL"`
 }
 
 type IdentityClient interface {
