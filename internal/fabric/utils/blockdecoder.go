@@ -38,16 +38,20 @@ func GetEvents(block *common.Block) []*api.EventEntry {
 	}
 	for idx, entry := range rawBlock.Data.Data {
 		timestamp := entry.Payload.Header.ChannelHeader.Timestamp
+		txId := entry.Payload.Header.ChannelHeader.TxId
 		actions := entry.Payload.Data.Actions
 		for actionIdx, action := range actions {
 			event := action.Payload.Action.ProposalResponsePayload.Extension.Events
 			if event == nil {
 				continue
 			}
+			// if the transaction did not publish any events, we need to get most of the
+			// information below from other parts of the transaction
+			chaincodeId := action.Payload.Action.ProposalResponsePayload.Extension.ChaincodeId.Name
 			eventEntry := api.EventEntry{
-				ChaincodeId:      event.ChaincodeId,
+				ChaincodeId:      chaincodeId,
 				BlockNumber:      rawBlock.Header.Number,
-				TransactionId:    event.TxId,
+				TransactionId:    txId,
 				TransactionIndex: idx,
 				EventIndex:       actionIdx, // each action only allowed one event, so event index is the action index
 				EventName:        event.EventName,
