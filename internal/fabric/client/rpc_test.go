@@ -182,13 +182,40 @@ func TestGatewayClientInstantiation(t *testing.T) {
 
 	wrapper.gatewayCreator = createMockGateway
 	wrapper.networkCreator = createMockNetwork
-	client, err := wrapper.getChannelClient("default-channel", "user1")
+	client, err := wrapper.getGatewayClient("default-channel", "user1")
 	assert.NoError(err)
 	assert.NotNil(client)
 	assert.Equal(1, len(wrapper.gwClients))
+	assert.Equal(0, len(wrapper.gwChannelClients))
 
 	gw := wrapper.gwClients["user1"]
 	assert.NotNil(gw)
+	assert.Equal(1, len(wrapper.gwGatewayClients))
+	assert.Equal(1, len(wrapper.gwGatewayClients["user1"]))
+	assert.Equal(client, wrapper.gwGatewayClients["user1"]["default-channel"])
+}
+
+func TestChannelClientInstantiation(t *testing.T) {
+	assert := assert.New(t)
+
+	config := conf.RPCConf{
+		UseGatewayClient: true,
+		ConfigPath:       tmpShortCCPFile,
+	}
+	rpc, idclient, err := RPCConnect(config, 5)
+	assert.NoError(err)
+	assert.NotNil(rpc)
+	assert.NotNil(idclient)
+
+	wrapper, ok := rpc.(*gwRPCWrapper)
+	assert.True(ok)
+
+	wrapper.channelCreator = createMockChannelClient
+	client, err := wrapper.getChannelClient("default-channel", "user1")
+	assert.NoError(err)
+	assert.NotNil(client)
+	assert.Equal(0, len(wrapper.gwClients))
+	assert.Equal(0, len(wrapper.gwGatewayClients))
 	assert.Equal(1, len(wrapper.gwChannelClients))
 	assert.Equal(1, len(wrapper.gwChannelClients["user1"]))
 	assert.Equal(client, wrapper.gwChannelClients["user1"]["default-channel"])

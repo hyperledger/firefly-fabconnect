@@ -20,8 +20,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/errors/retry"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
+	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
@@ -41,11 +44,14 @@ type gwRPCWrapper struct {
 	eventClientWrapper  *eventClientWrapper
 	gatewayCreator      gatewayCreator
 	networkCreator      networkCreator
+	channelCreator      channelCreator
 	// networkCreator networkC
 	// one gateway client per signer
 	gwClients map[string]*gateway.Gateway
 	// one gateway network per signer per channel
-	gwChannelClients map[string]map[string]*gateway.Network
+	gwGatewayClients map[string]map[string]*gateway.Network
+	// one channel client per signer per channel
+	gwChannelClients map[string]map[string]*channel.Client
 }
 
 func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTimeout int, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper) (RPCClient, error) {
@@ -57,8 +63,10 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 		eventClientWrapper:  eventClientWrapper,
 		gatewayCreator:      createGateway,
 		networkCreator:      getNetwork,
+		channelCreator:      createChannelClient,
 		gwClients:           make(map[string]*gateway.Gateway),
-		gwChannelClients:    make(map[string]map[string]*gateway.Network),
+		gwGatewayClients:    make(map[string]map[string]*gateway.Network),
+		gwChannelClients:    make(map[string]map[string]*channel.Client),
 	}, nil
 }
 
@@ -87,15 +95,28 @@ func (w *gwRPCWrapper) Query(channelId, signer, chaincodeName, method string, ar
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
 
-	contractClient := client.GetContract(chaincodeName)
-	result, err := contractClient.EvaluateTransaction(method, args...)
+	peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes := make([][]byte, len(args))
+	for i, v := range args {
+		bytes[i] = []byte(v)
+	}
+	req := channel.Request{
+		ChaincodeID: chaincodeName,
+		Fcn:         method,
+		Args:        bytes,
+	}
+	result, err := client.Query(req, channel.WithRetry(retry.DefaultChannelOpts), channel.WithTargetEndpoints(peerEndpoint))
 	if err != nil {
 		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
 		return nil, err
 	}
 
 	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
-	return result, nil
+	return result.Payload, nil
 }
 
 func (w *gwRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error) {
@@ -159,7 +180,7 @@ func (w *gwRPCWrapper) Close() error {
 }
 
 func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method string, args []string, isInit bool) ([]byte, *fab.TxStatusEvent, error) {
-	channelClient, err := w.getChannelClient(signer, channelId)
+	channelClient, err := w.getGatewayClient(signer, channelId)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -185,9 +206,11 @@ func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method 
 	}
 }
 
-func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient *gateway.Network, err error) {
-	channelClientsForSigner := w.gwChannelClients[signer]
-	if channelClientsForSigner == nil {
+// channel clients for transactions are created with the gateway API, so that the internal handling of using
+// the discovery service and selecting the right set of endorsers are automated
+func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient *gateway.Network, err error) {
+	gatewayClientsForSigner := w.gwGatewayClients[signer]
+	if gatewayClientsForSigner == nil {
 		// no channel clients have been created for this signer at all
 		// we will not have created a gateway client for this user either
 		gatewayClient, err := w.gatewayCreator(w.configProvider, signer, w.txTimeout)
@@ -195,16 +218,44 @@ func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient
 			return nil, err
 		}
 		w.gwClients[signer] = gatewayClient
-		channelClientsForSigner = make(map[string]*gateway.Network)
+		gatewayClientsForSigner = make(map[string]*gateway.Network)
+		w.gwGatewayClients[signer] = gatewayClientsForSigner
+	}
+
+	gatewayClient = gatewayClientsForSigner[channelId]
+	if gatewayClient == nil {
+		client := w.gwClients[signer]
+		gatewayClient, err = w.networkCreator(client, channelId)
+		if err != nil {
+			return nil, err
+		}
+		gatewayClientsForSigner[channelId] = gatewayClient
+	}
+	return gatewayClient, nil
+}
+
+// channel clients for queries are created with the channel client API, so that we can dictate the target
+// peer to be the single peer that this fabconnect instance is attached to. This is more useful than trying to
+// do a "strong read" across multiple peers
+func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient *channel.Client, err error) {
+	channelClientsForSigner := w.gwChannelClients[signer]
+	if channelClientsForSigner == nil {
+		channelClientsForSigner = make(map[string]*channel.Client)
 		w.gwChannelClients[signer] = channelClientsForSigner
 	}
 
 	channelClient = channelClientsForSigner[channelId]
 	if channelClient == nil {
-		client := w.gwClients[signer]
-		channelClient, err = w.networkCreator(client, channelId)
+		sdk := w.ledgerClientWrapper.sdk
+		org, err := getOrgFromConfig(w.configProvider)
 		if err != nil {
 			return nil, err
+		}
+		clientChannelContext := sdk.ChannelContext(channelId, fabsdk.WithUser(signer), fabsdk.WithOrg(org))
+		// Channel client is used to query and execute transactions (Org1 is default org)
+		channelClient, err = w.channelCreator(clientChannelContext)
+		if err != nil {
+			return nil, errors.Errorf("Failed to create new channel client: %s", err)
 		}
 		channelClientsForSigner[channelId] = channelClient
 	}

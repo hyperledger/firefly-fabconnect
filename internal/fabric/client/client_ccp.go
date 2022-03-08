@@ -41,11 +41,9 @@ type ccpClientWrapper struct {
 	signer          *msp.IdentityIdentifier
 }
 
-// defined to allow mocking in tests
-type channelCreator func(context.ChannelProvider) (*channel.Client, error)
-
 type ccpRPCWrapper struct {
 	txTimeout           int
+	configProvider      core.ConfigProvider
 	sdk                 *fabsdk.FabricSDK
 	cryptoSuiteConfig   core.CryptoSuiteConfig
 	userStore           msp.UserStore
@@ -72,6 +70,7 @@ func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, user
 	log.Infof("New gRPC connection established")
 	w := &ccpRPCWrapper{
 		sdk:                 ledgerClientWrapper.sdk,
+		configProvider:      configProvider,
 		cryptoSuiteConfig:   cryptoConfig,
 		userStore:           userStore,
 		idClient:            idClient,
@@ -106,6 +105,11 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
 
+	peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
+	if err != nil {
+		return nil, err
+	}
+
 	result, err := client.channelClient.Query(
 		channel.Request{
 			ChaincodeID: chaincodeName,
@@ -113,6 +117,7 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 			Args:        convert(args),
 		},
 		channel.WithRetry(retry.DefaultChannelOpts),
+		channel.WithTargetEndpoints(peerEndpoint),
 	)
 	if err != nil {
 		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
@@ -210,10 +215,6 @@ func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpC
 func (w *ccpRPCWrapper) Close() error {
 	w.sdk.Close()
 	return nil
-}
-
-func createChannelClient(channelProvider context.ChannelProvider) (*channel.Client, error) {
-	return channel.New(channelProvider)
 }
 
 func (w *ccpRPCWrapper) sendTransaction(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*msp.IdentityIdentifier, []byte, *fab.TxStatusEvent, error) {
