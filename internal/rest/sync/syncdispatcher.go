@@ -188,7 +188,7 @@ func (d *syncDispatcher) QueryChaincode(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	result, err1 := d.processor.GetRPCClient().Query(msg.Headers.ChannelID, msg.Headers.Signer, msg.Headers.ChaincodeName, msg.Function, msg.Args)
+	result, err1 := d.processor.GetRPCClient().Query(msg.Headers.ChannelID, msg.Headers.Signer, msg.Headers.ChaincodeName, msg.Function, msg.Args, msg.StrongRead)
 	callTime := time.Now().UTC().Sub(start)
 	if err1 != nil {
 		log.Warnf("Query [chaincode=%s, func=%s] failed to send: %s [%.2fs]", msg.Headers.ChaincodeName, msg.Function, err1, callTime.Seconds())

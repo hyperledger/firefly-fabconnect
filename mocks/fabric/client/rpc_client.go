@@ -55,13 +55,13 @@ func (_m *RPCClient) Invoke(channelId string, signer string, chaincodeName strin
 	return r0, r1
 }
 
-// Query provides a mock function with given fields: channelId, signer, chaincodeName, method, args
-func (_m *RPCClient) Query(channelId string, signer string, chaincodeName string, method string, args []string) ([]byte, error) {
-	ret := _m.Called(channelId, signer, chaincodeName, method, args)
+// Query provides a mock function with given fields: channelId, signer, chaincodeName, method, args, strongread
+func (_m *RPCClient) Query(channelId string, signer string, chaincodeName string, method string, args []string, strongread bool) ([]byte, error) {
+	ret := _m.Called(channelId, signer, chaincodeName, method, args, strongread)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(string, string, string, string, []string) []byte); ok {
-		r0 = rf(channelId, signer, chaincodeName, method, args)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, []string, bool) []byte); ok {
+		r0 = rf(channelId, signer, chaincodeName, method, args, strongread)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -69,8 +69,8 @@ func (_m *RPCClient) Query(channelId string, signer string, chaincodeName string
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string, string, string, []string) error); ok {
-		r1 = rf(channelId, signer, chaincodeName, method, args)
+	if rf, ok := ret.Get(1).(func(string, string, string, string, []string, bool) error); ok {
+		r1 = rf(channelId, signer, chaincodeName, method, args, strongread)
 	} else {
 		r1 = ret.Error(1)
 	}

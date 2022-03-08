@@ -90,7 +90,7 @@ func (w *ccpRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, 
 	return newReceipt(result, txStatus, signerID), err
 }
 
-func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, args []string) ([]byte, error) {
+func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, args []string, strongread bool) ([]byte, error) {
 	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
 
 	client, err := w.getChannelClient(channelId, signer)
@@ -99,23 +99,28 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
 
-	peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
-	if err != nil {
-		return nil, err
+	req := channel.Request{
+		ChaincodeID: chaincodeName,
+		Fcn:         method,
+		Args:        convert(args),
 	}
 
-	result, err := client.channelClient.Query(
-		channel.Request{
-			ChaincodeID: chaincodeName,
-			Fcn:         method,
-			Args:        convert(args),
-		},
-		channel.WithRetry(retry.DefaultChannelOpts),
-		channel.WithTargetEndpoints(peerEndpoint),
-	)
-	if err != nil {
+	var result channel.Response
+	var err1 error
+	if strongread {
+		// strongread means querying a set of peers that would have fulfilled the
+		// endorsement policies and make sure they all have the same results
+		result, err1 = client.channelClient.Query(req, channel.WithRetry(retry.DefaultChannelOpts))
+	} else {
+		peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
+		if err != nil {
+			return nil, err
+		}
+		result, err1 = client.channelClient.Query(req, channel.WithRetry(retry.DefaultChannelOpts), channel.WithTargetEndpoints(peerEndpoint))
+	}
+	if err1 != nil {
 		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
-		return nil, err
+		return nil, err1
 	}
 
 	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)

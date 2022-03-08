@@ -94,8 +94,9 @@ func (r *ReplyCommon) ReplyHeaders() *ReplyHeaders {
 // QueryChaincode message instructs the bridge to install a contract
 type QueryChaincode struct {
 	RequestCommon
-	Function string   `json:"func"`
-	Args     []string `json:"args,omitempty"`
+	Function   string   `json:"func"`
+	Args       []string `json:"args,omitempty"`
+	StrongRead bool     `json:"strongread"`
 }
 
 type GetTxById struct {

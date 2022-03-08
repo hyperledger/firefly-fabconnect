@@ -118,6 +118,19 @@ func BuildQueryMessage(res http.ResponseWriter, req *http.Request, params httpro
 		return nil, NewRestError(err.Error(), 400)
 	}
 	msg.Args = argsVal
+	strongread := body["strongread"]
+	if strongread != nil {
+		strVal, ok := strongread.(string)
+		if ok {
+			isStrongread, err := strconv.ParseBool(strVal)
+			if err != nil {
+				return nil, NewRestError(err.Error(), 400)
+			}
+			msg.StrongRead = isStrongread
+		} else {
+			msg.StrongRead = strongread.(bool)
+		}
+	}
 
 	return &msg, nil
 }

@@ -52,7 +52,7 @@ func MockRPCClient(fromBlock string, withReset ...bool) *mockfabric.RPCClient {
 	chaincodeResult := []byte(`{"AppraisedValue":123000,"Color":"red","ID":"asset01","Owner":"Tom","Size":10}`)
 	txResult["transaction"] = tx1
 	rpc.On("SubscribeEvent", mock.Anything, mock.Anything).Return(nil, roBlockEventChan, roCCEventChan, nil)
-	rpc.On("Query", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(chaincodeResult, nil)
+	rpc.On("Query", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(chaincodeResult, nil)
 	rpc.On("QueryChainInfo", mock.Anything, mock.Anything).Return(res, nil)
 	rpc.On("QueryBlock", mock.Anything, mock.Anything, mock.Anything).Return(rawBlock, block, nil)
 	rpc.On("QueryTransaction", mock.Anything, mock.Anything, mock.Anything).Return(txResult, nil)

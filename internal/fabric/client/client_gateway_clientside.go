@@ -82,7 +82,7 @@ func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, a
 	return newReceipt(result, txStatus, signingId.Identifier()), err
 }
 
-func (w *gwRPCWrapper) Query(channelId, signer, chaincodeName, method string, args []string) ([]byte, error) {
+func (w *gwRPCWrapper) Query(channelId, signer, chaincodeName, method string, args []string, strongread bool) ([]byte, error) {
 	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
 
 	client, err := w.getChannelClient(channelId, signer)
@@ -90,25 +90,41 @@ func (w *gwRPCWrapper) Query(channelId, signer, chaincodeName, method string, ar
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
 
-	peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
-	if err != nil {
-		return nil, err
-	}
+	if strongread {
+		client, err := w.getGatewayClient(channelId, signer)
+		if err != nil {
+			return nil, errors.Errorf("Failed to get gateway client. %s", err)
+		}
+		contractClient := client.GetContract(chaincodeName)
+		result, err := contractClient.EvaluateTransaction(method, args...)
+		if err != nil {
+			log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
+			return nil, err
+		}
 
-	bytes := convert(args)
-	req := channel.Request{
-		ChaincodeID: chaincodeName,
-		Fcn:         method,
-		Args:        bytes,
-	}
-	result, err := client.Query(req, channel.WithRetry(retry.DefaultChannelOpts), channel.WithTargetEndpoints(peerEndpoint))
-	if err != nil {
-		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
-		return nil, err
-	}
+		log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
+		return result, nil
+	} else {
+		peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
+		if err != nil {
+			return nil, err
+		}
 
-	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
-	return result.Payload, nil
+		bytes := convert(args)
+		req := channel.Request{
+			ChaincodeID: chaincodeName,
+			Fcn:         method,
+			Args:        bytes,
+		}
+		result, err := client.Query(req, channel.WithRetry(retry.DefaultChannelOpts), channel.WithTargetEndpoints(peerEndpoint))
+		if err != nil {
+			log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
+			return nil, err
+		}
+
+		log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
+		return result.Payload, nil
+	}
 }
 
 func (w *gwRPCWrapper) Close() error {
