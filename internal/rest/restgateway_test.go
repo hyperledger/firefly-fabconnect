@@ -419,6 +419,16 @@ func TestQueryEndpoints(t *testing.T) {
 	block := rr["block"].(map[string]interface{})
 	assert.Equal(float64(20), block["block_number"])
 
+	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/blockByTxId/f008dbfcb393fd40fa14a26fc2a0aaa01327d9483576e277a0a91b042bf7612f?fly-channel=default-channel&fly-signer=user1", g.config.HTTP.Port))
+	req = &http.Request{URL: url, Method: http.MethodGet, Header: header}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode)
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	result = utils.DecodePayload(bodyBytes).(map[string]interface{})
+	rr = result["result"].(map[string]interface{})
+	block = rr["block"].(map[string]interface{})
+	assert.Equal(float64(20), block["block_number"])
+
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/query?fly-channel=default-channel&fly-signer=user1&fly-chaincode=asset_transfer", g.config.HTTP.Port))
 	req = &http.Request{
 		URL:    url,

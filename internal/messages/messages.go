@@ -110,7 +110,13 @@ type GetChainInfo struct {
 
 type GetBlock struct {
 	RequestCommon
-	BlockNumber uint64 `json:"blockNumber"`
+	BlockNumber uint64
+	BlockHash   []byte
+}
+
+type GetBlockByTxId struct {
+	RequestCommon
+	TxId string
 }
 
 // SendTransaction message instructs the bridge to install a contract

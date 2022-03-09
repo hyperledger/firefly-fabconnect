@@ -157,7 +157,7 @@ func (s *subscription) getEventTimestamp(evt *eventsapi.EventEntry) {
 		return
 	}
 	// we didn't find the timestamp in our cache, query the node for the block header where we can find the timestamp
-	_, block, err := s.client.QueryBlock(s.info.ChannelId, evt.BlockNumber, s.info.Signer)
+	_, block, err := s.client.QueryBlock(s.info.ChannelId, s.info.Signer, evt.BlockNumber, nil)
 	if err != nil {
 		log.Errorf("Unable to retrieve block[%s] timestamp: %s", blockNumber, err)
 		evt.Timestamp = 0 // set to 0, we were not able to retrieve the timestamp.

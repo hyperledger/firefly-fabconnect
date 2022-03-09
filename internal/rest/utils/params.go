@@ -17,6 +17,7 @@
 package util
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -199,16 +200,50 @@ func BuildGetBlockMessage(res http.ResponseWriter, req *http.Request, params htt
 	if signer == "" {
 		return nil, NewRestError("Must specify the signer", 400)
 	}
-	blockNumber, err := strconv.ParseUint(params.ByName("blockNumber"), 10, 64)
-	if err != nil {
-		return nil, NewRestError("Invalid block number", 400)
-	}
 
 	msg := messages.GetBlock{}
 	msg.Headers.ID = msgId // this could be empty
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
-	msg.BlockNumber = blockNumber
+
+	blockNumberOrHash := params.ByName("blockNumber")
+	if len(blockNumberOrHash) == 64 {
+		// 32-byte hex string means this is a block hash
+		bytes, err := hex.DecodeString(blockNumberOrHash)
+		if err != nil {
+			return nil, NewRestError("Invalid block hash", 400)
+		}
+		msg.BlockHash = bytes
+	} else {
+		blockNumber, err := strconv.ParseUint(blockNumberOrHash, 10, 64)
+		if err != nil {
+			return nil, NewRestError("Invalid block number", 400)
+		}
+		msg.BlockNumber = blockNumber
+	}
+
+	return &msg, nil
+}
+
+func BuildGetBlockByTxIdMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetBlockByTxId, *RestError) {
+	var body map[string]interface{}
+	err := req.ParseForm()
+	if err != nil {
+		return nil, NewRestError(err.Error(), 400)
+	}
+	channel := getFlyParam("channel", body, req)
+	if channel == "" {
+		return nil, NewRestError("Must specify the channel", 400)
+	}
+	signer := getFlyParam("signer", body, req)
+	if signer == "" {
+		return nil, NewRestError("Must specify the signer", 400)
+	}
+
+	msg := messages.GetBlockByTxId{}
+	msg.Headers.ChannelID = channel
+	msg.Headers.Signer = signer
+	msg.TxId = params.ByName("txId")
 
 	return &msg, nil
 }

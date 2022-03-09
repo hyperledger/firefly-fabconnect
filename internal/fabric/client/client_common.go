@@ -88,7 +88,7 @@ func convert(args []string) [][]byte {
 }
 
 func (w *commonRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error) {
-	log.Tracef("RPC [%s] --> ChainInfo", channelId)
+	log.Tracef("RPC [%s] --> QueryChainInfo", channelId)
 
 	result, err := w.ledgerClientWrapper.queryChainInfo(channelId, signer)
 	if err != nil {
@@ -100,12 +100,25 @@ func (w *commonRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.Blockc
 	return result, nil
 }
 
-func (w *commonRPCWrapper) QueryBlock(channelId string, blockNumber uint64, signer string) (*utils.RawBlock, *utils.Block, error) {
+func (w *commonRPCWrapper) QueryBlock(channelId string, signer string, blockNumber uint64, blockhash []byte) (*utils.RawBlock, *utils.Block, error) {
 	log.Tracef("RPC [%s] --> QueryBlock %v", channelId, blockNumber)
 
-	rawblock, block, err := w.ledgerClientWrapper.queryBlock(channelId, blockNumber, signer)
+	rawblock, block, err := w.ledgerClientWrapper.queryBlock(channelId, signer, blockNumber, blockhash)
 	if err != nil {
 		log.Errorf("Failed to query block %v on channel %s. %s", blockNumber, channelId, err)
+		return nil, nil, err
+	}
+
+	log.Tracef("RPC [%s] <-- success", channelId)
+	return rawblock, block, nil
+}
+
+func (w *commonRPCWrapper) QueryBlockByTxId(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
+	log.Tracef("RPC [%s] --> QueryBlockByTxId %s", channelId, txId)
+
+	rawblock, block, err := w.ledgerClientWrapper.queryBlockByTxId(channelId, signer, txId)
+	if err != nil {
+		log.Errorf("Failed to query block by transaction Id %s on channel %s. %s", txId, channelId, err)
 		return nil, nil, err
 	}
 
