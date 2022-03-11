@@ -78,6 +78,7 @@ func (r *router) addRoutes() {
 
 	r.httpRouter.GET("/chaininfo", r.queryChainInfo)
 	r.httpRouter.GET("/blocks/:blockNumber", r.queryBlock)
+	r.httpRouter.GET("/blockByTxId/:txId", r.queryBlockByTxId)
 
 	r.httpRouter.POST("/query", r.queryChaincode)
 	r.httpRouter.POST("/transactions", r.sendTransaction)
@@ -155,6 +156,12 @@ func (r *router) queryBlock(res http.ResponseWriter, req *http.Request, params h
 	log.Infof("--> %s %s", req.Method, req.URL)
 	// query requests are always synchronous
 	r.syncDispatcher.GetBlock(res, req, params)
+}
+
+func (r *router) queryBlockByTxId(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Infof("--> %s %s", req.Method, req.URL)
+	// query requests are always synchronous
+	r.syncDispatcher.GetBlockByTxId(res, req, params)
 }
 
 func (r *router) queryChaincode(res http.ResponseWriter, req *http.Request, params httprouter.Params) {

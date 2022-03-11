@@ -17,6 +17,7 @@
 package client
 
 import (
+	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
@@ -58,12 +59,31 @@ func (l *ledgerClientWrapper) queryChainInfo(channelId, signer string) (*fab.Blo
 	return result, nil
 }
 
-func (l *ledgerClientWrapper) queryBlock(channelId string, blockNumber uint64, signer string) (*utils.RawBlock, *utils.Block, error) {
+func (l *ledgerClientWrapper) queryBlock(channelId string, signer string, blockNumber uint64, blockhash []byte) (*utils.RawBlock, *utils.Block, error) {
 	client, err := l.getLedgerClient(channelId, signer)
 	if err != nil {
 		return nil, nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
-	result, err := client.QueryBlock(blockNumber)
+	var result *common.Block
+	var err1 error
+	if blockhash == nil {
+		result, err1 = client.QueryBlock(blockNumber)
+	} else {
+		result, err1 = client.QueryBlockByHash(blockhash)
+	}
+	if err1 != nil {
+		return nil, nil, err1
+	}
+	rawblock, block, err := utils.DecodeBlock(result)
+	return rawblock, block, err
+}
+
+func (l *ledgerClientWrapper) queryBlockByTxId(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
+	client, err := l.getLedgerClient(channelId, signer)
+	if err != nil {
+		return nil, nil, errors.Errorf("Failed to get channel client. %s", err)
+	}
+	result, err := client.QueryBlockByTxID(fab.TransactionID(txId))
 	if err != nil {
 		return nil, nil, err
 	}

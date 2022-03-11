@@ -44,6 +44,7 @@ type SyncDispatcher interface {
 	GetTxById(res http.ResponseWriter, req *http.Request, params httprouter.Params)
 	GetChainInfo(res http.ResponseWriter, req *http.Request, params httprouter.Params)
 	GetBlock(res http.ResponseWriter, req *http.Request, params httprouter.Params)
+	GetBlockByTxId(res http.ResponseWriter, req *http.Request, params httprouter.Params)
 }
 
 type syncDispatcher struct {
@@ -188,7 +189,7 @@ func (d *syncDispatcher) QueryChaincode(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	result, err1 := d.processor.GetRPCClient().Query(msg.Headers.ChannelID, msg.Headers.Signer, msg.Headers.ChaincodeName, msg.Function, msg.Args)
+	result, err1 := d.processor.GetRPCClient().Query(msg.Headers.ChannelID, msg.Headers.Signer, msg.Headers.ChaincodeName, msg.Function, msg.Args, msg.StrongRead)
 	callTime := time.Now().UTC().Sub(start)
 	if err1 != nil {
 		log.Warnf("Query [chaincode=%s, func=%s] failed to send: %s [%.2fs]", msg.Headers.ChaincodeName, msg.Function, err1, callTime.Seconds())
@@ -254,7 +255,28 @@ func (d *syncDispatcher) GetBlock(res http.ResponseWriter, req *http.Request, pa
 		return
 	}
 
-	rawblock, block, err1 := d.processor.GetRPCClient().QueryBlock(msg.Headers.ChannelID, msg.BlockNumber, msg.Headers.Signer)
+	rawblock, block, err1 := d.processor.GetRPCClient().QueryBlock(msg.Headers.ChannelID, msg.Headers.Signer, msg.BlockNumber, msg.BlockHash)
+	if err1 != nil {
+		errors.RestErrReply(res, req, err1, 500)
+		return
+	}
+	var reply messages.LedgerQueryResult
+	result := make(map[string]interface{})
+	result["raw"] = rawblock
+	result["block"] = block
+	reply.Result = result
+
+	sendReply(res, req, reply)
+}
+
+func (d *syncDispatcher) GetBlockByTxId(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	msg, err := restutil.BuildGetBlockByTxIdMessage(res, req, params)
+	if err != nil {
+		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		return
+	}
+
+	rawblock, block, err1 := d.processor.GetRPCClient().QueryBlockByTxId(msg.Headers.ChannelID, msg.Headers.Signer, msg.TxId)
 	if err1 != nil {
 		errors.RestErrReply(res, req, err1, 500)
 		return

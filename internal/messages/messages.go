@@ -94,8 +94,9 @@ func (r *ReplyCommon) ReplyHeaders() *ReplyHeaders {
 // QueryChaincode message instructs the bridge to install a contract
 type QueryChaincode struct {
 	RequestCommon
-	Function string   `json:"func"`
-	Args     []string `json:"args,omitempty"`
+	Function   string   `json:"func"`
+	Args       []string `json:"args,omitempty"`
+	StrongRead bool     `json:"strongread"`
 }
 
 type GetTxById struct {
@@ -109,7 +110,13 @@ type GetChainInfo struct {
 
 type GetBlock struct {
 	RequestCommon
-	BlockNumber uint64 `json:"blockNumber"`
+	BlockNumber uint64
+	BlockHash   []byte
+}
+
+type GetBlockByTxId struct {
+	RequestCommon
+	TxId string
 }
 
 // SendTransaction message instructs the bridge to install a contract

@@ -134,16 +134,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/chaininfo"
-  /blocks/{blockNumber}:
+  /blocks/{blockNumberOrHash}:
     get:
       summary: "Query the block by number"
       parameters:
-        - $ref: "#/components/parameters/blockNumber"
+        - $ref: "#/components/parameters/blockNumberOrHash"
         - $ref: "#/components/parameters/channel"
         - $ref: "#/components/parameters/signer"
       responses:
         200:
-          description: "Transaction retrieved"
+          description: "Block retrieved"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/get_block_output"
+  /blockByTxId/{txId}:
+    get:
+      summary: "Query the block by a transaction Id included in the block"
+      parameters:
+        - $ref: "#/components/parameters/txId"
+        - $ref: "#/components/parameters/channel"
+        - $ref: "#/components/parameters/signer"
+      responses:
+        200:
+          description: "Block retrieved"
           content:
             application/json:
               schema:
@@ -485,6 +499,9 @@ components:
           items:
             type: "string"
             description: "Parameters to pass to the chaincode function"
+        strongread:
+          type: boolean
+          description: By default only the client organization's first peer is contacted for the query request; set to true to contact multiple peers in the channel
     query_input_structured:
       description: "Specify a JSON schema in the headers, so that the 'args' property can be specified as a JSON object"
       type: "object"
@@ -497,6 +514,9 @@ components:
         args:
           type: "object"
           description: "JSON structure for the parameters to pass to the chaincode function"
+        strongread:
+          type: boolean
+          description: By default only the client organization's first peer is contacted for the query request; set to true to contact multiple peers in the channel
     webhook_info:
       type: "object"
       properties:
@@ -929,9 +949,10 @@ components:
       in: "query"
       schema:
         type: "string"
-    blockNumber:
+    blockNumberOrHash:
+      description: block number or block hash
       required: true
-      name: blockNumber
+      name: blockNumberOrHash
       in: path
       schema:
         type: string
