@@ -51,7 +51,7 @@ func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, i
 }
 
 func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
-	eventClient, err := e.getEventClient(subInfo.ChannelId, subInfo.Signer, since)
+	eventClient, err := e.getEventClient(subInfo.ChannelId, subInfo.Signer, since, subInfo.Filter.ChaincodeId)
 	if err != nil {
 		log.Errorf("Failed to get event client. %s", err)
 		return nil, nil, nil, errors.Errorf("Failed to get event client. %s", err)
@@ -89,25 +89,29 @@ func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo,
 	}
 }
 
-func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint64) (eventClient *event.Client, err error) {
+func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint64, chaincodeId string) (eventClient *event.Client, err error) {
 	eventClientsForSigner := e.eventClients[signer]
 	if eventClientsForSigner == nil {
 		eventClientsForSigner = make(map[string]*event.Client)
 		e.eventClients[signer] = eventClientsForSigner
 	}
-	eventClient = eventClientsForSigner[channelId]
+	key := eventsapi.GetKeyForEventClient(channelId, chaincodeId)
+	eventClient = eventClientsForSigner[key]
 	if eventClient == nil {
 		eventOpts := []event.ClientOption{
 			event.WithBlockEvents(),
 			event.WithSeekType(seek.FromBlock),
 			event.WithBlockNum(since),
 		}
+		if chaincodeId != "" {
+			eventOpts = append(eventOpts, event.WithChaincodeID(chaincodeId))
+		}
 		channelProvider := e.sdk.ChannelContext(channelId, fabsdk.WithOrg(e.idClient.GetClientOrg()), fabsdk.WithUser(signer))
 		eventClient, err = e.eventClientCreator(channelProvider, eventOpts...)
 		if err != nil {
 			return nil, err
 		}
-		eventClientsForSigner[channelId] = eventClient
+		eventClientsForSigner[key] = eventClient
 	}
 	return eventClient, nil
 }

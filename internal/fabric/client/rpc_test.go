@@ -236,12 +236,21 @@ func TestEventClientInstantiation(t *testing.T) {
 	assert.True(ok)
 
 	wrapper.eventClientWrapper.eventClientCreator = createMockEventClient
-	client, err := wrapper.eventClientWrapper.getEventClient("default-channel", "user1", uint64(0))
+	client1, err := wrapper.eventClientWrapper.getEventClient("default-channel", "user1", uint64(0), "chaincode-1")
 	assert.NoError(err)
-	assert.NotNil(client)
+	assert.NotNil(client1)
 	assert.Equal(1, len(wrapper.eventClientWrapper.eventClients))
 	assert.Equal(1, len(wrapper.eventClientWrapper.eventClients["user1"]))
-	assert.Equal(client, wrapper.eventClientWrapper.eventClients["user1"]["default-channel"])
+	assert.Equal(client1, wrapper.eventClientWrapper.eventClients["user1"]["default-channel-chaincode-1"])
+
+	client2, err := wrapper.eventClientWrapper.getEventClient("default-channel", "user1", uint64(0), "chaincode-2")
+	assert.NoError(err)
+	assert.NotNil(client2)
+	assert.Equal(1, len(wrapper.eventClientWrapper.eventClients))
+	assert.Equal(2, len(wrapper.eventClientWrapper.eventClients["user1"]))
+	assert.Equal(client2, wrapper.eventClientWrapper.eventClients["user1"]["default-channel-chaincode-2"])
+
+	assert.NotEqual(fmt.Sprintf("%p", client1), fmt.Sprintf("%p", client2))
 }
 
 func TestLedgerClientInstantiation(t *testing.T) {

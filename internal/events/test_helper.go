@@ -186,7 +186,7 @@ func setupTestSubscription(sm *subscriptionMGR, stream *eventStream, subscriptio
 	if fromBlock != "" {
 		spec.FromBlock = fromBlock
 	}
-	_ = sm.addSubscription(spec)
+	_, _ = sm.addSubscription(spec)
 
 	return spec
 }

@@ -16,6 +16,8 @@
 
 package api
 
+import "fmt"
+
 const (
 	BlockType_TX                     = "tx"              // corresponds to blocks containing regular transactions
 	BlockType_Config                 = "config"          // corresponds to blocks containing channel configurations and updates
@@ -69,4 +71,12 @@ type EventEntry struct {
 	Payload          interface{} `json:"payload"`
 	Timestamp        int64       `json:"timestamp,omitempty"`
 	SubID            string      `json:"subId"`
+}
+
+func GetKeyForEventClient(channelId string, chaincodeId string) string {
+	// key for a unique event client is <channelId>-<chaincodeId>
+	// note that we don't allow "fromBlock" to be a key segment, because on restart
+	// the "fromBlock" will be set to the checkpoint which will be the same, thus failing
+	// to differentiate unique event clients
+	return fmt.Sprintf("%s-%s", channelId, chaincodeId)
 }

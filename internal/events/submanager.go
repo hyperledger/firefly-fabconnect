@@ -17,6 +17,7 @@
 package events
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -304,8 +305,9 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 	if err := validateFromBlock(spec.FromBlock); err != nil {
 		return nil, restutil.NewRestError(err.Error(), 400)
 	}
-	if err := s.addSubscription(&spec); err != nil {
-		return nil, restutil.NewRestError(err.Error(), 500)
+
+	if err, statusCode := s.addSubscription(&spec); err != nil {
+		return nil, restutil.NewRestError(err.Error(), statusCode)
 	}
 	return &spec, nil
 }
@@ -450,7 +452,7 @@ func (s *subscriptionMGR) getSubscriptions() []*eventsapi.SubscriptionInfo {
 	return l
 }
 
-func (s *subscriptionMGR) addSubscription(spec *eventsapi.SubscriptionInfo) error {
+func (s *subscriptionMGR) addSubscription(spec *eventsapi.SubscriptionInfo) (error, int) {
 	spec.TimeSorted = eventsapi.TimeSorted{
 		CreatedISO8601: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -467,17 +469,42 @@ func (s *subscriptionMGR) addSubscription(spec *eventsapi.SubscriptionInfo) erro
 	if spec.Filter.EventFilter == "" && spec.Filter.ChaincodeId != "" {
 		spec.Filter.EventFilter = ".*"
 	}
+
+	// A subscription is based on an event client and a registration. We must ensure that
+	// on restart all subscriptions can be restored. We must avoid allowing different subscriptions
+	// to register for the same parameters against the same event client, which would fail. NOTE that
+	// upon restart, all subscriptions will have been set for the "fromBlock" to the latest checkpoint,
+	// which would likely be the same across the board. As a result, "fromBlock" can not be a key segment
+	// to index event clients.
+	//
+	// Because of the above, we require that a subscription must have a unique composite key made up of:
+	// - channel ID
+	// - chaincode ID (empty string if creating a block event listener)
+	// - block type (endorser or config)
+	// - event filter
+	//
+	// Note that, because of the way event clients are cached by fabric-sdk-go, subscriptions having the
+	// same channel ID and chaincode ID, but different the event filter will share the same event client.
+	// This means subsequent subscriptions will NOT get historical events, because the offset in the event
+	// client will have been set to the latest block.
+	subscriptionKey := calculateLookupKey(spec)
+	_, err := s.db.Get(subscriptionKey)
+	if err == nil {
+		// a conflicting subscription already exists, return 400
+		return errors.Error("A subscription with the same channel ID, chaincode ID, block type and event filter already exists"), 400
+	}
+
 	// Create it
 	stream, err := s.streamByID(spec.Stream)
 	if err != nil {
-		return err
+		return err, 500
 	}
 	sub, err := newSubscription(stream, s.rpc, spec)
 	if err != nil {
-		return err
+		return err, 500
 	}
 	s.subscriptions[sub.info.ID] = sub
-	return s.storeSubscription(spec)
+	return s.storeSubscription(spec, subscriptionKey), 200
 }
 
 func (s *subscriptionMGR) resetSubscription(sub *subscription, initialBlock string) error {
@@ -492,7 +519,7 @@ func (s *subscriptionMGR) resetSubscription(sub *subscription, initialBlock stri
 
 		sub.info.FromBlock = initialBlock
 	}
-	if err := s.storeSubscription(sub.info); err != nil {
+	if err := s.storeSubscription(sub.info, calculateLookupKey(sub.info)); err != nil {
 		return err
 	}
 	// Request a reset on the next poling cycle
@@ -509,10 +536,13 @@ func (s *subscriptionMGR) deleteSubscription(sub *subscription) error {
 	return nil
 }
 
-func (s *subscriptionMGR) storeSubscription(info *eventsapi.SubscriptionInfo) error {
+func (s *subscriptionMGR) storeSubscription(info *eventsapi.SubscriptionInfo, lookupKey string) error {
 	infoBytes, _ := json.MarshalIndent(info, "", "  ")
 	if err := s.db.Put(info.ID, infoBytes); err != nil {
 		return errors.Errorf(errors.EventStreamsSubscribeStoreFailed, err)
+	}
+	if err := s.db.Put(lookupKey, []byte{}); err != nil {
+		return errors.Errorf(errors.EventStreamsSubscribeLookupKeyStoreFailed, err)
 	}
 	return nil
 }
@@ -651,4 +681,11 @@ func validateFromBlock(fromBlock string) error {
 		}
 	}
 	return nil
+}
+
+func calculateLookupKey(spec *eventsapi.SubscriptionInfo) string {
+	compositeKey := fmt.Sprintf("%s-%s-%s-%s", spec.ChannelId, spec.Filter.ChaincodeId, spec.Filter.BlockType, spec.Filter.EventFilter)
+	hashKey := sha256.Sum256([]byte(compositeKey))
+	subscriptionKey := fmt.Sprintf("sub-idx-%x", hashKey)
+	return subscriptionKey
 }

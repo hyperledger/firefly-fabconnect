@@ -82,7 +82,7 @@ func TestActionAndSubscriptionLifecyle(t *testing.T) {
 		Name:   subscriptionName,
 		Stream: stream.ID,
 	}
-	err = sm.addSubscription(sub)
+	err, _ = sm.addSubscription(sub)
 	assert.NoError(err)
 
 	assert.Equal([]*api.SubscriptionInfo{sub}, sm.getSubscriptions())
@@ -162,7 +162,7 @@ func TestActionChildCleanup(t *testing.T) {
 		Name:   "testSub",
 		Stream: stream.ID,
 	}
-	err = sm.addSubscription(sub)
+	err, _ = sm.addSubscription(sub)
 	assert.NoError(err)
 	err = sm.deleteStream(sm.streams[stream.ID])
 	assert.NoError(err)
@@ -197,7 +197,7 @@ func TestStreamAndSubscriptionErrors(t *testing.T) {
 		Name:   "testSub",
 		Stream: stream.ID,
 	}
-	err = sm.addSubscription(sub)
+	err, _ = sm.addSubscription(sub)
 	assert.NoError(err)
 
 	err = sm.resetSubscription(sm.subscriptions[sub.ID], "badness")
@@ -207,5 +207,39 @@ func TestStreamAndSubscriptionErrors(t *testing.T) {
 	err = sm.resetSubscription(sm.subscriptions[sub.ID], "0")
 	assert.EqualError(err, "Failed to store subscription: leveldb: closed")
 
+	sm.Close()
+}
+
+func TestStreamAndSubscriptionDuplicateErrors(t *testing.T) {
+	assert := assert.New(t)
+	dir := tempdir(t)
+	defer cleanup(t, dir)
+	sm := newTestSubscriptionManager()
+	sm.rpc = test.MockRPCClient("")
+	sm.db = kvstore.NewLDBKeyValueStore(path.Join(dir, "db"))
+	_ = sm.db.Init()
+	defer sm.db.Close()
+
+	stream := &StreamInfo{
+		Type:    "webhook",
+		Webhook: &webhookActionInfo{URL: "http://test.invalid"},
+	}
+	err := sm.addStream(stream)
+	assert.NoError(err)
+
+	sub := &api.SubscriptionInfo{
+		Name:      "testSub",
+		Stream:    stream.ID,
+		ChannelId: "testChannel",
+	}
+	sub.Filter.BlockType = eventsapi.BlockType_TX
+	sub.Filter.ChaincodeId = "testChaincode"
+	err, _ = sm.addSubscription(sub)
+	assert.NoError(err)
+
+	err, _ = sm.addSubscription(sub)
+	assert.EqualError(err, "A subscription with the same channel ID, chaincode ID, block type and event filter already exists")
+
+	sm.db.Close()
 	sm.Close()
 }
