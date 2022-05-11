@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 func TestInitLevelDBSuccess(t *testing.T) {
@@ -79,10 +80,17 @@ func TestActionAndSubscriptionLifecyle(t *testing.T) {
 	assert.NoError(err)
 
 	sub := &api.SubscriptionInfo{
-		Name:   subscriptionName,
-		Stream: stream.ID,
+		Name:      subscriptionName,
+		Stream:    stream.ID,
+		ChannelId: "testChannel",
 	}
+	sub.Filter.ChaincodeId = "testChaincode"
 	err, _ = sm.addSubscription(sub)
+	assert.NoError(err)
+
+	// confirm that the lookup key entry has also been persisted alongside the main entry
+	lookupKey := calculateLookupKey(sub)
+	_, err = sm.db.Get(lookupKey)
 	assert.NoError(err)
 
 	assert.Equal([]*api.SubscriptionInfo{sub}, sm.getSubscriptions())
@@ -132,6 +140,10 @@ func TestActionAndSubscriptionLifecyle(t *testing.T) {
 
 	err = sm.deleteSubscription(reloadedSub)
 	assert.NoError(err)
+
+	// confirm that the lookup key entry has been deleted alongside the main entry
+	_, err = sm.db.Get(lookupKey)
+	assert.EqualError(err, leveldb.ErrNotFound.Error())
 
 	reloadedStream, err := sm.streamByID(retStream.spec.ID)
 	assert.NoError(err)
@@ -194,8 +206,9 @@ func TestStreamAndSubscriptionErrors(t *testing.T) {
 	assert.NoError(err)
 
 	sub := &api.SubscriptionInfo{
-		Name:   "testSub",
-		Stream: stream.ID,
+		Name:      "testSub",
+		Stream:    stream.ID,
+		ChannelId: "testChannel",
 	}
 	err, _ = sm.addSubscription(sub)
 	assert.NoError(err)

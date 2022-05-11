@@ -533,6 +533,12 @@ func (s *subscriptionMGR) deleteSubscription(sub *subscription) error {
 	if err := s.db.Delete(sub.info.ID); err != nil {
 		return err
 	}
+	// also delete the lookup key entry
+	subscriptionKey := calculateLookupKey(sub.info)
+	if err := s.db.Delete(subscriptionKey); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -541,7 +547,7 @@ func (s *subscriptionMGR) storeSubscription(info *eventsapi.SubscriptionInfo, lo
 	if err := s.db.Put(info.ID, infoBytes); err != nil {
 		return errors.Errorf(errors.EventStreamsSubscribeStoreFailed, err)
 	}
-	if err := s.db.Put(lookupKey, []byte{}); err != nil {
+	if err := s.db.Put(lookupKey, []byte(info.ID)); err != nil {
 		return errors.Errorf(errors.EventStreamsSubscribeLookupKeyStoreFailed, err)
 	}
 	return nil
