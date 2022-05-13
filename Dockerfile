@@ -1,4 +1,4 @@
-FROM golang:1.16-alpine3.13 AS fabconnect-builder
+FROM golang:1.17-alpine3.13 AS fabconnect-builder
 RUN apk add make
 WORKDIR /fabconnect
 ADD go.mod go.sum ./

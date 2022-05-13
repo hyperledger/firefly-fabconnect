@@ -186,6 +186,8 @@ const (
 	EventStreamsSubscribeBadBlock = "FromBlock cannot be parsed as a BigInt"
 	// EventStreamsSubscribeStoreFailed problem saving a subscription to our DB
 	EventStreamsSubscribeStoreFailed = "Failed to store subscription: %s"
+	// EventStreamsSubscribeStoreFailed problem saving a subscription to our DB
+	EventStreamsSubscribeLookupKeyStoreFailed = "Failed to store subscription lookup key: %s"
 	// EventStreamsSubscribeNoEvent missing event
 	EventStreamsSubscribeNoEvent = "Chaincode event name must be specified"
 	// EventStreamsSubscriptionNotFound sub not found

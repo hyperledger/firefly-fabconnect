@@ -27,6 +27,7 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/kvstore"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 func TestInitLevelDBSuccess(t *testing.T) {
@@ -79,10 +80,17 @@ func TestActionAndSubscriptionLifecyle(t *testing.T) {
 	assert.NoError(err)
 
 	sub := &api.SubscriptionInfo{
-		Name:   subscriptionName,
-		Stream: stream.ID,
+		Name:      subscriptionName,
+		Stream:    stream.ID,
+		ChannelId: "testChannel",
 	}
-	err = sm.addSubscription(sub)
+	sub.Filter.ChaincodeId = "testChaincode"
+	err, _ = sm.addSubscription(sub)
+	assert.NoError(err)
+
+	// confirm that the lookup key entry has also been persisted alongside the main entry
+	lookupKey := calculateLookupKey(sub)
+	_, err = sm.db.Get(lookupKey)
 	assert.NoError(err)
 
 	assert.Equal([]*api.SubscriptionInfo{sub}, sm.getSubscriptions())
@@ -133,6 +141,10 @@ func TestActionAndSubscriptionLifecyle(t *testing.T) {
 	err = sm.deleteSubscription(reloadedSub)
 	assert.NoError(err)
 
+	// confirm that the lookup key entry has been deleted alongside the main entry
+	_, err = sm.db.Get(lookupKey)
+	assert.EqualError(err, leveldb.ErrNotFound.Error())
+
 	reloadedStream, err := sm.streamByID(retStream.spec.ID)
 	assert.NoError(err)
 	err = sm.deleteStream(reloadedStream)
@@ -162,7 +174,7 @@ func TestActionChildCleanup(t *testing.T) {
 		Name:   "testSub",
 		Stream: stream.ID,
 	}
-	err = sm.addSubscription(sub)
+	err, _ = sm.addSubscription(sub)
 	assert.NoError(err)
 	err = sm.deleteStream(sm.streams[stream.ID])
 	assert.NoError(err)
@@ -194,10 +206,11 @@ func TestStreamAndSubscriptionErrors(t *testing.T) {
 	assert.NoError(err)
 
 	sub := &api.SubscriptionInfo{
-		Name:   "testSub",
-		Stream: stream.ID,
+		Name:      "testSub",
+		Stream:    stream.ID,
+		ChannelId: "testChannel",
 	}
-	err = sm.addSubscription(sub)
+	err, _ = sm.addSubscription(sub)
 	assert.NoError(err)
 
 	err = sm.resetSubscription(sm.subscriptions[sub.ID], "badness")
@@ -207,5 +220,39 @@ func TestStreamAndSubscriptionErrors(t *testing.T) {
 	err = sm.resetSubscription(sm.subscriptions[sub.ID], "0")
 	assert.EqualError(err, "Failed to store subscription: leveldb: closed")
 
+	sm.Close()
+}
+
+func TestStreamAndSubscriptionDuplicateErrors(t *testing.T) {
+	assert := assert.New(t)
+	dir := tempdir(t)
+	defer cleanup(t, dir)
+	sm := newTestSubscriptionManager()
+	sm.rpc = test.MockRPCClient("")
+	sm.db = kvstore.NewLDBKeyValueStore(path.Join(dir, "db"))
+	_ = sm.db.Init()
+	defer sm.db.Close()
+
+	stream := &StreamInfo{
+		Type:    "webhook",
+		Webhook: &webhookActionInfo{URL: "http://test.invalid"},
+	}
+	err := sm.addStream(stream)
+	assert.NoError(err)
+
+	sub := &api.SubscriptionInfo{
+		Name:      "testSub",
+		Stream:    stream.ID,
+		ChannelId: "testChannel",
+	}
+	sub.Filter.BlockType = eventsapi.BlockType_TX
+	sub.Filter.ChaincodeId = "testChaincode"
+	err, _ = sm.addSubscription(sub)
+	assert.NoError(err)
+
+	err, _ = sm.addSubscription(sub)
+	assert.EqualError(err, "A subscription with the same channel ID, chaincode ID, block type and event filter already exists")
+
+	sm.db.Close()
 	sm.Close()
 }
