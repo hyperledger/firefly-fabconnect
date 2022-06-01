@@ -30,6 +30,7 @@ import (
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
 	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/dep"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
 	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
 	"github.com/julienschmidt/httprouter"
@@ -48,7 +49,7 @@ func (p *identityManagerProvider) IdentityManager(orgName string) (msp.IdentityM
 type idClientWrapper struct {
 	identityConfig msp.IdentityConfig
 	identityMgr    msp.IdentityManager
-	caClient       CAClient
+	caClient       dep.CAClient
 	listeners      []SignerUpdateListener
 }
 
@@ -258,12 +259,12 @@ func (w *idClientWrapper) Reenroll(res http.ResponseWriter, req *http.Request, p
 
 	err = w.caClient.Reenroll(&input)
 	if err != nil {
-		log.Errorf("Failed to re-enroll user %s. %s", enreq.Name, err)
+		log.Errorf("Failed to re-enroll user %s. %s", username, err)
 		return nil, restutil.NewRestError(err.Error())
 	}
 
 	result := identity.IdentityResponse{
-		Name:    enreq.Name,
+		Name:    username,
 		Success: true,
 	}
 
