@@ -17,6 +17,8 @@
 package client
 
 import (
+	"sync"
+
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
@@ -39,15 +41,19 @@ type eventClientWrapper struct {
 	sdk                *fabsdk.FabricSDK
 	idClient           IdentityClient
 	eventClientCreator eventClientCreator
+	mu                 sync.Mutex
 }
 
 func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *eventClientWrapper {
-	return &eventClientWrapper{
+	w := &eventClientWrapper{
 		sdk:                sdk,
 		idClient:           idClient,
 		eventClients:       make(map[string]map[string]*event.Client),
 		eventClientCreator: createEventClient,
 	}
+
+	idClient.AddSignerUpdateListener(w)
+	return w
 }
 
 func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
@@ -90,6 +96,7 @@ func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo,
 }
 
 func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint64, chaincodeId string) (eventClient *event.Client, err error) {
+	e.mu.Lock()
 	eventClientsForSigner := e.eventClients[signer]
 	if eventClientsForSigner == nil {
 		eventClientsForSigner = make(map[string]*event.Client)
@@ -113,7 +120,14 @@ func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint
 		}
 		eventClientsForSigner[key] = eventClient
 	}
+	e.mu.Unlock()
 	return eventClient, nil
+}
+
+func (e *eventClientWrapper) SignerUpdated(signer string) {
+	e.mu.Lock()
+	e.eventClients[signer] = nil
+	e.mu.Unlock()
 }
 
 func createEventClient(channelProvider context.ChannelProvider, eventOpts ...event.ClientOption) (*event.Client, error) {

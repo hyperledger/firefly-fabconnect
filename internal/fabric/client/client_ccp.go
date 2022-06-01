@@ -17,6 +17,8 @@
 package client
 
 import (
+	"sync"
+
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel/invoke"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/errors/retry"
@@ -45,6 +47,7 @@ type ccpRPCWrapper struct {
 	userStore         msp.UserStore
 	// one channel client per channel ID, per signer ID
 	channelClients map[string](map[string]*ccpClientWrapper)
+	mu             sync.Mutex
 }
 
 func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, userStore msp.UserStore, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper) (RPCClient, error) {
@@ -74,6 +77,8 @@ func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, user
 		userStore:         userStore,
 		channelClients:    make(map[string]map[string]*ccpClientWrapper),
 	}
+
+	idClient.AddSignerUpdateListener(w)
 	return w, nil
 }
 
@@ -127,7 +132,16 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 	return result.Payload, nil
 }
 
+func (w *ccpRPCWrapper) SignerUpdated(signer string) {
+	w.mu.Lock()
+	for _, clientsOfChannel := range w.channelClients {
+		clientsOfChannel[signer] = nil
+	}
+	w.mu.Unlock()
+}
+
 func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpClientWrapper, error) {
+	w.mu.Lock()
 	id, err := w.idClient.GetSigningIdentity(signer)
 	if err == msp.ErrUserNotFound {
 		return nil, errors.Errorf("Signer %s does not exist", signer)
@@ -155,6 +169,7 @@ func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpC
 		w.channelClients[channelId][id.Identifier().ID] = newWrapper
 		clientOfUser = newWrapper
 	}
+	w.mu.Unlock()
 	return clientOfUser, nil
 }
 

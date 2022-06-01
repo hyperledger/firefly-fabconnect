@@ -66,4 +66,9 @@ type RPCClient interface {
 type IdentityClient interface {
 	GetSigningIdentity(name string) (msp.SigningIdentity, error)
 	GetClientOrg() string
+	AddSignerUpdateListener(SignerUpdateListener)
+}
+
+type SignerUpdateListener interface {
+	SignerUpdated(signer string)
 }

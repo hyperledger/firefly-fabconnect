@@ -40,6 +40,7 @@ mocks: mockery ${GOFILES}
 	${MOCKERY} --case underscore --dir internal/events --name SubscriptionManager --output mocks/events --outpkg mockevents
 	${MOCKERY} --case underscore --dir internal/fabric/client --name RPCClient --output mocks/fabric/client --outpkg mockfabric
 	${MOCKERY} --case underscore --dir internal/fabric/client --name IdentityClient --output mocks/fabric/client --outpkg mockfabric
+	${MOCKERY} --case underscore --dir internal/fabric/dep --name CAClient --output mocks/fabric/dep --outpkg mockfabricdep
 	${MOCKERY} --case underscore --dir internal/kvstore --name KVStore --output mocks/kvstore --outpkg mockkvstore
 	${MOCKERY} --case underscore --dir internal/kvstore --name KVIterator --output mocks/kvstore --outpkg mockkvstore
 	${MOCKERY} --case underscore --dir internal/rest/async --name AsyncDispatcher --output mocks/rest/async --outpkg mockasync

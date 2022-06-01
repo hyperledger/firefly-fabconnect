@@ -19,6 +19,8 @@ package client
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"runtime"
@@ -31,9 +33,13 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
+	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	mockfabricdep "github.com/hyperledger/firefly-fabconnect/mocks/fabric/dep"
+	"github.com/julienschmidt/httprouter"
 	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 var tmpdir string
@@ -163,6 +169,13 @@ func TestCCPClientInstantiation(t *testing.T) {
 	assert.NotNil(client)
 	assert.Equal(1, len(wrapper.channelClients))
 	assert.Equal(1, len(wrapper.channelClients["default-channel"]))
+
+	idcWrapper := wrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.channelClients["default-channel"]["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.channelClients["default-channel"]["user1"])
 }
 
 func TestGatewayClientInstantiation(t *testing.T) {
@@ -193,6 +206,13 @@ func TestGatewayClientInstantiation(t *testing.T) {
 	assert.Equal(1, len(wrapper.gwGatewayClients))
 	assert.Equal(1, len(wrapper.gwGatewayClients["user1"]))
 	assert.Equal(client, wrapper.gwGatewayClients["user1"]["default-channel"])
+
+	idcWrapper := wrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.gwGatewayClients["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.gwGatewayClients["user1"])
 }
 
 func TestChannelClientInstantiation(t *testing.T) {
@@ -219,6 +239,13 @@ func TestChannelClientInstantiation(t *testing.T) {
 	assert.Equal(1, len(wrapper.gwChannelClients))
 	assert.Equal(1, len(wrapper.gwChannelClients["user1"]))
 	assert.Equal(client, wrapper.gwChannelClients["user1"]["default-channel"])
+
+	idcWrapper := wrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.gwChannelClients["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.gwChannelClients["user1"])
 }
 
 func TestEventClientInstantiation(t *testing.T) {
@@ -251,6 +278,13 @@ func TestEventClientInstantiation(t *testing.T) {
 	assert.Equal(client2, wrapper.eventClientWrapper.eventClients["user1"]["default-channel-chaincode-2"])
 
 	assert.NotEqual(fmt.Sprintf("%p", client1), fmt.Sprintf("%p", client2))
+
+	idcWrapper := wrapper.eventClientWrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.eventClientWrapper.eventClients["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.eventClientWrapper.eventClients["user1"])
 }
 
 func TestLedgerClientInstantiation(t *testing.T) {
@@ -274,4 +308,182 @@ func TestLedgerClientInstantiation(t *testing.T) {
 	assert.Equal(1, len(wrapper.ledgerClientWrapper.ledgerClients))
 	assert.Equal(1, len(wrapper.ledgerClientWrapper.ledgerClients["user1"]))
 	assert.Equal(client, wrapper.ledgerClientWrapper.ledgerClients["user1"]["default-channel"])
+
+	idcWrapper := wrapper.ledgerClientWrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.ledgerClientWrapper.ledgerClients["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.ledgerClientWrapper.ledgerClients["user1"])
+}
+
+func TestIdentityRegister(t *testing.T) {
+	assert := assert.New(t)
+
+	config := conf.RPCConf{
+		ConfigPath: tmpCCPFile,
+	}
+	rpc, idclient, err := RPCConnect(config, 5)
+	assert.NoError(err)
+	assert.NotNil(rpc)
+	assert.NotNil(idclient)
+
+	idcWrapper := idclient.(*idClientWrapper)
+	mockCAClient := mockfabricdep.CAClient{}
+	mockCAClient.On("Register", mock.Anything).Return("mysecret", nil)
+	idcWrapper.caClient = &mockCAClient
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/identities", strings.NewReader(`{"name":"user1","attributes":{"firstname":"John"}}`))
+	r.Header.Set("Content-Type", "application/json")
+
+	res, restErr := idclient.Register(w, r, httprouter.Params{})
+	assert.Empty(restErr)
+	assert.Equal("user1", res.Name)
+	assert.Equal("mysecret", res.Secret)
+}
+
+func TestIdentityModify(t *testing.T) {
+	assert := assert.New(t)
+
+	config := conf.RPCConf{
+		ConfigPath: tmpCCPFile,
+	}
+	rpc, idclient, err := RPCConnect(config, 5)
+	assert.NoError(err)
+	assert.NotNil(rpc)
+	assert.NotNil(idclient)
+
+	idcWrapper := idclient.(*idClientWrapper)
+	mockCAClient := mockfabricdep.CAClient{}
+	mockCAClient.On("ModifyIdentity", mock.Anything).Return(&mspApi.IdentityResponse{}, nil)
+	idcWrapper.caClient = &mockCAClient
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPut, "/identities/user1", strings.NewReader(`{"attributes":{"firstname":"John"}}`))
+	r.Header.Set("Content-Type", "application/json")
+
+	res, restErr := idclient.Modify(w, r, httprouter.Params{httprouter.Param{Key: "username", Value: "user1"}})
+	assert.Empty(restErr)
+	assert.Equal("user1", res.Name)
+}
+
+func TestIdentityEnroll(t *testing.T) {
+	assert := assert.New(t)
+
+	config := conf.RPCConf{
+		ConfigPath: tmpCCPFile,
+	}
+	rpc, idclient, err := RPCConnect(config, 5)
+	assert.NoError(err)
+	assert.NotNil(rpc)
+	assert.NotNil(idclient)
+
+	idcWrapper := idclient.(*idClientWrapper)
+	mockCAClient := mockfabricdep.CAClient{}
+	mockCAClient.On("Enroll", mock.Anything).Return(nil)
+	idcWrapper.caClient = &mockCAClient
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/identities/user1/enroll", strings.NewReader(`{"name":"user1","secret":"mysecret","attributes":{"firstname":true}}`))
+	r.Header.Set("Content-Type", "application/json")
+
+	res, restErr := idclient.Enroll(w, r, httprouter.Params{httprouter.Param{Key: "username", Value: "user1"}})
+	assert.Empty(restErr)
+	assert.Equal("user1", res.Name)
+	assert.Equal(true, res.Success)
+}
+
+func TestIdentityReenroll(t *testing.T) {
+	assert := assert.New(t)
+
+	config := conf.RPCConf{
+		ConfigPath: tmpCCPFile,
+	}
+	rpc, idclient, err := RPCConnect(config, 5)
+	assert.NoError(err)
+	assert.NotNil(rpc)
+	assert.NotNil(idclient)
+
+	idcWrapper := idclient.(*idClientWrapper)
+	mockCAClient := mockfabricdep.CAClient{}
+	mockCAClient.On("Reenroll", mock.Anything).Return(nil)
+	idcWrapper.caClient = &mockCAClient
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/identities/user1/reenroll", strings.NewReader(`{"secret":"mysecret","attributes":{"firstname":true}}`))
+	r.Header.Set("Content-Type", "application/json")
+
+	res, restErr := idclient.Reenroll(w, r, httprouter.Params{httprouter.Param{Key: "username", Value: "user1"}})
+	assert.Empty(restErr)
+	assert.Equal("user1", res.Name)
+	assert.Equal(true, res.Success)
+}
+
+func TestIdentityRevoke(t *testing.T) {
+	assert := assert.New(t)
+
+	config := conf.RPCConf{
+		ConfigPath: tmpCCPFile,
+	}
+	rpc, idclient, err := RPCConnect(config, 5)
+	assert.NoError(err)
+	assert.NotNil(rpc)
+	assert.NotNil(idclient)
+
+	idcWrapper := idclient.(*idClientWrapper)
+	mockCAClient := mockfabricdep.CAClient{}
+	mockCAClient.On("Revoke", mock.Anything).Return(&mspApi.RevocationResponse{
+		CRL: []byte("some bytes"),
+		RevokedCerts: []mspApi.RevokedCert{
+			{
+				Serial: "some-serial",
+				AKI:    "some-aki",
+			},
+		},
+	}, nil)
+	idcWrapper.caClient = &mockCAClient
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/identities/user1/revoke", strings.NewReader(`{"reason":"getting old"}`))
+	r.Header.Set("Content-Type", "application/json")
+
+	res, restErr := idclient.Revoke(w, r, httprouter.Params{httprouter.Param{Key: "username", Value: "user1"}})
+	assert.Empty(restErr)
+	assert.Equal([]byte("some bytes"), res.CRL)
+	assert.Equal(1, len(res.RevokedCerts))
+	assert.Equal("some-serial", res.RevokedCerts[0]["serial"])
+	assert.Equal("some-aki", res.RevokedCerts[0]["aki"])
+}
+
+func TestIdentityList(t *testing.T) {
+	assert := assert.New(t)
+
+	config := conf.RPCConf{
+		ConfigPath: tmpCCPFile,
+	}
+	rpc, idclient, err := RPCConnect(config, 5)
+	assert.NoError(err)
+	assert.NotNil(rpc)
+	assert.NotNil(idclient)
+
+	idcWrapper := idclient.(*idClientWrapper)
+	mockCAClient := mockfabricdep.CAClient{}
+	mockCAClient.On("GetAllIdentities", mock.Anything).Return([]*mspApi.IdentityResponse{
+		{
+			ID:     "user1",
+			CAName: "myca",
+		},
+	}, nil)
+	idcWrapper.caClient = &mockCAClient
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/identities", strings.NewReader(""))
+	r.Header.Set("Content-Type", "application/json")
+
+	res, restErr := idclient.List(w, r, httprouter.Params{})
+	assert.Empty(restErr)
+	assert.Equal(1, len(res))
+	assert.Equal("user1", res[0].Name)
+	assert.Equal("myca", res[0].CAName)
 }

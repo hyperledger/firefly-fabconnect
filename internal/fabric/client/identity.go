@@ -30,6 +30,7 @@ import (
 	mspImpl "github.com/hyperledger/fabric-sdk-go/pkg/msp"
 	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	"github.com/hyperledger/firefly-fabconnect/internal/fabric/dep"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest/identity"
 	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
 	"github.com/julienschmidt/httprouter"
@@ -48,7 +49,8 @@ func (p *identityManagerProvider) IdentityManager(orgName string) (msp.IdentityM
 type idClientWrapper struct {
 	identityConfig msp.IdentityConfig
 	identityMgr    msp.IdentityManager
-	caClient       mspApi.CAClient
+	caClient       dep.CAClient
+	listeners      []SignerUpdateListener
 }
 
 func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore) (*idClientWrapper, error) {
@@ -93,10 +95,12 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 	if err != nil {
 		return nil, errors.Errorf("CA Client creation failed. %s", err)
 	}
+	var listeners []SignerUpdateListener
 	idc := &idClientWrapper{
 		identityConfig: identityConfig,
 		identityMgr:    mgr,
 		caClient:       caClient,
+		listeners:      listeners,
 	}
 	return idc, nil
 }
@@ -226,6 +230,8 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 		Name:    enreq.Name,
 		Success: true,
 	}
+
+	w.notifySignerUpdate(username)
 	return &result, nil
 }
 
@@ -253,14 +259,16 @@ func (w *idClientWrapper) Reenroll(res http.ResponseWriter, req *http.Request, p
 
 	err = w.caClient.Reenroll(&input)
 	if err != nil {
-		log.Errorf("Failed to re-enroll user %s. %s", enreq.Name, err)
+		log.Errorf("Failed to re-enroll user %s. %s", username, err)
 		return nil, restutil.NewRestError(err.Error())
 	}
 
 	result := identity.IdentityResponse{
-		Name:    enreq.Name,
+		Name:    username,
 		Success: true,
 	}
+
+	w.notifySignerUpdate(username)
 	return &result, nil
 }
 
@@ -377,4 +385,14 @@ func (w *idClientWrapper) getCACert() ([]byte, error) {
 		return nil, err
 	}
 	return result.CAChain, nil
+}
+
+func (w *idClientWrapper) AddSignerUpdateListener(listener SignerUpdateListener) {
+	w.listeners = append(w.listeners, listener)
+}
+
+func (w *idClientWrapper) notifySignerUpdate(signer string) {
+	for _, listener := range w.listeners {
+		listener.SignerUpdated(signer)
+	}
 }

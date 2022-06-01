@@ -17,6 +17,8 @@
 package client
 
 import (
+	"sync"
+
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
@@ -36,15 +38,18 @@ type ledgerClientWrapper struct {
 	sdk                 *fabsdk.FabricSDK
 	idClient            IdentityClient
 	ledgerClientCreator ledgerClientCreator
+	mu                  sync.Mutex
 }
 
 func newLedgerClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *ledgerClientWrapper {
-	return &ledgerClientWrapper{
+	w := &ledgerClientWrapper{
 		sdk:                 sdk,
 		idClient:            idClient,
 		ledgerClients:       make(map[string]map[string]*ledger.Client),
 		ledgerClientCreator: createLedgerClient,
 	}
+	idClient.AddSignerUpdateListener(w)
+	return w
 }
 
 func (l *ledgerClientWrapper) queryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error) {
@@ -114,6 +119,7 @@ func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (
 }
 
 func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerClient *ledger.Client, err error) {
+	l.mu.Lock()
 	ledgerClientsForSigner := l.ledgerClients[signer]
 	if ledgerClientsForSigner == nil {
 		ledgerClientsForSigner = make(map[string]*ledger.Client)
@@ -128,7 +134,14 @@ func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerC
 		}
 		ledgerClientsForSigner[channelId] = ledgerClient
 	}
+	l.mu.Unlock()
 	return ledgerClient, nil
+}
+
+func (l *ledgerClientWrapper) SignerUpdated(signer string) {
+	l.mu.Lock()
+	l.ledgerClients[signer] = nil
+	l.mu.Unlock()
 }
 
 func createLedgerClient(channelProvider context.ChannelProvider, opts ...ledger.ClientOption) (*ledger.Client, error) {

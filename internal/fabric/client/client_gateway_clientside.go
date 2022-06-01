@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
@@ -45,10 +46,11 @@ type gwRPCWrapper struct {
 	gwGatewayClients map[string]map[string]*gateway.Network
 	// one channel client per signer per channel
 	gwChannelClients map[string]map[string]*channel.Client
+	mu               sync.Mutex
 }
 
 func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTimeout int, idClient IdentityClient, ledgerClientWrapper *ledgerClientWrapper, eventClientWrapper *eventClientWrapper) (RPCClient, error) {
-	return &gwRPCWrapper{
+	w := &gwRPCWrapper{
 		commonRPCWrapper: &commonRPCWrapper{
 			txTimeout:           txTimeout,
 			configProvider:      configProvider,
@@ -62,7 +64,10 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 		gwClients:        make(map[string]*gateway.Gateway),
 		gwGatewayClients: make(map[string]map[string]*gateway.Network),
 		gwChannelClients: make(map[string]map[string]*channel.Client),
-	}, nil
+	}
+
+	idClient.AddSignerUpdateListener(w)
+	return w, nil
 }
 
 func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error) {
@@ -127,6 +132,14 @@ func (w *gwRPCWrapper) Query(channelId, signer, chaincodeName, method string, ar
 	}
 }
 
+func (w *gwRPCWrapper) SignerUpdated(signer string) {
+	w.mu.Lock()
+	w.gwClients[signer] = nil
+	w.gwGatewayClients[signer] = nil
+	w.gwChannelClients[signer] = nil
+	w.mu.Unlock()
+}
+
 func (w *gwRPCWrapper) Close() error {
 	// the ledgerClientWrapper and the eventClientWrapper share the same sdk instance
 	// only need to close it from one of them
@@ -164,6 +177,7 @@ func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method 
 // channel clients for transactions are created with the gateway API, so that the internal handling of using
 // the discovery service and selecting the right set of endorsers are automated
 func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient *gateway.Network, err error) {
+	w.mu.Lock()
 	gatewayClientsForSigner := w.gwGatewayClients[signer]
 	if gatewayClientsForSigner == nil {
 		// no channel clients have been created for this signer at all
@@ -186,6 +200,7 @@ func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient
 		}
 		gatewayClientsForSigner[channelId] = gatewayClient
 	}
+	w.mu.Unlock()
 	return gatewayClient, nil
 }
 
@@ -193,6 +208,7 @@ func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient
 // peer to be the single peer that this fabconnect instance is attached to. This is more useful than trying to
 // do a "strong read" across multiple peers
 func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient *channel.Client, err error) {
+	w.mu.Lock()
 	channelClientsForSigner := w.gwChannelClients[signer]
 	if channelClientsForSigner == nil {
 		channelClientsForSigner = make(map[string]*channel.Client)
@@ -214,6 +230,7 @@ func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient
 		}
 		channelClientsForSigner[channelId] = channelClient
 	}
+	w.mu.Unlock()
 	return channelClient, nil
 }
 
