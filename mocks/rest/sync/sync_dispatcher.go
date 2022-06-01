@@ -26,6 +26,11 @@ func (_m *SyncDispatcher) GetBlock(res http.ResponseWriter, req *http.Request, p
 	_m.Called(res, req, params)
 }
 
+// GetBlockByTxId provides a mock function with given fields: res, req, params
+func (_m *SyncDispatcher) GetBlockByTxId(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	_m.Called(res, req, params)
+}
+
 // GetChainInfo provides a mock function with given fields: res, req, params
 func (_m *SyncDispatcher) GetChainInfo(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	_m.Called(res, req, params)

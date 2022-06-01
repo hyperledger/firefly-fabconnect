@@ -163,6 +163,13 @@ func TestCCPClientInstantiation(t *testing.T) {
 	assert.NotNil(client)
 	assert.Equal(1, len(wrapper.channelClients))
 	assert.Equal(1, len(wrapper.channelClients["default-channel"]))
+
+	idcWrapper := wrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.channelClients["default-channel"]["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.channelClients["default-channel"]["user1"])
 }
 
 func TestGatewayClientInstantiation(t *testing.T) {
@@ -193,6 +200,13 @@ func TestGatewayClientInstantiation(t *testing.T) {
 	assert.Equal(1, len(wrapper.gwGatewayClients))
 	assert.Equal(1, len(wrapper.gwGatewayClients["user1"]))
 	assert.Equal(client, wrapper.gwGatewayClients["user1"]["default-channel"])
+
+	idcWrapper := wrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.gwGatewayClients["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.gwGatewayClients["user1"])
 }
 
 func TestChannelClientInstantiation(t *testing.T) {
@@ -219,6 +233,13 @@ func TestChannelClientInstantiation(t *testing.T) {
 	assert.Equal(1, len(wrapper.gwChannelClients))
 	assert.Equal(1, len(wrapper.gwChannelClients["user1"]))
 	assert.Equal(client, wrapper.gwChannelClients["user1"]["default-channel"])
+
+	idcWrapper := wrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.gwChannelClients["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.gwChannelClients["user1"])
 }
 
 func TestEventClientInstantiation(t *testing.T) {
@@ -251,6 +272,13 @@ func TestEventClientInstantiation(t *testing.T) {
 	assert.Equal(client2, wrapper.eventClientWrapper.eventClients["user1"]["default-channel-chaincode-2"])
 
 	assert.NotEqual(fmt.Sprintf("%p", client1), fmt.Sprintf("%p", client2))
+
+	idcWrapper := wrapper.eventClientWrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.eventClientWrapper.eventClients["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.eventClientWrapper.eventClients["user1"])
 }
 
 func TestLedgerClientInstantiation(t *testing.T) {
@@ -274,4 +302,11 @@ func TestLedgerClientInstantiation(t *testing.T) {
 	assert.Equal(1, len(wrapper.ledgerClientWrapper.ledgerClients))
 	assert.Equal(1, len(wrapper.ledgerClientWrapper.ledgerClients["user1"]))
 	assert.Equal(client, wrapper.ledgerClientWrapper.ledgerClients["user1"]["default-channel"])
+
+	idcWrapper := wrapper.ledgerClientWrapper.idClient.(*idClientWrapper)
+	assert.Equal(3, len(idcWrapper.listeners))
+
+	assert.NotEmpty(wrapper.ledgerClientWrapper.ledgerClients["user1"])
+	idcWrapper.notifySignerUpdate("user1")
+	assert.Empty(wrapper.ledgerClientWrapper.ledgerClients["user1"])
 }

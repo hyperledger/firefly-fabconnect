@@ -21,6 +21,7 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
+	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	eventsapi "github.com/hyperledger/firefly-fabconnect/internal/events/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/fabric/utils"
 )
@@ -66,4 +67,20 @@ type RPCClient interface {
 type IdentityClient interface {
 	GetSigningIdentity(name string) (msp.SigningIdentity, error)
 	GetClientOrg() string
+	AddSignerUpdateListener(SignerUpdateListener)
+}
+
+type SignerUpdateListener interface {
+	SignerUpdated(signer string)
+}
+
+type CAClient interface {
+	Register(*mspApi.RegistrationRequest) (string, error)
+	ModifyIdentity(*mspApi.IdentityRequest) (*mspApi.IdentityResponse, error)
+	Enroll(*mspApi.EnrollmentRequest) error
+	Reenroll(*mspApi.ReenrollmentRequest) error
+	Revoke(*mspApi.RevocationRequest) (*mspApi.RevocationResponse, error)
+	GetAllIdentities(string) ([]*mspApi.IdentityResponse, error)
+	GetIdentity(string, string) (*mspApi.IdentityResponse, error)
+	GetCAInfo() (*mspApi.GetCAInfoResponse, error)
 }
