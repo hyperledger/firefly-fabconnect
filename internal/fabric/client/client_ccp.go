@@ -142,6 +142,7 @@ func (w *ccpRPCWrapper) SignerUpdated(signer string) {
 
 func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpClientWrapper, error) {
 	w.mu.Lock()
+	defer w.mu.Unlock()
 	id, err := w.idClient.GetSigningIdentity(signer)
 	if err == msp.ErrUserNotFound {
 		return nil, errors.Errorf("Signer %s does not exist", signer)
@@ -169,7 +170,6 @@ func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpC
 		w.channelClients[channelId][id.Identifier().ID] = newWrapper
 		clientOfUser = newWrapper
 	}
-	w.mu.Unlock()
 	return clientOfUser, nil
 }
 

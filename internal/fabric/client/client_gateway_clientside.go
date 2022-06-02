@@ -178,6 +178,7 @@ func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method 
 // the discovery service and selecting the right set of endorsers are automated
 func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient *gateway.Network, err error) {
 	w.mu.Lock()
+	defer w.mu.Unlock()
 	gatewayClientsForSigner := w.gwGatewayClients[signer]
 	if gatewayClientsForSigner == nil {
 		// no channel clients have been created for this signer at all
@@ -200,7 +201,6 @@ func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient
 		}
 		gatewayClientsForSigner[channelId] = gatewayClient
 	}
-	w.mu.Unlock()
 	return gatewayClient, nil
 }
 
@@ -209,6 +209,7 @@ func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient
 // do a "strong read" across multiple peers
 func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient *channel.Client, err error) {
 	w.mu.Lock()
+	defer w.mu.Unlock()
 	channelClientsForSigner := w.gwChannelClients[signer]
 	if channelClientsForSigner == nil {
 		channelClientsForSigner = make(map[string]*channel.Client)
@@ -230,7 +231,6 @@ func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient
 		}
 		channelClientsForSigner[channelId] = channelClient
 	}
-	w.mu.Unlock()
 	return channelClient, nil
 }
 

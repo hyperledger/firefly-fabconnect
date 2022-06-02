@@ -120,6 +120,7 @@ func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (
 
 func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerClient *ledger.Client, err error) {
 	l.mu.Lock()
+	defer l.mu.Unlock()
 	ledgerClientsForSigner := l.ledgerClients[signer]
 	if ledgerClientsForSigner == nil {
 		ledgerClientsForSigner = make(map[string]*ledger.Client)
@@ -134,7 +135,6 @@ func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerC
 		}
 		ledgerClientsForSigner[channelId] = ledgerClient
 	}
-	l.mu.Unlock()
 	return ledgerClient, nil
 }
 

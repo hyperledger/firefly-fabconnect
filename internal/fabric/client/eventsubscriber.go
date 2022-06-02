@@ -97,6 +97,7 @@ func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo,
 
 func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint64, chaincodeId string) (eventClient *event.Client, err error) {
 	e.mu.Lock()
+	defer e.mu.Unlock()
 	eventClientsForSigner := e.eventClients[signer]
 	if eventClientsForSigner == nil {
 		eventClientsForSigner = make(map[string]*event.Client)
@@ -120,7 +121,6 @@ func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint
 		}
 		eventClientsForSigner[key] = eventClient
 	}
-	e.mu.Unlock()
 	return eventClient, nil
 }
 
