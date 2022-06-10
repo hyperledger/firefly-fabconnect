@@ -34,11 +34,16 @@ import (
 // defined to allow mocking in tests
 type gatewayCreator func(core.ConfigProvider, string, int) (*gateway.Gateway, error)
 type networkCreator func(*gateway.Gateway, string) (*gateway.Network, error)
+type txPreparer func(*gwRPCWrapper, string, string, string, string) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error)
+type txSubmitter func(*gateway.Transaction, ...string) ([]byte, error)
 
 type gwRPCWrapper struct {
 	*commonRPCWrapper
-	gatewayCreator gatewayCreator
-	networkCreator networkCreator
+	gatewayCreator  gatewayCreator
+	networkCreator  networkCreator
+	txPreparer      txPreparer
+	txSubmitter     txSubmitter
+	txInitSubmitter txSubmitter
 	// networkCreator networkC
 	// one gateway client per signer
 	gwClients map[string]*gateway.Gateway
@@ -61,6 +66,9 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 		},
 		gatewayCreator:   createGateway,
 		networkCreator:   getNetwork,
+		txPreparer:       prepareTx,
+		txSubmitter:      submitTx,
+		txInitSubmitter:  submitInitTx,
 		gwClients:        make(map[string]*gateway.Gateway),
 		gwGatewayClients: make(map[string]map[string]*gateway.Network),
 		gwChannelClients: make(map[string]map[string]*channel.Client),
@@ -73,7 +81,7 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error) {
 	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelId, chaincodeName, method, isInit, args)
 
-	result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, false)
+	result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, isInit)
 	if err != nil {
 		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelId, chaincodeName, method, isInit, err)
 		return nil, err
@@ -148,17 +156,16 @@ func (w *gwRPCWrapper) Close() error {
 }
 
 func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method string, args []string, isInit bool) ([]byte, *fab.TxStatusEvent, error) {
-	channelClient, err := w.getGatewayClient(signer, channelId)
+	tx, notifier, err := w.txPreparer(w, signer, channelId, chaincodeName, method)
 	if err != nil {
 		return nil, nil, err
 	}
-	contractClient := channelClient.GetContract(chaincodeName)
-	tx, err := contractClient.CreateTransaction(method)
-	if err != nil {
-		return nil, nil, err
+	var result []byte
+	if isInit {
+		result, err = w.txInitSubmitter(tx, args...)
+	} else {
+		result, err = w.txSubmitter(tx, args...)
 	}
-	notifier := tx.RegisterCommitEvent()
-	result, err := tx.Submit(args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -240,4 +247,26 @@ func createGateway(configProvider core.ConfigProvider, signer string, txTimeout 
 
 func getNetwork(gateway *gateway.Gateway, channelId string) (*gateway.Network, error) {
 	return gateway.GetNetwork(channelId)
+}
+
+func prepareTx(w *gwRPCWrapper, signer, channelId, chaincodeName, method string) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
+	channelClient, err := w.getGatewayClient(signer, channelId)
+	if err != nil {
+		return nil, nil, err
+	}
+	contractClient := channelClient.GetContract(chaincodeName)
+	tx, err := contractClient.CreateTransaction(method)
+	if err != nil {
+		return nil, nil, err
+	}
+	notifier := tx.RegisterCommitEvent()
+	return tx, notifier, nil
+}
+
+func submitTx(tx *gateway.Transaction, args ...string) ([]byte, error) {
+	return tx.Submit(args...)
+}
+
+func submitInitTx(tx *gateway.Transaction, args ...string) ([]byte, error) {
+	return tx.SubmitInit(args...)
 }
