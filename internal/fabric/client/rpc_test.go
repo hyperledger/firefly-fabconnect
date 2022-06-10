@@ -32,6 +32,7 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/context"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
 	mspApi "github.com/hyperledger/fabric-sdk-go/pkg/msp/api"
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
@@ -134,6 +135,7 @@ func createMockChannelClient(channelProvider context.ChannelProvider) (*channel.
 }
 
 func createMockGateway(configProvider core.ConfigProvider, signer string, txTimeout int) (*gateway.Gateway, error) {
+
 	return &gateway.Gateway{}, nil
 }
 
@@ -213,6 +215,74 @@ func TestGatewayClientInstantiation(t *testing.T) {
 	assert.NotEmpty(wrapper.gwGatewayClients["user1"])
 	idcWrapper.notifySignerUpdate("user1")
 	assert.Empty(wrapper.gwGatewayClients["user1"])
+}
+
+func TestGatewayClientSendTx(t *testing.T) {
+	assert := assert.New(t)
+
+	config := conf.RPCConf{
+		UseGatewayClient: true,
+		ConfigPath:       tmpShortCCPFile,
+	}
+	rpc, idclient, err := RPCConnect(config, 5)
+	assert.NoError(err)
+	assert.NotNil(rpc)
+	assert.NotNil(idclient)
+
+	wrapper, ok := rpc.(*gwRPCWrapper)
+	assert.True(ok)
+	wrapper.gatewayCreator = createMockGateway
+	wrapper.networkCreator = createMockNetwork
+
+	mockPrepareTx := func(w *gwRPCWrapper, signer, channelId, chaincodeName, method string) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
+		notifier := make(chan *fab.TxStatusEvent)
+		go func() {
+			notifier <- &fab.TxStatusEvent{}
+		}()
+		return nil, notifier, nil
+	}
+	mockSubmitTx := func(tx *gateway.Transaction, args ...string) ([]byte, error) {
+		return []byte(""), nil
+	}
+	wrapper.txPreparer = mockPrepareTx
+	wrapper.txSubmitter = mockSubmitTx
+
+	_, _, err = wrapper.sendTransaction("signer1", "channel-1", "chaincode-1", "method-1", []string{"args-1"}, false)
+	assert.NoError(err)
+}
+
+func TestGatewayClientSendInitTx(t *testing.T) {
+	assert := assert.New(t)
+
+	config := conf.RPCConf{
+		UseGatewayClient: true,
+		ConfigPath:       tmpShortCCPFile,
+	}
+	rpc, idclient, err := RPCConnect(config, 5)
+	assert.NoError(err)
+	assert.NotNil(rpc)
+	assert.NotNil(idclient)
+
+	wrapper, ok := rpc.(*gwRPCWrapper)
+	assert.True(ok)
+	wrapper.gatewayCreator = createMockGateway
+	wrapper.networkCreator = createMockNetwork
+
+	mockPrepareTx := func(w *gwRPCWrapper, signer, channelId, chaincodeName, method string) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
+		notifier := make(chan *fab.TxStatusEvent)
+		go func() {
+			notifier <- &fab.TxStatusEvent{}
+		}()
+		return nil, notifier, nil
+	}
+	mockSubmitInitTx := func(tx *gateway.Transaction, args ...string) ([]byte, error) {
+		return []byte(""), nil
+	}
+	wrapper.txPreparer = mockPrepareTx
+	wrapper.txInitSubmitter = mockSubmitInitTx
+
+	_, _, err = wrapper.sendTransaction("signer1", "channel-1", "chaincode-1", "method-1", []string{"args-1"}, true)
+	assert.NoError(err)
 }
 
 func TestChannelClientInstantiation(t *testing.T) {
