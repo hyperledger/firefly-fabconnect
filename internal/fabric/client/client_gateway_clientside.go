@@ -73,7 +73,7 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error) {
 	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelId, chaincodeName, method, isInit, args)
 
-	result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, false)
+	result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, isInit)
 	if err != nil {
 		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelId, chaincodeName, method, isInit, err)
 		return nil, err
@@ -158,7 +158,12 @@ func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method 
 		return nil, nil, err
 	}
 	notifier := tx.RegisterCommitEvent()
-	result, err := tx.Submit(args...)
+	var result []byte
+	if isInit {
+		result, err = tx.SubmitInit(args...)
+	} else {
+		result, err = tx.Submit(args...)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
