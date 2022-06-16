@@ -51,5 +51,3 @@ require (
 )
 
 replace google.golang.org/grpc => google.golang.org/grpc v1.29.0
-
-replace github.com/hyperledger/fabric-sdk-go => github.com/kaleido-io/fabric-sdk-go v1.0.1-0.20220610141558-4cdb9535ce4b
