@@ -234,7 +234,7 @@ func TestGatewayClientSendTx(t *testing.T) {
 	wrapper.gatewayCreator = createMockGateway
 	wrapper.networkCreator = createMockNetwork
 
-	mockPrepareTx := func(w *gwRPCWrapper, signer, channelId, chaincodeName, method string) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
+	mockPrepareTx := func(w *gwRPCWrapper, signer, channelId, chaincodeName, method string, isInit bool) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
 		notifier := make(chan *fab.TxStatusEvent)
 		go func() {
 			notifier <- &fab.TxStatusEvent{}
@@ -268,18 +268,18 @@ func TestGatewayClientSendInitTx(t *testing.T) {
 	wrapper.gatewayCreator = createMockGateway
 	wrapper.networkCreator = createMockNetwork
 
-	mockPrepareTx := func(w *gwRPCWrapper, signer, channelId, chaincodeName, method string) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
+	mockPrepareTx := func(w *gwRPCWrapper, signer, channelId, chaincodeName, method string, isInit bool) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
 		notifier := make(chan *fab.TxStatusEvent)
 		go func() {
 			notifier <- &fab.TxStatusEvent{}
 		}()
 		return nil, notifier, nil
 	}
-	mockSubmitInitTx := func(tx *gateway.Transaction, args ...string) ([]byte, error) {
+	mockSubmitTx := func(tx *gateway.Transaction, args ...string) ([]byte, error) {
 		return []byte(""), nil
 	}
 	wrapper.txPreparer = mockPrepareTx
-	wrapper.txInitSubmitter = mockSubmitInitTx
+	wrapper.txSubmitter = mockSubmitTx
 
 	_, _, err = wrapper.sendTransaction("signer1", "channel-1", "chaincode-1", "method-1", []string{"args-1"}, true)
 	assert.NoError(err)
