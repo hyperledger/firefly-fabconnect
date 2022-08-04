@@ -19,6 +19,7 @@ package util
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -385,22 +386,42 @@ func processArgs(body map[string]interface{}) ([]string, error) {
 			}
 			entry := argsMap[name.(string)]
 
+			var entryStringValue string
+
+			propType := itemDef["type"].(string)
+
+			// If the type isn't string or object then it needs to be unmarshalled from JSON format
+			if propType != "string" && propType != "object" {
+				entryStringValue, ok = entry.(string)
+
+				if !ok {
+					return nil, errors.New("Invalid object passed")
+				}
+
+				err := json.Unmarshal([]byte(entryStringValue), &entry)
+
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			// validate the args entry against the schema, matching by "name"
 			err := validate(itemDef, name.(string), entry)
 			if err != nil {
 				return nil, err
 			}
 
-			propType := itemDef["type"].(string)
 			if propType == "object" {
 				encoded, _ := json.Marshal(entry)
 				args[i] = string(encoded)
-			} else {
+			} else if propType == "string" {
 				strVal, ok := entry.(string)
 				if !ok {
-					return nil, fmt.Errorf("top level argument properties in the payload schema must be string values or objects")
+					return nil, fmt.Errorf("argument property %q of type %q could not be converted to a string", name, propType)
 				}
 				args[i] = strVal
+			} else {
+				args[i] = entryStringValue
 			}
 		}
 	} else {
