@@ -244,46 +244,6 @@ var payloadPinBatchAsString = `{
 	}
 }`
 
-var payloadPinBatchAsArray = `{
-	"headers": {
-		"type": "",
-		"payloadSchema": {
-			"type": "array",
-			"prefixItems": [
-				{
-					"name": "uuids",
-					"type": "string"
-				},
-				{
-					"name": "batchHash",
-					"type": "string"
-				},
-				{
-					"name": "payloadRef",
-					"type": "string"
-				},
-				{
-					"name": "contexts",
-					"type": "array",
-					"items": {
-						"type": "string"
-					}
-				}
-			]
-		},
-		"signer": "signer001",
-		"channel": "firefly",
-		"chaincode": "simplestorage"
-	},
-	"func": "PinBatch",
-	"args": {
-		"batchHash": "0x310a7b9a570eee114f7eb911c914a76c553541a43cfcb7da5f02a01fcba917e6",
-		"contexts": "[\"0x2f87013b99fff4d8083acb8c6b9dff4e045cf58a8a3383201a6c7a1f2f4e71be\",\"0xb9deaaf95ad150198f074a058980bef204a307d712e3b484ee4210b3cd0a491b\"]",
-		"payloadRef": "Qmf412jQZiuVUtdgnB36FXFX7xg5V6KEbSJ4dpQuhkLyfD",
-		"uuids": "0x9ffc50ff6bfe4502adc793aea54cc059c5df767cfe444e038eb51c5523097db5"
-	}
-}`
-
 var payloadTypesCheck = `{
 	"headers": {
 		"type": "",
@@ -607,9 +567,9 @@ func TestProcessArgsTypesInvalidStringArray(t *testing.T) {
 func TestProcessArgsTypesInvalidNumberArray(t *testing.T) {
 	assert := assert.New(t)
 	body := make(map[string]interface{})
-	err := json.Unmarshal([]byte(payloadTypesInvalidNumberArray), &body)
+	_ = json.Unmarshal([]byte(payloadTypesInvalidNumberArray), &body)
 
-	_, err = processArgs(body)
+	_, err := processArgs(body)
 	assert.ErrorContains(err, "Expected: number, given: string")
 }
 
