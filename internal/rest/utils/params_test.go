@@ -207,6 +207,194 @@ var payloadSimpleSchemaBadValue = `{
 	}
 }`
 
+var payloadPinBatchAsString = `{
+	"headers": {
+		"type": "",
+		"payloadSchema": {
+			"type": "array",
+			"prefixItems": [
+				{
+					"name": "uuids",
+					"type": "string"
+				},
+				{
+					"name": "batchHash",
+					"type": "string"
+				},
+				{
+					"name": "payloadRef",
+					"type": "string"
+				},
+				{
+					"name": "contexts",
+					"type": "string"
+				}
+			]
+		},
+		"signer": "signer001",
+		"channel": "firefly",
+		"chaincode": "simplestorage"
+	},
+	"func": "PinBatch",
+	"args": {
+		"batchHash": "0x310a7b9a570eee114f7eb911c914a76c553541a43cfcb7da5f02a01fcba917e6",
+		"contexts": "[\"0x2f87013b99fff4d8083acb8c6b9dff4e045cf58a8a3383201a6c7a1f2f4e71be\",\"0xb9deaaf95ad150198f074a058980bef204a307d712e3b484ee4210b3cd0a491b\"]",
+		"payloadRef": "Qmf412jQZiuVUtdgnB36FXFX7xg5V6KEbSJ4dpQuhkLyfD",
+		"uuids": "0x9ffc50ff6bfe4502adc793aea54cc059c5df767cfe444e038eb51c5523097db5"
+	}
+}`
+
+var payloadTypesCheck = `{
+	"headers": {
+		"type": "",
+		"payloadSchema": {
+			"type": "array",
+			"prefixItems": [
+				{
+					"name": "string",
+					"type": "string"
+				},
+				{
+					"name": "number",
+					"type": "number"
+				},
+				{
+					"name": "integer",
+					"type": "integer"
+				},
+				{
+					"name": "boolean",
+					"type": "boolean"
+				},
+				{
+					"name": "stringArray",
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				{
+					"name": "numberArray",
+					"type": "array",
+					"items": {
+						"type": "number"
+					}
+				},
+				{
+					"name": "integerArray",
+					"type": "array",
+					"items": {
+						"type": "number"
+					}
+				},
+				{
+					"name": "booleanArray",
+					"type": "array",
+					"items": {
+						"type": "boolean"
+					}
+				}
+			]
+		}
+	},
+	"func": "TestTypes",
+	"args": {
+		"string": "abc",
+		"number": "3.14",
+		"integer": "42",
+		"boolean": "true",
+		"stringArray": "[\"def\",\"ghi\"]",
+		"numberArray": "[3.14,6.28,9.42]",
+		"integerArray": "[0,1,1,2,3,5,8]",
+		"booleanArray": "[true,false,true,false]"
+	}
+}`
+
+var payloadTypesInvalidInteger = `{
+	"headers": {
+		"type": "",
+		"payloadSchema": {
+			"type": "array",
+			"prefixItems": [
+				{
+					"name": "invalidInteger",
+					"type": "integer"
+				}
+			]
+		}
+	},
+	"func": "TestTypes",
+	"args": {
+		"invalidInteger": "3.14"
+	}
+}`
+
+var payloadTypesInvalidStringArray = `{
+	"headers": {
+		"type": "",
+		"payloadSchema": {
+			"type": "array",
+			"prefixItems": [
+				{
+					"name": "invalidStringArray",
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				}
+			]
+		}
+	},
+	"func": "TestTypes",
+	"args": {
+		"invalidStringArray": "[\"def\",123,\"ghi\"]"
+	}
+}`
+
+var payloadTypesInvalidNumberArray = `{
+	"headers": {
+		"type": "",
+		"payloadSchema": {
+			"type": "array",
+			"prefixItems": [
+				{
+					"name": "invalidNumberArray",
+					"type": "array",
+					"items": {
+						"type": "number"
+					}
+				}
+			]
+		}
+	},
+	"func": "TestTypes",
+	"args": {
+		"invalidNumberArray": "[3.14,\"foo\",9.42]"
+	}
+}`
+
+var payloadTypesInvalidIntegerArray = `{
+	"headers": {
+		"type": "",
+		"payloadSchema": {
+			"type": "array",
+			"prefixItems": [
+				{
+					"name": "invalidIntegerArray",
+					"type": "array",
+					"items": {
+						"type": "integer"
+					}
+				}
+			]
+		}
+	},
+	"func": "TestTypes",
+	"args": {
+		"invalidIntegerArray": "[0,1,1,\"bar\",3,5,8]"
+	}
+}`
+
 func TestProcessArgsNotSchema(t *testing.T) {
 	assert := assert.New(t)
 	body := make(map[string]interface{})
@@ -307,4 +495,89 @@ func TestProcessArgsBadValue(t *testing.T) {
 
 	_, err := processArgs(body)
 	assert.EqualError(err, "failed to validate argument \"id\": - (root): Invalid type. Expected: string, given: integer\n")
+}
+
+func TestProcessArgsPinBatchAsString(t *testing.T) {
+	assert := assert.New(t)
+	body := make(map[string]interface{})
+	_ = json.Unmarshal([]byte(payloadPinBatchAsString), &body)
+
+	args, err := processArgs(body)
+	assert.NoError(err)
+	assert.Equal(args, []string{
+		"0x9ffc50ff6bfe4502adc793aea54cc059c5df767cfe444e038eb51c5523097db5",
+		"0x310a7b9a570eee114f7eb911c914a76c553541a43cfcb7da5f02a01fcba917e6",
+		"Qmf412jQZiuVUtdgnB36FXFX7xg5V6KEbSJ4dpQuhkLyfD",
+		"[\"0x2f87013b99fff4d8083acb8c6b9dff4e045cf58a8a3383201a6c7a1f2f4e71be\",\"0xb9deaaf95ad150198f074a058980bef204a307d712e3b484ee4210b3cd0a491b\"]",
+	})
+}
+
+func TestProcessArgsPinBatchAsArray(t *testing.T) {
+	assert := assert.New(t)
+	body := make(map[string]interface{})
+	_ = json.Unmarshal([]byte(payloadPinBatchAsString), &body)
+
+	args, err := processArgs(body)
+	assert.NoError(err)
+	assert.Equal(args, []string{
+		"0x9ffc50ff6bfe4502adc793aea54cc059c5df767cfe444e038eb51c5523097db5",
+		"0x310a7b9a570eee114f7eb911c914a76c553541a43cfcb7da5f02a01fcba917e6",
+		"Qmf412jQZiuVUtdgnB36FXFX7xg5V6KEbSJ4dpQuhkLyfD",
+		"[\"0x2f87013b99fff4d8083acb8c6b9dff4e045cf58a8a3383201a6c7a1f2f4e71be\",\"0xb9deaaf95ad150198f074a058980bef204a307d712e3b484ee4210b3cd0a491b\"]",
+	})
+}
+
+func TestProcessArgsTypes(t *testing.T) {
+	assert := assert.New(t)
+	body := make(map[string]interface{})
+	_ = json.Unmarshal([]byte(payloadTypesCheck), &body)
+
+	args, err := processArgs(body)
+	assert.NoError(err)
+	assert.Equal(args, []string{
+		"abc",
+		"3.14",
+		"42",
+		"true",
+		"[\"def\",\"ghi\"]",
+		"[3.14,6.28,9.42]",
+		"[0,1,1,2,3,5,8]",
+		"[true,false,true,false]",
+	})
+}
+
+func TestProcessArgsTypesInvalidInteger(t *testing.T) {
+	assert := assert.New(t)
+	body := make(map[string]interface{})
+	_ = json.Unmarshal([]byte(payloadTypesInvalidInteger), &body)
+
+	_, err := processArgs(body)
+	assert.ErrorContains(err, "Expected: integer, given: number")
+}
+
+func TestProcessArgsTypesInvalidStringArray(t *testing.T) {
+	assert := assert.New(t)
+	body := make(map[string]interface{})
+	_ = json.Unmarshal([]byte(payloadTypesInvalidStringArray), &body)
+
+	_, err := processArgs(body)
+	assert.ErrorContains(err, "Expected: string, given: integer")
+}
+
+func TestProcessArgsTypesInvalidNumberArray(t *testing.T) {
+	assert := assert.New(t)
+	body := make(map[string]interface{})
+	_ = json.Unmarshal([]byte(payloadTypesInvalidNumberArray), &body)
+
+	_, err := processArgs(body)
+	assert.ErrorContains(err, "Expected: number, given: string")
+}
+
+func TestProcessArgsTypesInvalidIntegerArray(t *testing.T) {
+	assert := assert.New(t)
+	body := make(map[string]interface{})
+	_ = json.Unmarshal([]byte(payloadTypesInvalidIntegerArray), &body)
+
+	_, err := processArgs(body)
+	assert.ErrorContains(err, "Expected: integer, given: string")
 }
