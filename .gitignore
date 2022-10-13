@@ -17,3 +17,10 @@ firefly-fabconnect
 fabconnect
 fabconnect-nocgo
 coverage.txt
+
+ # Others
+/.vscode/
+/.idea/
+
+# Dependency directories (remove the comment below to include it)
+vendor/*
