@@ -301,6 +301,14 @@ func BuildTxMessage(res http.ResponseWriter, req *http.Request, params httproute
 		return nil, nil, NewRestError(err.Error(), 400)
 	}
 	msg.Args = argsVal
+	transientMap := body["transientMap"]
+	if transientMap != nil {
+		tmpMap := transientMap.(map[string]interface{})
+		msg.TransientMap = make(map[string]string, len(tmpMap))
+		for k, v := range tmpMap {
+			msg.TransientMap[k] = v.(string)
+		}
+	}
 
 	opts := TxOpts{}
 	opts.Sync = true

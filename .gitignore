@@ -17,6 +17,7 @@ firefly-fabconnect
 fabconnect
 fabconnect-nocgo
 coverage.txt
+__debug_bin
 
  # Others
 /.vscode/

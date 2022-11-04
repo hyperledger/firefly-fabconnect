@@ -36,6 +36,7 @@ type Tx struct {
 	IsInit        bool
 	Function      string
 	Args          []string
+	TransientMap  map[string]string
 	Hash          string
 	Receipt       *client.TxReceipt
 	Signer        string
@@ -48,6 +49,7 @@ func NewSendTx(msg *messages.SendTransaction, signer string) *Tx {
 		IsInit:        msg.IsInit,
 		Function:      msg.Function,
 		Args:          msg.Args,
+		TransientMap:  msg.TransientMap,
 		Signer:        msg.Headers.Signer,
 	}
 }
@@ -66,7 +68,7 @@ func (tx *Tx) Send(ctx context.Context, rpc client.RPCClient) error {
 
 	var receipt *client.TxReceipt
 	var err error
-	receipt, err = rpc.Invoke(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args, tx.IsInit)
+	receipt, err = rpc.Invoke(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args, tx.TransientMap, tx.IsInit)
 	tx.lock.Lock()
 	tx.Receipt = receipt
 	tx.lock.Unlock()

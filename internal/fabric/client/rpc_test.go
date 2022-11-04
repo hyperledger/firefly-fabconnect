@@ -241,13 +241,15 @@ func TestGatewayClientSendTx(t *testing.T) {
 		}()
 		return nil, notifier, nil
 	}
-	mockSubmitTx := func(tx *gateway.Transaction, args ...string) ([]byte, error) {
+	mockSubmitTx := func(tx *gateway.Transaction, transientMap map[string][]byte, args ...string) ([]byte, error) {
 		return []byte(""), nil
 	}
 	wrapper.txPreparer = mockPrepareTx
 	wrapper.txSubmitter = mockSubmitTx
 
-	_, _, err = wrapper.sendTransaction("signer1", "channel-1", "chaincode-1", "method-1", []string{"args-1"}, false)
+	testmap := make(map[string]string)
+	testmap["entry-1"] = "value-1"
+	_, _, err = wrapper.sendTransaction("signer1", "channel-1", "chaincode-1", "method-1", []string{"args-1"}, testmap, false)
 	assert.NoError(err)
 }
 
@@ -275,13 +277,15 @@ func TestGatewayClientSendInitTx(t *testing.T) {
 		}()
 		return nil, notifier, nil
 	}
-	mockSubmitTx := func(tx *gateway.Transaction, args ...string) ([]byte, error) {
+	mockSubmitTx := func(tx *gateway.Transaction, transientMap map[string][]byte, args ...string) ([]byte, error) {
 		return []byte(""), nil
 	}
 	wrapper.txPreparer = mockPrepareTx
 	wrapper.txSubmitter = mockSubmitTx
 
-	_, _, err = wrapper.sendTransaction("signer1", "channel-1", "chaincode-1", "method-1", []string{"args-1"}, true)
+	testmap := make(map[string]string)
+	testmap["entry-1"] = "value-1"
+	_, _, err = wrapper.sendTransaction("signer1", "channel-1", "chaincode-1", "method-1", []string{"args-1"}, testmap, true)
 	assert.NoError(err)
 }
 

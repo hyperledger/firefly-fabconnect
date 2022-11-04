@@ -79,10 +79,18 @@ func newReceipt(responsePayload []byte, status *fab.TxStatusEvent, signerID *msp
 	}
 }
 
-func convert(args []string) [][]byte {
+func convertStringArray(args []string) [][]byte {
 	result := [][]byte{}
 	for _, v := range args {
 		result = append(result, []byte(v))
+	}
+	return result
+}
+
+func convertStringMap(_map map[string]string) map[string][]byte {
+	result := make(map[string][]byte, len(_map))
+	for k, v := range _map {
+		result[k] = []byte(v)
 	}
 	return result
 }

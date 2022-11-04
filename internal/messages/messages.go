@@ -122,9 +122,10 @@ type GetBlockByTxId struct {
 // SendTransaction message instructs the bridge to install a contract
 type SendTransaction struct {
 	RequestCommon
-	IsInit   bool     `json:"init"`
-	Function string   `json:"func"`
-	Args     []string `json:"args,omitempty"`
+	IsInit       bool              `json:"init"`
+	Function     string            `json:"func"`
+	Args         []string          `json:"args,omitempty"`
+	TransientMap map[string]string `json:"transientMap,omitempty"`
 }
 
 // DeployChaincode message instructs the bridge to install a contract

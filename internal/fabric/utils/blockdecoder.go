@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"strconv"
+	"time"
 
 	"github.com/golang/protobuf/proto" //nolint
 	"github.com/hyperledger/fabric-protos-go/common"
@@ -204,7 +205,7 @@ func (block *RawBlock) decodePayloadHeader(header *common.Header, _header *Paylo
 	}
 	_channelHeader.ChannelId = channelHeader.ChannelId
 	_channelHeader.Epoch = strconv.FormatUint(channelHeader.Epoch, 10)
-	_channelHeader.Timestamp = channelHeader.Timestamp.AsTime().UnixNano()
+	_channelHeader.Timestamp = time.Unix(channelHeader.Timestamp.GetSeconds(), int64(channelHeader.Timestamp.GetNanos())).UnixNano()
 	_channelHeader.TxId = channelHeader.TxId
 	_channelHeader.Type = common.HeaderType_name[channelHeader.Type]
 	_channelHeader.Version = int(channelHeader.Version)
