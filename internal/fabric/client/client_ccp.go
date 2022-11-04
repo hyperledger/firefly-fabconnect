@@ -82,10 +82,10 @@ func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, user
 	return w, nil
 }
 
-func (w *ccpRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error) {
+func (w *ccpRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*TxReceipt, error) {
 	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelId, chaincodeName, method, isInit, args)
 
-	signerID, result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, isInit)
+	signerID, result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, transientMap, isInit)
 	if err != nil {
 		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelId, chaincodeName, method, isInit, err)
 		return nil, err
@@ -107,7 +107,7 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 	req := channel.Request{
 		ChaincodeID: chaincodeName,
 		Fcn:         method,
-		Args:        convert(args),
+		Args:        convertStringArray(args),
 	}
 
 	var result channel.Response
@@ -178,7 +178,7 @@ func (w *ccpRPCWrapper) Close() error {
 	return nil
 }
 
-func (w *ccpRPCWrapper) sendTransaction(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*msp.IdentityIdentifier, []byte, *fab.TxStatusEvent, error) {
+func (w *ccpRPCWrapper) sendTransaction(channelId, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*msp.IdentityIdentifier, []byte, *fab.TxStatusEvent, error) {
 	client, err := w.getChannelClient(channelId, signer)
 	if err != nil {
 		return nil, nil, nil, errors.Errorf("Failed to get channel client. %s", err)
@@ -197,10 +197,11 @@ func (w *ccpRPCWrapper) sendTransaction(channelId, signer, chaincodeName, method
 	result, err := client.channelClient.InvokeHandler(
 		handlerChain,
 		channel.Request{
-			ChaincodeID: chaincodeName,
-			Fcn:         method,
-			Args:        convert(args),
-			IsInit:      isInit,
+			ChaincodeID:  chaincodeName,
+			Fcn:          method,
+			Args:         convertStringArray(args),
+			TransientMap: convertStringMap(transientMap),
+			IsInit:       isInit,
 		},
 		channel.WithRetry(retry.DefaultChannelOpts),
 	)

@@ -52,7 +52,7 @@ type RegistrationWrapper struct {
 }
 
 type RPCClient interface {
-	Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error)
+	Invoke(channelId, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*TxReceipt, error)
 	Query(channelId, signer, chaincodeName, method string, args []string, strongread bool) ([]byte, error)
 	QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error)
 	QueryBlock(channelId string, signer string, blocknumber uint64, blockhash []byte) (*utils.RawBlock, *utils.Block, error)

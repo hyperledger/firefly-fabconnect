@@ -41,7 +41,7 @@ func MockRPCClient(fromBlock string, withReset ...bool) *mockfabric.RPCClient {
 		},
 	}
 	tx1 := &utils.Transaction{
-		Timestamp: int64(1000000),
+		Timestamp: 1000000,
 		TxId:      "3144a3ad43dcc11374832bbb71561320de81fd80d69cc8e26a9ea7d3240a5e84",
 	}
 	block := &utils.Block{

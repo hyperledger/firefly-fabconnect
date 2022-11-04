@@ -174,7 +174,7 @@ func (block *RawBlock) decodePayload(payload *common.Payload, _payload *Payload)
 		}
 		for _, action := range _payloadData.Actions {
 			if action.Payload.Action.ProposalResponsePayload.Extension.Events != nil {
-				action.Payload.Action.ProposalResponsePayload.Extension.Events.Timestamp = strconv.FormatInt(timestamp, 10)
+				action.Payload.Action.ProposalResponsePayload.Extension.Events.Timestamp = strconv.Itoa(int(timestamp))
 			}
 		}
 		return _transaction, nil
@@ -204,7 +204,7 @@ func (block *RawBlock) decodePayloadHeader(header *common.Header, _header *Paylo
 	}
 	_channelHeader.ChannelId = channelHeader.ChannelId
 	_channelHeader.Epoch = strconv.FormatUint(channelHeader.Epoch, 10)
-	_channelHeader.Timestamp = channelHeader.Timestamp.AsTime().UnixNano()
+	_channelHeader.Timestamp = channelHeader.Timestamp.GetNanos()
 	_channelHeader.TxId = channelHeader.TxId
 	_channelHeader.Type = common.HeaderType_name[channelHeader.Type]
 	_channelHeader.Version = int(channelHeader.Version)

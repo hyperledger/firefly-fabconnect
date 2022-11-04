@@ -32,13 +32,13 @@ func (_m *RPCClient) Close() error {
 	return r0
 }
 
-// Invoke provides a mock function with given fields: channelId, signer, chaincodeName, method, args, isInit
-func (_m *RPCClient) Invoke(channelId string, signer string, chaincodeName string, method string, args []string, isInit bool) (*client.TxReceipt, error) {
-	ret := _m.Called(channelId, signer, chaincodeName, method, args, isInit)
+// Invoke provides a mock function with given fields: channelId, signer, chaincodeName, method, args, transientMap, isInit
+func (_m *RPCClient) Invoke(channelId string, signer string, chaincodeName string, method string, args []string, transientMap map[string]string, isInit bool) (*client.TxReceipt, error) {
+	ret := _m.Called(channelId, signer, chaincodeName, method, args, transientMap, isInit)
 
 	var r0 *client.TxReceipt
-	if rf, ok := ret.Get(0).(func(string, string, string, string, []string, bool) *client.TxReceipt); ok {
-		r0 = rf(channelId, signer, chaincodeName, method, args, isInit)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, []string, map[string]string, bool) *client.TxReceipt); ok {
+		r0 = rf(channelId, signer, chaincodeName, method, args, transientMap, isInit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*client.TxReceipt)
@@ -46,8 +46,8 @@ func (_m *RPCClient) Invoke(channelId string, signer string, chaincodeName strin
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string, string, string, []string, bool) error); ok {
-		r1 = rf(channelId, signer, chaincodeName, method, args, isInit)
+	if rf, ok := ret.Get(1).(func(string, string, string, string, []string, map[string]string, bool) error); ok {
+		r1 = rf(channelId, signer, chaincodeName, method, args, transientMap, isInit)
 	} else {
 		r1 = ret.Error(1)
 	}

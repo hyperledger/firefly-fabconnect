@@ -35,7 +35,7 @@ import (
 type gatewayCreator func(core.ConfigProvider, string, int) (*gateway.Gateway, error)
 type networkCreator func(*gateway.Gateway, string) (*gateway.Network, error)
 type txPreparer func(*gwRPCWrapper, string, string, string, string, bool) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error)
-type txSubmitter func(*gateway.Transaction, ...string) ([]byte, error)
+type txSubmitter func(*gateway.Transaction, map[string][]byte, ...string) ([]byte, error)
 
 type gwRPCWrapper struct {
 	*commonRPCWrapper
@@ -76,10 +76,10 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 	return w, nil
 }
 
-func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, isInit bool) (*TxReceipt, error) {
+func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*TxReceipt, error) {
 	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelId, chaincodeName, method, isInit, args)
 
-	result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, isInit)
+	result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, transientMap, isInit)
 	if err != nil {
 		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelId, chaincodeName, method, isInit, err)
 		return nil, err
@@ -121,7 +121,7 @@ func (w *gwRPCWrapper) Query(channelId, signer, chaincodeName, method string, ar
 			return nil, err
 		}
 
-		bytes := convert(args)
+		bytes := convertStringArray(args)
 		req := channel.Request{
 			ChaincodeID: chaincodeName,
 			Fcn:         method,
@@ -153,12 +153,14 @@ func (w *gwRPCWrapper) Close() error {
 	return nil
 }
 
-func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method string, args []string, isInit bool) ([]byte, *fab.TxStatusEvent, error) {
+func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) ([]byte, *fab.TxStatusEvent, error) {
 	tx, notifier, err := w.txPreparer(w, signer, channelId, chaincodeName, method, isInit)
 	if err != nil {
 		return nil, nil, err
 	}
-	result, err := w.txSubmitter(tx, args...)
+	var result []byte
+	convertedMap := convertStringMap(transientMap)
+	result, err = w.txSubmitter(tx, convertedMap, args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -261,6 +263,6 @@ func prepareTx(w *gwRPCWrapper, signer, channelId, chaincodeName, method string,
 	return tx, notifier, nil
 }
 
-func submitTx(tx *gateway.Transaction, args ...string) ([]byte, error) {
-	return tx.Submit(args...)
+func submitTx(tx *gateway.Transaction, transientMap map[string][]byte, args ...string) ([]byte, error) {
+	return tx.SubmitWithTransientMap(transientMap, args...)
 }

@@ -69,7 +69,7 @@ type EventEntry struct {
 	EventIndex       int         `json:"eventIndex"`
 	EventName        string      `json:"eventName"`
 	Payload          interface{} `json:"payload"`
-	Timestamp        int64       `json:"timestamp,omitempty"`
+	Timestamp        int32       `json:"timestamp,omitempty"`
 	SubID            string      `json:"subId"`
 }
 
