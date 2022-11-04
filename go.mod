@@ -14,7 +14,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hyperledger/fabric-config v0.0.7 // indirect
 	github.com/hyperledger/fabric-protos-go v0.0.0-20211118165945-23d738fc3553
-	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20220510182741-7a94fbc3efed
+	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20220617091732-e170b98fa821
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/klauspost/compress v1.13.5 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
@@ -51,5 +51,3 @@ require (
 )
 
 replace google.golang.org/grpc => google.golang.org/grpc v1.29.0
-
-replace github.com/hyperledger/fabric-sdk-go => github.com/kaleido-io/fabric-sdk-go v1.0.1-0.20220610141558-4cdb9535ce4b
