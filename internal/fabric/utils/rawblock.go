@@ -50,7 +50,7 @@ type PayloadHeader struct {
 type ChannelHeader struct {
 	ChannelId string `json:"channel_id"`
 	Epoch     string `json:"epoch"`
-	Timestamp int32  `json:"timestamp"`
+	Timestamp int64  `json:"timestamp"`
 	TxId      string `json:"tx_id"`
 	Type      string `json:"type"`
 	Version   int    `json:"version"`

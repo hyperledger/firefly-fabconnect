@@ -375,7 +375,7 @@ func TestProcessEventsEnd2EndWebhook(t *testing.T) {
 		e2s := <-eventStream
 		assert.Equal(1, len(e2s))
 		assert.Equal(uint64(10), e2s[0].BlockNumber)
-		assert.Equal(int32(1000000), e2s[0].Timestamp)
+		assert.Equal(int64(1000000), e2s[0].Timestamp)
 		wg.Done()
 	}()
 	wg.Wait()

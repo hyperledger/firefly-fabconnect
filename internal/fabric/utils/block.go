@@ -44,7 +44,7 @@ type Transaction struct {
 	Creator   *Creator             `json:"creator"`
 	Status    string               `json:"status"`
 	Signature string               `json:"signature"`
-	Timestamp int32                `json:"timestamp"` // unix nano
+	Timestamp int64                `json:"timestamp"` // unix nano
 	Actions   []*TransactionAction `json:"actions"`
 }
 
@@ -61,7 +61,7 @@ type TransactionAction struct {
 type ConfigRecord struct {
 	Type      string         `json:"type"`
 	Signature string         `json:"signature"`
-	Timestamp int32          `json:"timestamp"` // unix nano
+	Timestamp int64          `json:"timestamp"` // unix nano
 	Nonce     string         `json:"nonce"`     // hex string
 	Creator   *Creator       `json:"creator"`
 	Config    *common.Config `json:"config"`

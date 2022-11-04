@@ -117,5 +117,5 @@ func TestGetEvents(t *testing.T) {
 	assert.Equal("AssetCreated", entry.EventName)
 	assert.Regexp("[0-9a-f]{64}", entry.TransactionId)
 	assert.Equal(0, entry.TransactionIndex)
-	assert.Equal(int32(312746000), entry.Timestamp)
+	assert.Equal(int64(1641861241312746000), entry.Timestamp)
 }
