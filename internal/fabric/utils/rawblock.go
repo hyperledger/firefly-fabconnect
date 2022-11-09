@@ -123,6 +123,6 @@ type ChaincodeSpec struct {
 }
 
 type ChaincodeSpecInput struct {
-	Args   []string `json:"args"`
-	IsInit bool     `json:"is_init"`
+	Args   []interface{} `json:"args"`
+	IsInit bool          `json:"is_init"`
 }

@@ -19,7 +19,6 @@ package utils
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"strconv"
 	"time"
 
@@ -336,7 +335,7 @@ func (block *RawBlock) decodeActionPayloadChaincodeProposalPayload(chaincodeProp
 		chaincodeInput := &ChaincodeSpecInput{}
 		chaincodeSpec.Input = chaincodeInput
 
-		chaincodeInputArgs := make([]string, len(ccSpec.ChaincodeSpec.Input.Args))
+		chaincodeInputArgs := make([]interface{}, len(ccSpec.ChaincodeSpec.Input.Args))
 		if chaincodeSpec.ChaincodeId.Name == "_lifecycle" {
 			funcName := string(ccSpec.ChaincodeSpec.Input.Args[0])
 			chaincodeInputArgs[0] = funcName
@@ -347,21 +346,13 @@ func (block *RawBlock) decodeActionPayloadChaincodeProposalPayload(chaincodeProp
 				if err := proto.Unmarshal(argsBytes, approveArgs); err != nil {
 					return errors.Wrap(err, "error decoding args for ApproveChaincodeDefinitionForMyOrg")
 				}
-				encoded, err := json.Marshal(approveArgs)
-				if err != nil {
-					return errors.Wrap(err, "error encoding args for ApproveChaincodeDefinitionForMyOrg to JSON")
-				}
-				chaincodeInputArgs[1] = string(encoded)
+				chaincodeInputArgs[1] = approveArgs
 			} else if funcName == "CommitChaincodeDefinition" {
 				commitArgs := &lifecycle.CommitChaincodeDefinitionArgs{}
 				if err := proto.Unmarshal(argsBytes, commitArgs); err != nil {
 					return errors.Wrap(err, "error decoding args for CommitChaincodeDefinition")
 				}
-				encoded, err := json.Marshal(commitArgs)
-				if err != nil {
-					return errors.Wrap(err, "error encoding args for CommitChaincodeDefinition to JSON")
-				}
-				chaincodeInputArgs[1] = string(encoded)
+				chaincodeInputArgs[1] = commitArgs
 			}
 		} else {
 			for j, arg := range ccSpec.ChaincodeSpec.Input.Args {
