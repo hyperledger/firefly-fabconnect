@@ -84,6 +84,7 @@ func TestDecodeEndorserBlockLifecycleTxs(t *testing.T) {
 	assert.Equal("_lifecycle", cpp.Input.ChaincodeSpec.ChaincodeId.Name)
 	assert.Equal("UNDEFINED", cpp.Input.ChaincodeSpec.Type)
 	assert.Equal("ApproveChaincodeDefinitionForMyOrg", cpp.Input.ChaincodeSpec.Input.Args[0])
+	assert.Equal("{\"sequence\":1,\"name\":\"asset_transfer\",\"version\":\"1.1.0.u0ypz4p14q\",\"source\":{\"Type\":{\"LocalPackage\":{\"package_id\":\"asset_transfer-1.1.0.u0ypz4p14q:969ba6734de347c850b55d3f5854e30001c4c2195fdc255807ba09a0187f83a9\"}}}}", cpp.Input.ChaincodeSpec.Input.Args[1])
 }
 
 func TestDecodeConfigBlock(t *testing.T) {
