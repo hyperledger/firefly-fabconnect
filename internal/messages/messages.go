@@ -144,14 +144,15 @@ type LedgerQueryResult struct {
 	Result interface{} `json:"result"`
 }
 
-// TransactionReceipt is sent when a transaction has been successfully mined
+// TransactionReceipt is sent when a transaction has been successfully mined. Must
+// conform to the FireFly standard structure for a blockchain receipt (see BlockchainReceiptNotification{})
 type TransactionReceipt struct {
 	ReplyCommon
-	BlockNumber   uint64 `json:"blockNumber"`
-	SignerMSP     string `json:"signerMSP"`
-	Signer        string `json:"signer"`
-	TransactionID string `json:"transactionID"`
-	Status        string `json:"status"`
+	BlockNumber     uint64 `json:"blockNumber"`
+	SignerMSP       string `json:"signerMSP"`
+	Signer          string `json:"signer"`
+	TransactionHash string `json:"transactionHash"`
+	Status          string `json:"status"`
 }
 
 type ErrorReply struct {

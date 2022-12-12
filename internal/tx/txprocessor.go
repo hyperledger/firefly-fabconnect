@@ -237,7 +237,7 @@ func (p *txProcessor) waitForCompletion(inflight *inflightTx, initialWaitDelay t
 		reply.BlockNumber = receipt.BlockNumber
 		reply.Signer = receipt.Signer
 		reply.SignerMSP = receipt.SignerMSP
-		reply.TransactionID = receipt.TransactionID
+		reply.TransactionHash = receipt.TransactionID
 
 		inflight.txContext.Reply(&reply)
 	}

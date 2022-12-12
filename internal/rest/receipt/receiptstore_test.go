@@ -48,7 +48,7 @@ func TestReplyProcessorWithValidReply(t *testing.T) {
 	replyMsg.Headers.ID = utils.UUIDv4()
 	replyMsg.Headers.ReqID = utils.UUIDv4()
 	replyMsg.Headers.ReqOffset = "topic:1:2"
-	replyMsg.TransactionID = "9c842ffd430a56a5338f353a7b5b5052b4ac604564d82318af9329b4bf46dd89"
+	replyMsg.TransactionHash = "9c842ffd430a56a5338f353a7b5b5052b4ac604564d82318af9329b4bf46dd89"
 	replyMsgBytes, _ := json.Marshal(&replyMsg)
 
 	r.ProcessReceipt(replyMsgBytes)
@@ -77,7 +77,7 @@ func TestReplyProcessorWithPeristenceErrorPanics(t *testing.T) {
 	replyMsg.Headers.ID = utils.UUIDv4()
 	replyMsg.Headers.ReqID = utils.UUIDv4()
 	replyMsg.Headers.ReqOffset = "topic:1:2"
-	replyMsg.TransactionID = "9c842ffd430a56a5338f353a7b5b5052b4ac604564d82318af9329b4bf46dd89"
+	replyMsg.TransactionHash = "9c842ffd430a56a5338f353a7b5b5052b4ac604564d82318af9329b4bf46dd89"
 	replyMsgBytes, _ := json.Marshal(&replyMsg)
 
 	assert.Panics(t, func() {
@@ -99,7 +99,7 @@ func TestReplyProcessorWithPeristenceErrorDuplicateSwallows(t *testing.T) {
 	replyMsg.Headers.ID = utils.UUIDv4()
 	replyMsg.Headers.ReqID = utils.UUIDv4()
 	replyMsg.Headers.ReqOffset = "topic:1:2"
-	replyMsg.TransactionID = "9c842ffd430a56a5338f353a7b5b5052b4ac604564d82318af9329b4bf46dd89"
+	replyMsg.TransactionHash = "9c842ffd430a56a5338f353a7b5b5052b4ac604564d82318af9329b4bf46dd89"
 	replyMsgBytes, _ := json.Marshal(&replyMsg)
 
 	r.ProcessReceipt(replyMsgBytes)
@@ -181,7 +181,7 @@ func TestSendReplyBroadcast(t *testing.T) {
 	replyMsg.Headers.ID = utils.UUIDv4()
 	replyMsg.Headers.ReqID = utils.UUIDv4()
 	replyMsg.Headers.ReqOffset = "topic:1:2"
-	replyMsg.TransactionID = "9c842ffd430a56a5338f353a7b5b5052b4ac604564d82318af9329b4bf46dd89"
+	replyMsg.TransactionHash = "9c842ffd430a56a5338f353a7b5b5052b4ac604564d82318af9329b4bf46dd89"
 	replyMsgBytes, _ := json.Marshal(&replyMsg)
 
 	r.ProcessReceipt(replyMsgBytes)
