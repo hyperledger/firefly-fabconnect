@@ -34,8 +34,8 @@ import (
 // defined to allow mocking in tests
 type gatewayCreator func(core.ConfigProvider, string, int) (*gateway.Gateway, error)
 type networkCreator func(*gateway.Gateway, string) (*gateway.Network, error)
-type txPreparer func(*gwRPCWrapper, string, string, string, string, bool) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error)
-type txSubmitter func(*gateway.Transaction, map[string][]byte, ...string) ([]byte, error)
+type txPreparer func(*gwRPCWrapper, string, string, string, string, bool, map[string][]byte) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error)
+type txSubmitter func(*gateway.Transaction, ...string) ([]byte, error)
 
 type gwRPCWrapper struct {
 	*commonRPCWrapper
@@ -154,13 +154,13 @@ func (w *gwRPCWrapper) Close() error {
 }
 
 func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) ([]byte, *fab.TxStatusEvent, error) {
-	tx, notifier, err := w.txPreparer(w, signer, channelId, chaincodeName, method, isInit)
+	convertedMap := convertStringMap(transientMap)
+	tx, notifier, err := w.txPreparer(w, signer, channelId, chaincodeName, method, isInit, convertedMap)
 	if err != nil {
 		return nil, nil, err
 	}
 	var result []byte
-	convertedMap := convertStringMap(transientMap)
-	result, err = w.txSubmitter(tx, convertedMap, args...)
+	result, err = w.txSubmitter(tx, args...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -244,18 +244,21 @@ func getNetwork(gateway *gateway.Gateway, channelId string) (*gateway.Network, e
 	return gateway.GetNetwork(channelId)
 }
 
-func prepareTx(w *gwRPCWrapper, signer, channelId, chaincodeName, method string, isInit bool) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
+func prepareTx(w *gwRPCWrapper, signer, channelId, chaincodeName, method string, isInit bool, transientMap map[string][]byte) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
 	channelClient, err := w.getGatewayClient(signer, channelId)
 	if err != nil {
 		return nil, nil, err
 	}
 	contractClient := channelClient.GetContract(chaincodeName)
 	var tx *gateway.Transaction
+	var opts []func(*gateway.Transaction) error
 	if isInit {
-		tx, err = contractClient.CreateTransaction(method, gateway.WithInit())
-	} else {
-		tx, err = contractClient.CreateTransaction(method)
+		opts = append(opts, gateway.WithInit())
 	}
+	if len(transientMap) > 0 {
+		opts = append(opts, gateway.WithTransient(transientMap))
+	}
+	tx, err = contractClient.CreateTransaction(method, opts...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -263,6 +266,6 @@ func prepareTx(w *gwRPCWrapper, signer, channelId, chaincodeName, method string,
 	return tx, notifier, nil
 }
 
-func submitTx(tx *gateway.Transaction, transientMap map[string][]byte, args ...string) ([]byte, error) {
-	return tx.SubmitWithTransientMap(transientMap, args...)
+func submitTx(tx *gateway.Transaction, args ...string) ([]byte, error) {
+	return tx.Submit(args...)
 }
