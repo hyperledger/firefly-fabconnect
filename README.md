@@ -242,7 +242,7 @@ An event subscription can be created as follows which contains instructions to d
   "filter": {
     "chaincodeId": "assettransfercomplex"
   },
-  "payloadType": "stringifiedJSON"
+  "payloadType": "string"
 }
 ```
 
