@@ -18,7 +18,6 @@ package client
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -62,7 +61,7 @@ func TestMain(m *testing.M) {
 }
 
 func newTempdir() string {
-	dir, _ := ioutil.TempDir("", "rpc_test")
+	dir, _ := os.MkdirTemp("", "rpc_test")
 	fmt.Printf("tmpdir/create: %s\n", dir)
 	return dir
 }
@@ -117,7 +116,7 @@ func teardown() {
 
 func setupConfigFile(filename, sourcedir, targetdir string) (string, error) {
 	configFile := path.Join(sourcedir, "../../../../test/fixture", filename)
-	content, err := ioutil.ReadFile(configFile)
+	content, err := os.ReadFile(configFile)
 	if err != nil {
 		return "", err
 	}
