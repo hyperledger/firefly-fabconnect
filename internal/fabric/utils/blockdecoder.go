@@ -27,7 +27,6 @@ import (
 	"github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
-	"github.com/hyperledger/firefly-fabconnect/internal/utils"
 	"github.com/pkg/errors"
 )
 
@@ -389,7 +388,7 @@ func (block *RawBlock) decodeProposalResponsePayloadExtension(_extension *Extens
 	_chaincodeEvent.ChaincodeId = ccevt.ChaincodeId
 	_chaincodeEvent.TxId = ccevt.TxId
 	_chaincodeEvent.EventName = ccevt.EventName
-	_chaincodeEvent.Payload = utils.DecodePayload(ccevt.Payload)
+	_chaincodeEvent.Payload = ccevt.Payload
 
 	return nil
 }
