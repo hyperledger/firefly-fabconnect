@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/rest"

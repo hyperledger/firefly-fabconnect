@@ -376,7 +376,6 @@ func (s *subscriptionMGR) streamByID(id string) (*eventStream, error) {
 
 func (s *subscriptionMGR) addStream(spec *StreamInfo) error {
 	spec.ID = streamIDPrefix + utils.UUIDv4()
-	spec.CreatedISO8601 = time.Now().UTC().Format(time.RFC3339)
 	spec.Path = StreamPathPrefix + "/" + spec.ID
 	stream, err := newEventStream(s, spec, s.wsChannels)
 	if err != nil {
