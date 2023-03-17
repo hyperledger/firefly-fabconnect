@@ -26,17 +26,17 @@ import (
 
 // adapted from the CommitHandler in https://github.com/hyperledger/fabric-sdk-go
 // in order to custom process the transaction status event
-type txSubmitAndListenHandler struct {
+type TxSubmitAndListenHandler struct {
 	txStatusEvent *fab.TxStatusEvent
 }
 
-func NewTxSubmitAndListenHandler(txStatus *fab.TxStatusEvent) *txSubmitAndListenHandler {
-	return &txSubmitAndListenHandler{
+func NewTxSubmitAndListenHandler(txStatus *fab.TxStatusEvent) *TxSubmitAndListenHandler {
+	return &TxSubmitAndListenHandler{
 		txStatusEvent: txStatus,
 	}
 }
 
-func (h *txSubmitAndListenHandler) Handle(requestContext *invoke.RequestContext, clientContext *invoke.ClientContext) {
+func (h *TxSubmitAndListenHandler) Handle(requestContext *invoke.RequestContext, clientContext *invoke.ClientContext) {
 	txnID := requestContext.Response.TransactionID
 
 	// Register Tx event
