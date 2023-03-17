@@ -178,8 +178,8 @@ func (w *ccpRPCWrapper) Close() error {
 	return nil
 }
 
-func (w *ccpRPCWrapper) sendTransaction(channelId, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*msp.IdentityIdentifier, []byte, *fab.TxStatusEvent, error) {
-	client, err := w.getChannelClient(channelId, signer)
+func (w *ccpRPCWrapper) sendTransaction(channelID, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*msp.IdentityIdentifier, []byte, *fab.TxStatusEvent, error) {
+	client, err := w.getChannelClient(channelID, signer)
 	if err != nil {
 		return nil, nil, nil, errors.Errorf("Failed to get channel client. %s", err)
 	}

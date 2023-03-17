@@ -83,12 +83,12 @@ func (l *ledgerClientWrapper) queryBlock(channelID string, signer string, blockN
 	return rawblock, block, err
 }
 
-func (l *ledgerClientWrapper) queryBlockByTxID(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
-	client, err := l.getLedgerClient(channelId, signer)
+func (l *ledgerClientWrapper) queryBlockByTxID(channelID string, signer string, txID string) (*utils.RawBlock, *utils.Block, error) {
+	client, err := l.getLedgerClient(channelID, signer)
 	if err != nil {
 		return nil, nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
-	result, err := client.QueryBlockByTxID(fab.TransactionID(txId))
+	result, err := client.QueryBlockByTxID(fab.TransactionID(txID))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -96,13 +96,13 @@ func (l *ledgerClientWrapper) queryBlockByTxID(channelId string, signer string, 
 	return rawblock, block, err
 }
 
-func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (map[string]interface{}, error) {
-	client, err := l.getLedgerClient(channelId, signer)
+func (l *ledgerClientWrapper) queryTransaction(channelID, signer, txID string) (map[string]interface{}, error) {
+	client, err := l.getLedgerClient(channelID, signer)
 	if err != nil {
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
-	txID := fab.TransactionID(txId)
-	result, err := client.QueryTransaction(txID)
+	fabTxID := fab.TransactionID(txID)
+	result, err := client.QueryTransaction(fabTxID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (l *ledgerClientWrapper) queryTransaction(channelId, signer, txId string) (
 	return ret, nil
 }
 
-func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerClient *ledger.Client, err error) {
+func (l *ledgerClientWrapper) getLedgerClient(channelID, signer string) (ledgerClient *ledger.Client, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	ledgerClientsForSigner := l.ledgerClients[signer]
@@ -126,14 +126,14 @@ func (l *ledgerClientWrapper) getLedgerClient(channelId, signer string) (ledgerC
 		ledgerClientsForSigner = make(map[string]*ledger.Client)
 		l.ledgerClients[signer] = ledgerClientsForSigner
 	}
-	ledgerClient = ledgerClientsForSigner[channelId]
+	ledgerClient = ledgerClientsForSigner[channelID]
 	if ledgerClient == nil {
-		channelProvider := l.sdk.ChannelContext(channelId, fabsdk.WithOrg(l.idClient.GetClientOrg()), fabsdk.WithUser(signer))
+		channelProvider := l.sdk.ChannelContext(channelID, fabsdk.WithOrg(l.idClient.GetClientOrg()), fabsdk.WithUser(signer))
 		ledgerClient, err = l.ledgerClientCreator(channelProvider)
 		if err != nil {
 			return nil, err
 		}
-		ledgerClientsForSigner[channelId] = ledgerClient
+		ledgerClientsForSigner[channelID] = ledgerClient
 	}
 	return ledgerClient, nil
 }
