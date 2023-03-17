@@ -310,7 +310,7 @@ func (a *eventStream) handleEvent(event *eventData) {
 	// Does nothing more than add it to the batch, to be picked up
 	// by the batchDispatcher
 	if a.stopped {
-		log.Infof("Event stream stopped, skipping event %s for transaction %s", event.event.EventName, event.event.TransactionId)
+		log.Infof("Event stream stopped, skipping event %s for transaction %s", event.event.EventName, event.event.TransactionID)
 	} else {
 		a.eventStream <- event
 	}
@@ -442,7 +442,7 @@ func (a *eventStream) eventPoller() {
 			log.Infof("%s: Notified of an ongoing stream update, exiting event poller", a.spec.ID)
 			a.markAllSubscriptionsStale(ctx)
 			return
-		case <-time.After(a.pollingInterval): //fall through and continue to the next iteration
+		case <-time.After(a.pollingInterval): // fall through and continue to the next iteration
 		}
 	}
 
@@ -540,12 +540,11 @@ func (a *eventStream) batchProcessor() {
 				<-a.updateInterrupt
 				// we were notified by the caller about an ongoing update, return
 				log.Infof("%s: Notified of an ongoing stream update, exiting batch processor", a.spec.ID)
-				a.updateWG.Done() //Not moving this to a 'defer' since we need to unlock after calling Done()
+				a.updateWG.Done() // Not moving this to a 'defer' since we need to unlock after calling Done()
 				a.batchCond.L.Unlock()
 				return
-			} else {
-				a.batchCond.Wait()
 			}
+			a.batchCond.Wait()
 		}
 		if a.suspendOrStop() {
 			log.Infof("%s: Suspended, returning exiting batch processor", a.spec.ID)
@@ -582,7 +581,7 @@ func (a *eventStream) processBatch(batchNumber uint64, events []*eventData) {
 				// we were notified by the caller about an ongoing update, no need to continue
 				log.Infof("%s: Notified of an ongoing stream update, terminating process batch", a.spec.ID)
 				return
-			case <-time.After(time.Duration(a.spec.BlockedRetryDelaySec) * time.Second): //fall through and continue
+			case <-time.After(time.Duration(a.spec.BlockedRetryDelaySec) * time.Second): // fall through and continue
 			}
 		}
 		attempt++
@@ -645,7 +644,7 @@ func (a *eventStream) performActionWithRetry(batchNumber uint64, events []*event
 				// we were notified by the caller about an ongoing update, no need to continue
 				log.Infof("%s: Notified of an ongoing stream update, terminating perform action for batch number: %d", a.spec.ID, batchNumber)
 				return
-			case <-time.After(delay): //fall through and continue
+			case <-time.After(delay): // fall through and continue
 			}
 			delay = time.Duration(float64(delay) * a.backoffFactor)
 		}

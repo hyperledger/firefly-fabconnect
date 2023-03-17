@@ -82,23 +82,23 @@ func newRPCClientFromCCP(configProvider core.ConfigProvider, txTimeout int, user
 	return w, nil
 }
 
-func (w *ccpRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*TxReceipt, error) {
-	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelId, chaincodeName, method, isInit, args)
+func (w *ccpRPCWrapper) Invoke(channelID, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*TxReceipt, error) {
+	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelID, chaincodeName, method, isInit, args)
 
-	signerID, result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, transientMap, isInit)
+	signerID, result, txStatus, err := w.sendTransaction(channelID, signer, chaincodeName, method, args, transientMap, isInit)
 	if err != nil {
-		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelId, chaincodeName, method, isInit, err)
+		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelID, chaincodeName, method, isInit, err)
 		return nil, err
 	}
 
-	log.Tracef("RPC [%s:%s:%s:isInit=%t] <-- %+v", channelId, chaincodeName, method, isInit, result)
+	log.Tracef("RPC [%s:%s:%s:isInit=%t] <-- %+v", channelID, chaincodeName, method, isInit, result)
 	return newReceipt(result, txStatus, signerID), err
 }
 
-func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, args []string, strongread bool) ([]byte, error) {
-	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
+func (w *ccpRPCWrapper) Query(channelID, signer, chaincodeName, method string, args []string, strongread bool) ([]byte, error) {
+	log.Tracef("RPC [%s:%s:%s] --> %+v", channelID, chaincodeName, method, args)
 
-	client, err := w.getChannelClient(channelId, signer)
+	client, err := w.getChannelClient(channelID, signer)
 	if err != nil {
 		log.Errorf("Failed to get channel client. %s", err)
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
@@ -124,11 +124,11 @@ func (w *ccpRPCWrapper) Query(channelId, signer, chaincodeName, method string, a
 		result, err1 = client.channelClient.Query(req, channel.WithRetry(retry.DefaultChannelOpts), channel.WithTargetEndpoints(peerEndpoint))
 	}
 	if err1 != nil {
-		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
+		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelID, chaincodeName, method, err)
 		return nil, err1
 	}
 
-	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
+	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelID, chaincodeName, method, result)
 	return result.Payload, nil
 }
 
@@ -140,7 +140,7 @@ func (w *ccpRPCWrapper) SignerUpdated(signer string) {
 	w.mu.Unlock()
 }
 
-func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpClientWrapper, error) {
+func (w *ccpRPCWrapper) getChannelClient(channelID string, signer string) (*ccpClientWrapper, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	id, err := w.idClient.GetSigningIdentity(signer)
@@ -151,13 +151,13 @@ func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpC
 		return nil, errors.Errorf("Failed to retrieve signing identity: %s", err)
 	}
 
-	allClientsOfChannel := w.channelClients[channelId]
+	allClientsOfChannel := w.channelClients[channelID]
 	if allClientsOfChannel == nil {
-		w.channelClients[channelId] = make(map[string]*ccpClientWrapper)
+		w.channelClients[channelID] = make(map[string]*ccpClientWrapper)
 	}
-	clientOfUser := w.channelClients[channelId][id.Identifier().ID]
+	clientOfUser := w.channelClients[channelID][id.Identifier().ID]
 	if clientOfUser == nil {
-		channelProvider := w.sdk.ChannelContext(channelId, fabsdk.WithOrg(w.idClient.GetClientOrg()), fabsdk.WithUser(id.Identifier().ID))
+		channelProvider := w.sdk.ChannelContext(channelID, fabsdk.WithOrg(w.idClient.GetClientOrg()), fabsdk.WithUser(id.Identifier().ID))
 		cClient, err := w.channelCreator(channelProvider)
 		if err != nil {
 			return nil, err
@@ -167,7 +167,7 @@ func (w *ccpRPCWrapper) getChannelClient(channelId string, signer string) (*ccpC
 			channelProvider: channelProvider,
 			signer:          id.Identifier(),
 		}
-		w.channelClients[channelId][id.Identifier().ID] = newWrapper
+		w.channelClients[channelID][id.Identifier().ID] = newWrapper
 		clientOfUser = newWrapper
 	}
 	return clientOfUser, nil

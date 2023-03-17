@@ -39,7 +39,7 @@ func NewTxSubmitAndListenHandler(txStatus *fab.TxStatusEvent) *txSubmitAndListen
 func (h *txSubmitAndListenHandler) Handle(requestContext *invoke.RequestContext, clientContext *invoke.ClientContext) {
 	txnID := requestContext.Response.TransactionID
 
-	//Register Tx event
+	// Register Tx event
 	reg, statusNotifier, err := clientContext.EventService.RegisterTxStatusEvent(string(txnID))
 	if err != nil {
 		requestContext.Error = errors.Errorf("Error registering for TxStatus event for transaction %s. %s", txnID, err)

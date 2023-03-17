@@ -30,9 +30,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// AsyncDispatcher is passed in to process messages over a streaming system with
+// Dispatcher is passed in to process messages over a streaming system with
 // a receipt store. Only used for POST methods, when fly-sync is not set to true
-type AsyncDispatcher interface {
+type Dispatcher interface {
 	ValidateConf() error
 	Run() error
 	IsInitialized() bool
@@ -51,10 +51,10 @@ type asyncRequestHandler interface {
 
 type asyncDispatcher struct {
 	handler      asyncRequestHandler
-	receiptStore receipt.ReceiptStore
+	receiptStore receipt.Store
 }
 
-func NewAsyncDispatcher(conf *conf.RESTGatewayConf, processor tx.TxProcessor, receiptstore receipt.ReceiptStore) AsyncDispatcher {
+func NewAsyncDispatcher(conf *conf.RESTGatewayConf, processor tx.Processor, receiptstore receipt.Store) Dispatcher {
 	var handler asyncRequestHandler
 	if len(conf.Kafka.Brokers) > 0 {
 		handler = newKafkaHandler(conf.Kafka, receiptstore)
@@ -96,7 +96,7 @@ func (d *asyncDispatcher) Close() {
 	d.receiptStore.Close()
 }
 
-func (w *asyncDispatcher) processMsg(ctx context.Context, msg *messages.SendTransaction, ack bool) (*messages.AsyncSentMsg, int, error) {
+func (d *asyncDispatcher) processMsg(ctx context.Context, msg *messages.SendTransaction, ack bool) (*messages.AsyncSentMsg, int, error) {
 	switch msg.Headers.MsgType {
 	case messages.MsgTypeDeployContract, messages.MsgTypeSendTransaction:
 		if msg.Headers.Signer == "" {
@@ -114,7 +114,7 @@ func (w *asyncDispatcher) processMsg(ctx context.Context, msg *messages.SendTran
 
 	// Pass to the handler
 	log.Infof("Request handler accepted message. MsgID: %s Type: %s", msg.Headers.ID, msg.Headers.MsgType)
-	msgAck, status, err := w.handler.dispatchMsg(ctx, msg.Headers.ChannelID, msg.Headers.ID, msg, ack)
+	msgAck, status, err := d.handler.dispatchMsg(ctx, msg.Headers.ChannelID, msg.Headers.ID, msg, ack)
 	if err != nil {
 		return nil, status, err
 	}
@@ -125,10 +125,10 @@ func (w *asyncDispatcher) processMsg(ctx context.Context, msg *messages.SendTran
 	}, 200, nil
 }
 
-func (w *asyncDispatcher) Run() error {
-	return w.handler.run()
+func (d *asyncDispatcher) Run() error {
+	return d.handler.run()
 }
 
-func (w *asyncDispatcher) IsInitialized() bool {
-	return w.handler.isInitialized()
+func (d *asyncDispatcher) IsInitialized() bool {
+	return d.handler.isInitialized()
 }

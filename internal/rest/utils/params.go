@@ -39,8 +39,10 @@ type TxOpts struct {
 // getFlyParam standardizes how special 'fly' params are specified, in body, query params, or headers
 // these fly-* parameters are supported:
 //   - signer, channel, chaincode
+//
 // precedence order:
 //   - "headers" in body > query parameters > http headers
+//
 // naming conventions:
 //   - properties in the "headers" section of the body has the original name, eg. "channel"
 //   - query parameter has the short prefix, eg. "fly-channel"
@@ -89,7 +91,7 @@ func BuildQueryMessage(res http.ResponseWriter, req *http.Request, params httpro
 		return nil, NewRestError(err.Error(), 400)
 	}
 
-	msgId := getFlyParam("id", body, req)
+	msgID := getFlyParam("id", body, req)
 	channel := getFlyParam("channel", body, req)
 	if channel == "" {
 		return nil, NewRestError("Must specify the channel", 400)
@@ -104,7 +106,7 @@ func BuildQueryMessage(res http.ResponseWriter, req *http.Request, params httpro
 	}
 
 	msg := messages.QueryChaincode{}
-	msg.Headers.ID = msgId // this could be empty
+	msg.Headers.ID = msgID // this could be empty
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
 	msg.Headers.ChaincodeName = chaincode
@@ -137,13 +139,13 @@ func BuildQueryMessage(res http.ResponseWriter, req *http.Request, params httpro
 	return &msg, nil
 }
 
-func BuildTxByIdMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetTxById, *RestError) {
+func BuildTxByIDMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetTxByID, *RestError) {
 	var body map[string]interface{}
 	err := req.ParseForm()
 	if err != nil {
 		return nil, NewRestError(err.Error(), 400)
 	}
-	msgId := getFlyParam("id", body, req)
+	msgID := getFlyParam("id", body, req)
 	channel := getFlyParam("channel", body, req)
 	if channel == "" {
 		return nil, NewRestError("Must specify the channel", 400)
@@ -153,11 +155,11 @@ func BuildTxByIdMessage(res http.ResponseWriter, req *http.Request, params httpr
 		return nil, NewRestError("Must specify the signer", 400)
 	}
 
-	msg := messages.GetTxById{}
-	msg.Headers.ID = msgId // this could be empty
+	msg := messages.GetTxByID{}
+	msg.Headers.ID = msgID // this could be empty
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
-	msg.TxId = params.ByName("txId")
+	msg.TxID = params.ByName("txId")
 
 	return &msg, nil
 }
@@ -168,7 +170,7 @@ func BuildGetChainInfoMessage(res http.ResponseWriter, req *http.Request, params
 	if err != nil {
 		return nil, NewRestError(err.Error(), 400)
 	}
-	msgId := getFlyParam("id", body, req)
+	msgID := getFlyParam("id", body, req)
 	channel := getFlyParam("channel", body, req)
 	if channel == "" {
 		return nil, NewRestError("Must specify the channel", 400)
@@ -179,7 +181,7 @@ func BuildGetChainInfoMessage(res http.ResponseWriter, req *http.Request, params
 	}
 
 	msg := messages.GetChainInfo{}
-	msg.Headers.ID = msgId // this could be empty
+	msg.Headers.ID = msgID // this could be empty
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
 
@@ -192,7 +194,7 @@ func BuildGetBlockMessage(res http.ResponseWriter, req *http.Request, params htt
 	if err != nil {
 		return nil, NewRestError(err.Error(), 400)
 	}
-	msgId := getFlyParam("id", body, req)
+	msgID := getFlyParam("id", body, req)
 	channel := getFlyParam("channel", body, req)
 	if channel == "" {
 		return nil, NewRestError("Must specify the channel", 400)
@@ -203,7 +205,7 @@ func BuildGetBlockMessage(res http.ResponseWriter, req *http.Request, params htt
 	}
 
 	msg := messages.GetBlock{}
-	msg.Headers.ID = msgId // this could be empty
+	msg.Headers.ID = msgID // this could be empty
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
 
@@ -226,7 +228,7 @@ func BuildGetBlockMessage(res http.ResponseWriter, req *http.Request, params htt
 	return &msg, nil
 }
 
-func BuildGetBlockByTxIdMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetBlockByTxId, *RestError) {
+func BuildGetBlockByTxIDMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetBlockByTxID, *RestError) {
 	var body map[string]interface{}
 	err := req.ParseForm()
 	if err != nil {
@@ -241,10 +243,10 @@ func BuildGetBlockByTxIdMessage(res http.ResponseWriter, req *http.Request, para
 		return nil, NewRestError("Must specify the signer", 400)
 	}
 
-	msg := messages.GetBlockByTxId{}
+	msg := messages.GetBlockByTxID{}
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
-	msg.TxId = params.ByName("txId")
+	msg.TxID = params.ByName("txId")
 
 	return &msg, nil
 }
@@ -259,7 +261,7 @@ func BuildTxMessage(res http.ResponseWriter, req *http.Request, params httproute
 		return nil, nil, NewRestError(err.Error(), 400)
 	}
 
-	msgId := getFlyParam("id", body, req)
+	msgID := getFlyParam("id", body, req)
 	channel := getFlyParam("channel", body, req)
 	if channel == "" {
 		return nil, nil, NewRestError("Must specify the channel", 400)
@@ -274,7 +276,7 @@ func BuildTxMessage(res http.ResponseWriter, req *http.Request, params httproute
 	}
 
 	msg := messages.SendTransaction{}
-	msg.Headers.ID = msgId // this could be empty
+	msg.Headers.ID = msgID // this could be empty
 	msg.Headers.MsgType = messages.MsgTypeSendTransaction
 	msg.Headers.ChannelID = channel
 	msg.Headers.Signer = signer
@@ -403,7 +405,7 @@ func processArgs(body map[string]interface{}) ([]string, error) {
 				entryStringValue, ok = entry.(string)
 
 				if !ok {
-					return nil, errors.New("Invalid object passed")
+					return nil, errors.New("invalid object passed")
 				}
 
 				err := json.Unmarshal([]byte(entryStringValue), &entry)
@@ -419,16 +421,17 @@ func processArgs(body map[string]interface{}) ([]string, error) {
 				return nil, err
 			}
 
-			if propType == "object" {
+			switch propType {
+			case "object":
 				encoded, _ := json.Marshal(entry)
 				args[i] = string(encoded)
-			} else if propType == "string" {
+			case "string":
 				strVal, ok := entry.(string)
 				if !ok {
 					return nil, fmt.Errorf("argument property %q of type %q could not be converted to a string", name, propType)
 				}
 				args[i] = strVal
-			} else {
+			default:
 				args[i] = entryStringValue
 			}
 		}

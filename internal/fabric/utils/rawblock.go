@@ -48,10 +48,10 @@ type PayloadHeader struct {
 }
 
 type ChannelHeader struct {
-	ChannelId string `json:"channel_id"`
+	ChannelID string `json:"channel_id"`
 	Epoch     string `json:"epoch"`
 	Timestamp int64  `json:"timestamp"`
-	TxId      string `json:"tx_id"`
+	TxID      string `json:"tx_id"`
 	Type      string `json:"type"`
 	Version   int    `json:"version"`
 }
@@ -93,15 +93,15 @@ type ProposalResponsePayload struct {
 }
 
 type Extension struct {
-	ChaincodeId *peer.ChaincodeID `json:"chaincode_id"`
+	ChaincodeID *peer.ChaincodeID `json:"chaincode_id"`
 	Events      *ChaincodeEvent   `json:"events"`
 	// Response
 	// Result
 }
 
 type ChaincodeEvent struct {
-	ChaincodeId string      `json:"chaincodeId"`
-	TxId        string      `json:"transactionId"`
+	ChaincodeID string      `json:"chaincodeId"`
+	TxID        string      `json:"transactionId"`
 	Timestamp   string      `json:"timestamp"`
 	EventName   string      `json:"eventName"`
 	Payload     interface{} `json:"payload"`
@@ -117,7 +117,7 @@ type ProposalPayloadInput struct {
 }
 
 type ChaincodeSpec struct {
-	ChaincodeId *peer.ChaincodeID   `json:"chaincode_id"`
+	ChaincodeID *peer.ChaincodeID   `json:"chaincode_id"`
 	Input       *ChaincodeSpecInput `json:"input"`
 	Type        string              `json:"type"`
 }

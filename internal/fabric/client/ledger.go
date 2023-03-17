@@ -52,8 +52,8 @@ func newLedgerClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, 
 	return w
 }
 
-func (l *ledgerClientWrapper) queryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error) {
-	client, err := l.getLedgerClient(channelId, signer)
+func (l *ledgerClientWrapper) queryChainInfo(channelID, signer string) (*fab.BlockchainInfoResponse, error) {
+	client, err := l.getLedgerClient(channelID, signer)
 	if err != nil {
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
@@ -64,8 +64,8 @@ func (l *ledgerClientWrapper) queryChainInfo(channelId, signer string) (*fab.Blo
 	return result, nil
 }
 
-func (l *ledgerClientWrapper) queryBlock(channelId string, signer string, blockNumber uint64, blockhash []byte) (*utils.RawBlock, *utils.Block, error) {
-	client, err := l.getLedgerClient(channelId, signer)
+func (l *ledgerClientWrapper) queryBlock(channelID string, signer string, blockNumber uint64, blockhash []byte) (*utils.RawBlock, *utils.Block, error) {
+	client, err := l.getLedgerClient(channelID, signer)
 	if err != nil {
 		return nil, nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
@@ -83,7 +83,7 @@ func (l *ledgerClientWrapper) queryBlock(channelId string, signer string, blockN
 	return rawblock, block, err
 }
 
-func (l *ledgerClientWrapper) queryBlockByTxId(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
+func (l *ledgerClientWrapper) queryBlockByTxID(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
 	client, err := l.getLedgerClient(channelId, signer)
 	if err != nil {
 		return nil, nil, errors.Errorf("Failed to get channel client. %s", err)

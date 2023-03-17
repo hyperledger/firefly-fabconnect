@@ -121,10 +121,10 @@ func (w *commonRPCWrapper) QueryBlock(channelId string, signer string, blockNumb
 	return rawblock, block, nil
 }
 
-func (w *commonRPCWrapper) QueryBlockByTxId(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
-	log.Tracef("RPC [%s] --> QueryBlockByTxId %s", channelId, txId)
+func (w *commonRPCWrapper) QueryBlockByTxID(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
+	log.Tracef("RPC [%s] --> QueryBlockByTxID %s", channelId, txId)
 
-	rawblock, block, err := w.ledgerClientWrapper.queryBlockByTxId(channelId, signer, txId)
+	rawblock, block, err := w.ledgerClientWrapper.queryBlockByTxID(channelId, signer, txId)
 	if err != nil {
 		log.Errorf("Failed to query block by transaction Id %s on channel %s. %s", txId, channelId, err)
 		return nil, nil, err
@@ -151,7 +151,7 @@ func (w *commonRPCWrapper) QueryTransaction(channelId, signer, txId string) (map
 func (w *commonRPCWrapper) SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
 	reg, blockEventCh, ccEventCh, err := w.eventClientWrapper.subscribeEvent(subInfo, since)
 	if err != nil {
-		log.Errorf("Failed to subscribe to event [%s:%s:%s]. %s", subInfo.Stream, subInfo.ChannelId, subInfo.Filter.ChaincodeId, err)
+		log.Errorf("Failed to subscribe to event [%s:%s:%s]. %s", subInfo.Stream, subInfo.ChannelID, subInfo.Filter.ChaincodeID, err)
 		return nil, nil, nil, err
 	}
 	return reg, blockEventCh, ccEventCh, nil

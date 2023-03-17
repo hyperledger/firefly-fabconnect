@@ -56,7 +56,7 @@ type RevokeRequest struct {
 	GenCRL bool   `json:"generateCRL"`
 }
 
-type IdentityResponse struct {
+type Response struct {
 	Name    string `json:"name"`
 	Success bool   `json:"success"`
 }
@@ -66,11 +66,11 @@ type RevokeResponse struct {
 	CRL          []byte              `json:"CRL"`
 }
 
-type IdentityClient interface {
+type Client interface {
 	Register(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*RegisterResponse, *restutil.RestError)
 	Modify(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*RegisterResponse, *restutil.RestError)
-	Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*IdentityResponse, *restutil.RestError)
-	Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*IdentityResponse, *restutil.RestError)
+	Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*Response, *restutil.RestError)
+	Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*Response, *restutil.RestError)
 	Revoke(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*RevokeResponse, *restutil.RestError)
 	List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*Identity, *restutil.RestError)
 	Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*Identity, *restutil.RestError)

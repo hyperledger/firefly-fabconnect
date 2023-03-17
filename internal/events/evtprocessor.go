@@ -68,7 +68,7 @@ func (ep *evtProcessor) processEventEntry(subInfo *api.SubscriptionInfo, entry *
 	entry.SubID = subInfo.ID
 	payloadType := subInfo.PayloadType
 	if payloadType == "" {
-		payloadType = api.EventPayloadType_Bytes
+		payloadType = api.EventPayloadTypeBytes
 	}
 
 	// if the payload comes from the block decoder, it's already decoded into a map
@@ -76,9 +76,9 @@ func (ep *evtProcessor) processEventEntry(subInfo *api.SubscriptionInfo, entry *
 	payloadBytes, ok := entry.Payload.([]byte)
 	if ok {
 		switch payloadType {
-		case api.EventPayloadType_String:
+		case api.EventPayloadTypeString:
 			entry.Payload = string(payloadBytes)
-		case api.EventPayloadType_StringifiedJSON, api.EventPayloadType_JSON:
+		case api.EventPayloadTypeStringifiedJSON, api.EventPayloadTypeJSON:
 			structuredMap := make(map[string]interface{})
 			err := json.Unmarshal(payloadBytes, &structuredMap)
 			if err != nil {
@@ -95,7 +95,7 @@ func (ep *evtProcessor) processEventEntry(subInfo *api.SubscriptionInfo, entry *
 	}
 
 	// Ok, now we have the full event in a friendly map output. Pass it down to the stream
-	log.Infof("%s: Dispatching event. BlockNumber=%d TxId=%s", subInfo.ID, result.event.BlockNumber, result.event.TransactionId)
+	log.Infof("%s: Dispatching event. BlockNumber=%d TxId=%s", subInfo.ID, result.event.BlockNumber, result.event.TransactionID)
 	ep.stream.eventHandler(&result)
 	return nil
 }

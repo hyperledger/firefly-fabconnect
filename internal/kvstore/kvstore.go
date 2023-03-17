@@ -60,12 +60,12 @@ func (k *levelDBKeyValueStore) warnIfErr(op, key string, err error) {
 	}
 }
 
-func (kv *levelDBKeyValueStore) Init() error {
-	db, err := leveldb.OpenFile(kv.path, nil)
+func (k *levelDBKeyValueStore) Init() error {
+	db, err := leveldb.OpenFile(k.path, nil)
 	if err != nil {
-		return errors.Errorf(errors.KVStoreDBLoad, kv.path, err)
+		return errors.Errorf(errors.KVStoreDBLoad, k.path, err)
 	}
-	kv.db = db
+	k.db = db
 	return nil
 }
 

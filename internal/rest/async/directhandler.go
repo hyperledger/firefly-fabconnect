@@ -35,15 +35,15 @@ import (
 
 type directHandler struct {
 	initialized   bool
-	receipts      receipt.ReceiptStore
+	receipts      receipt.Store
 	conf          *conf.RESTGatewayConf
-	processor     tx.TxProcessor
+	processor     tx.Processor
 	inFlightMutex sync.Mutex
 	inFlight      map[string]*msgContext
 	stopChan      chan error
 }
 
-func newDirectHandler(conf *conf.RESTGatewayConf, processor tx.TxProcessor, receiptstore receipt.ReceiptStore) *directHandler {
+func newDirectHandler(conf *conf.RESTGatewayConf, processor tx.Processor, receiptstore receipt.Store) *directHandler {
 	return &directHandler{
 		processor: processor,
 		receipts:  receiptstore,

@@ -115,27 +115,26 @@ func (w *gwRPCWrapper) Query(channelId, signer, chaincodeName, method string, ar
 
 		log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
 		return result, nil
-	} else {
-		peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
-		if err != nil {
-			return nil, err
-		}
-
-		bytes := convertStringArray(args)
-		req := channel.Request{
-			ChaincodeID: chaincodeName,
-			Fcn:         method,
-			Args:        bytes,
-		}
-		result, err := client.Query(req, channel.WithRetry(retry.DefaultChannelOpts), channel.WithTargetEndpoints(peerEndpoint))
-		if err != nil {
-			log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
-			return nil, err
-		}
-
-		log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
-		return result.Payload, nil
 	}
+	peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes := convertStringArray(args)
+	req := channel.Request{
+		ChaincodeID: chaincodeName,
+		Fcn:         method,
+		Args:        bytes,
+	}
+	result, err := client.Query(req, channel.WithRetry(retry.DefaultChannelOpts), channel.WithTargetEndpoints(peerEndpoint))
+	if err != nil {
+		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
+		return nil, err
+	}
+
+	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
+	return result.Payload, nil
 }
 
 func (w *gwRPCWrapper) SignerUpdated(signer string) {

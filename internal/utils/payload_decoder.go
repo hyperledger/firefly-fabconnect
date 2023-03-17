@@ -24,7 +24,6 @@ func DecodePayload(payload []byte) interface{} {
 	err := json.Unmarshal(payload, &structured)
 	if err != nil {
 		return string(payload)
-	} else {
-		return structured
 	}
+	return structured
 }

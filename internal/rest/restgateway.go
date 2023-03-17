@@ -45,13 +45,13 @@ const (
 	MaxHeaderSize = 16 * 1024
 )
 
-// RESTGateway as the HTTP gateway interface for fabconnect
-type RESTGateway struct {
+// Gateway as the HTTP gateway interface for fabconnect
+type Gateway struct {
 	config          *conf.RESTGatewayConf
-	processor       tx.TxProcessor
-	receiptStore    receipt.ReceiptStore
-	syncDispatcher  restsync.SyncDispatcher
-	asyncDispatcher restasync.AsyncDispatcher
+	processor       tx.Processor
+	receiptStore    receipt.Store
+	syncDispatcher  restsync.Dispatcher
+	asyncDispatcher restasync.Dispatcher
 	sm              events.SubscriptionManager
 	ws              ws.WebSocketServer
 	rpc             client.RPCClient
@@ -68,8 +68,8 @@ type statusMsg struct {
 }
 
 // NewRESTGateway constructor
-func NewRESTGateway(config *conf.RESTGatewayConf) *RESTGateway {
-	g := &RESTGateway{
+func NewRESTGateway(config *conf.RESTGatewayConf) *Gateway {
+	g := &Gateway{
 		config:      config,
 		sendCond:    sync.NewCond(&sync.Mutex{}),
 		pendingMsgs: make(map[string]bool),
@@ -81,8 +81,8 @@ func NewRESTGateway(config *conf.RESTGatewayConf) *RESTGateway {
 	return g
 }
 
-func (g *RESTGateway) Init() error {
-	g.syncDispatcher = restsync.NewSyncDispatcher(g.processor)
+func (g *Gateway) Init() error {
+	g.syncDispatcher = restsync.NewDispatcher(g.processor)
 	g.asyncDispatcher = restasync.NewAsyncDispatcher(g.config, g.processor, g.receiptStore)
 	err := g.asyncDispatcher.ValidateConf()
 	if err != nil {
@@ -118,7 +118,7 @@ func (g *RESTGateway) Init() error {
 	return nil
 }
 
-func (g *RESTGateway) ValidateConf() error {
+func (g *Gateway) ValidateConf() error {
 	// HTTP and RPC configurations are mandatory
 	if g.config.HTTP.Port == 0 {
 		return errors.Errorf(errors.ConfigRESTGatewayRequiredHTTPPort)
@@ -133,7 +133,7 @@ func (g *RESTGateway) ValidateConf() error {
 }
 
 // Start kicks off the HTTP listener and router
-func (g *RESTGateway) Start() error {
+func (g *Gateway) Start() error {
 	tlsConfig, err := utils.CreateTLSConfiguration(&g.config.HTTP.TLS)
 	if err != nil {
 		return err
@@ -194,7 +194,7 @@ func (g *RESTGateway) Start() error {
 	return err
 }
 
-func (g *RESTGateway) Shutdown() {
+func (g *Gateway) Shutdown() {
 	if g.sm != nil {
 		g.sm.Close()
 	}

@@ -67,7 +67,7 @@ var rootConfig = &cmdConfig{}
 
 func newRootCmd() (*cobra.Command, *conf.RESTGatewayConf) {
 	restGatewayConf := &conf.RESTGatewayConf{}
-	var restGateway *rest.RESTGateway
+	var restGateway *rest.Gateway
 
 	rootCmd := &cobra.Command{
 		Use:   "fabconnect",
@@ -142,7 +142,7 @@ func initConfig() {
 	}
 }
 
-func startServer(restGatewayConf *conf.RESTGatewayConf, restGateway *rest.RESTGateway) error {
+func startServer(restGatewayConf *conf.RESTGatewayConf, restGateway *rest.Gateway) error {
 
 	if rootConfig.PrintYAML {
 		a, err := marshalToYAML(rootConfig)

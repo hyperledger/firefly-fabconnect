@@ -25,14 +25,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//
 // Instantiate an RPC client to interact with a Fabric network. based on the client configuration
 // on gateway usage, it creates different types of client under the cover:
 // - "useGatewayClient: true": returned RPCClient uses the client-side Gateway
 // - "useGatewayClient: false": returned RPCClient uses a static network map described by the Connection Profile
 // - "useGatewayServer: true": for Fabric 2.4 node only, the returned RPCClient utilizes the server-side gateway service
-//
-func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClient, error) {
+func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.Client, error) {
 	configProvider := config.FromFile(c.ConfigPath)
 	userStore, err := newUserstore(configProvider)
 	if err != nil {

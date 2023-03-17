@@ -194,7 +194,7 @@ func (w *idClientWrapper) Modify(res http.ResponseWriter, req *http.Request, par
 	return &result, nil
 }
 
-func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.IdentityResponse, *restutil.RestError) {
+func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Response, *restutil.RestError) {
 	username := params.ByName("username")
 	enreq := identity.EnrollRequest{}
 	decoder := json.NewDecoder(req.Body)
@@ -226,7 +226,7 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 		return nil, restutil.NewRestError(err.Error())
 	}
 
-	result := identity.IdentityResponse{
+	result := identity.Response{
 		Name:    enreq.Name,
 		Success: true,
 	}
@@ -235,7 +235,7 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 	return &result, nil
 }
 
-func (w *idClientWrapper) Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.IdentityResponse, *restutil.RestError) {
+func (w *idClientWrapper) Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Response, *restutil.RestError) {
 	username := params.ByName("username")
 	enreq := identity.EnrollRequest{}
 	decoder := json.NewDecoder(req.Body)
@@ -263,7 +263,7 @@ func (w *idClientWrapper) Reenroll(res http.ResponseWriter, req *http.Request, p
 		return nil, restutil.NewRestError(err.Error())
 	}
 
-	result := identity.IdentityResponse{
+	result := identity.Response{
 		Name:    username,
 		Success: true,
 	}
@@ -317,19 +317,19 @@ func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, param
 	}
 	ret := make([]*identity.Identity, len(result))
 	for i, v := range result {
-		newId := identity.Identity{}
-		newId.Name = v.ID
-		newId.MaxEnrollments = v.MaxEnrollments
-		newId.CAName = v.CAName
-		newId.Type = v.Type
-		newId.Affiliation = v.Affiliation
+		newID := identity.Identity{}
+		newID.Name = v.ID
+		newID.MaxEnrollments = v.MaxEnrollments
+		newID.CAName = v.CAName
+		newID.Type = v.Type
+		newID.Affiliation = v.Affiliation
 		if len(v.Attributes) > 0 {
-			newId.Attributes = make(map[string]string, len(v.Attributes))
+			newID.Attributes = make(map[string]string, len(v.Attributes))
 			for _, attr := range v.Attributes {
-				newId.Attributes[attr.Name] = attr.Value
+				newID.Attributes[attr.Name] = attr.Value
 			}
 		}
-		ret[i] = &newId
+		ret[i] = &newID
 	}
 	return ret, nil
 }
@@ -340,16 +340,16 @@ func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params
 	if err != nil {
 		return nil, restutil.NewRestError(err.Error(), 500)
 	}
-	newId := identity.Identity{}
-	newId.Name = result.ID
-	newId.MaxEnrollments = result.MaxEnrollments
-	newId.CAName = result.CAName
-	newId.Type = result.Type
-	newId.Affiliation = result.Affiliation
+	newID := identity.Identity{}
+	newID.Name = result.ID
+	newID.MaxEnrollments = result.MaxEnrollments
+	newID.CAName = result.CAName
+	newID.Type = result.Type
+	newID.Affiliation = result.Affiliation
 	if len(result.Attributes) > 0 {
-		newId.Attributes = make(map[string]string, len(result.Attributes))
+		newID.Attributes = make(map[string]string, len(result.Attributes))
 		for _, attr := range result.Attributes {
-			newId.Attributes[attr.Name] = attr.Value
+			newID.Attributes[attr.Name] = attr.Value
 		}
 	}
 
@@ -362,11 +362,11 @@ func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params
 	if err == nil {
 		// the user may have been enrolled by a different client instance
 		ecert := si.EnrollmentCertificate()
-		mspId := si.Identifier().MSPID
-		newId.MSPID = mspId
-		newId.EnrollmentCert = ecert
+		mspID := si.Identifier().MSPID
+		newID.MSPID = mspID
+		newID.EnrollmentCert = ecert
 	}
-	newId.Organization = w.identityConfig.Client().Organization
+	newID.Organization = w.identityConfig.Client().Organization
 
 	// the SDK doesn't save the CACert locally, we have to retrieve it from the Fabric CA server
 	cacert, err := w.getCACert()
@@ -374,8 +374,8 @@ func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params
 		return nil, restutil.NewRestError(err.Error(), 500)
 	}
 
-	newId.CACert = cacert
-	return &newId, nil
+	newID.CACert = cacert
+	return &newID, nil
 }
 
 func (w *idClientWrapper) getCACert() ([]byte, error) {

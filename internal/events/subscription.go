@@ -49,13 +49,13 @@ func newSubscription(stream *eventStream, rpc client.RPCClient, i *eventsapi.Sub
 		ep:          newEvtProcessor(i.ID, stream),
 		filterStale: true,
 	}
-	i.Summary = fmt.Sprintf(`FromBlock=%s,Chaincode=%s,Filter=%s`, i.FromBlock, i.Filter.ChaincodeId, i.Filter.EventFilter)
+	i.Summary = fmt.Sprintf(`FromBlock=%s,Chaincode=%s,Filter=%s`, i.FromBlock, i.Filter.ChaincodeID, i.Filter.EventFilter)
 	// If a name was not provided by the end user, set it to the system generated summary
 	if i.Name == "" {
 		log.Debugf("No name provided for subscription, using auto-generated ID:%s", i.ID)
 		i.Name = i.ID
 	}
-	log.Infof("Created subscription ID:%s Chaincode: %s name:%s", i.ID, i.Filter.ChaincodeId, i.Name)
+	log.Infof("Created subscription ID:%s Chaincode: %s name:%s", i.ID, i.Filter.ChaincodeID, i.Name)
 	return s, nil
 }
 
@@ -79,7 +79,7 @@ func (s *subscription) setInitialBlockHeight(ctx context.Context) (uint64, error
 		log.Infof("%s: initial block height for subscription: %d", s.info.ID, fromBlock)
 		return fromBlock, nil
 	}
-	result, err := s.client.QueryChainInfo(s.info.ChannelId, s.info.Signer)
+	result, err := s.client.QueryChainInfo(s.info.ChannelID, s.info.Signer)
 	if err != nil {
 		return 0, errors.Errorf(errors.RPCCallReturnedError, "QSCC GetChainInfo()", err)
 	}
@@ -131,9 +131,9 @@ func (s *subscription) processNewEvents() {
 				return
 			}
 			event := &eventsapi.EventEntry{
-				ChaincodeId:   ccEvent.ChaincodeID,
+				ChaincodeID:   ccEvent.ChaincodeID,
 				BlockNumber:   ccEvent.BlockNumber,
-				TransactionId: ccEvent.TxID,
+				TransactionID: ccEvent.TxID,
 				EventName:     ccEvent.EventName,
 				Payload:       ccEvent.Payload,
 			}
@@ -157,7 +157,7 @@ func (s *subscription) getEventTimestamp(evt *eventsapi.EventEntry) {
 		return
 	}
 	// we didn't find the timestamp in our cache, query the node for the block header where we can find the timestamp
-	_, block, err := s.client.QueryBlock(s.info.ChannelId, s.info.Signer, evt.BlockNumber, nil)
+	_, block, err := s.client.QueryBlock(s.info.ChannelID, s.info.Signer, evt.BlockNumber, nil)
 	if err != nil {
 		log.Errorf("Unable to retrieve block[%s] timestamp: %s", blockNumber, err)
 		evt.Timestamp = 0 // set to 0, we were not able to retrieve the timestamp.

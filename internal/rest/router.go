@@ -43,15 +43,15 @@ const (
 )
 
 type router struct {
-	syncDispatcher  restsync.SyncDispatcher
-	asyncDispatcher restasync.AsyncDispatcher
-	identityClient  identity.IdentityClient
+	syncDispatcher  restsync.Dispatcher
+	asyncDispatcher restasync.Dispatcher
+	identityClient  identity.Client
 	subManager      events.SubscriptionManager
 	ws              ws.WebSocketServer
 	httpRouter      *httprouter.Router
 }
 
-func newRouter(syncDispatcher restsync.SyncDispatcher, asyncDispatcher restasync.AsyncDispatcher, idClient identity.IdentityClient, sm events.SubscriptionManager, ws ws.WebSocketServer) *router {
+func newRouter(syncDispatcher restsync.Dispatcher, asyncDispatcher restasync.Dispatcher, idClient identity.Client, sm events.SubscriptionManager, ws ws.WebSocketServer) *router {
 	r := httprouter.New()
 	cors.Default().Handler(r)
 	return &router{
@@ -78,7 +78,7 @@ func (r *router) addRoutes() {
 
 	r.httpRouter.GET("/chaininfo", r.queryChainInfo)
 	r.httpRouter.GET("/blocks/:blockNumber", r.queryBlock)
-	r.httpRouter.GET("/blockByTxId/:txId", r.queryBlockByTxId)
+	r.httpRouter.GET("/blockByTxId/:txId", r.queryBlockByTxID)
 
 	r.httpRouter.POST("/query", r.queryChaincode)
 	r.httpRouter.POST("/transactions", r.sendTransaction)
@@ -158,10 +158,10 @@ func (r *router) queryBlock(res http.ResponseWriter, req *http.Request, params h
 	r.syncDispatcher.GetBlock(res, req, params)
 }
 
-func (r *router) queryBlockByTxId(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *router) queryBlockByTxID(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	// query requests are always synchronous
-	r.syncDispatcher.GetBlockByTxId(res, req, params)
+	r.syncDispatcher.GetBlockByTxID(res, req, params)
 }
 
 func (r *router) queryChaincode(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
@@ -173,7 +173,7 @@ func (r *router) queryChaincode(res http.ResponseWriter, req *http.Request, para
 func (r *router) getTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	// query requests are always synchronous
-	r.syncDispatcher.GetTxById(res, req, params)
+	r.syncDispatcher.GetTxByID(res, req, params)
 }
 
 func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {

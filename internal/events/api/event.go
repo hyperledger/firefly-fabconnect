@@ -19,25 +19,27 @@ package api
 import "fmt"
 
 const (
-	BlockType_TX                     = "tx"              // corresponds to blocks containing regular transactions
-	BlockType_Config                 = "config"          // corresponds to blocks containing channel configurations and updates
-	EventPayloadType_Bytes           = "bytes"           // default data type of the event payload, no special processing is done before returning to the subscribing client
-	EventPayloadType_String          = "string"          // event payload will be an UTF-8 encoded string
-	EventPayloadType_JSON            = "json"            // event payload will be a structured map with UTF-8 encoded string values
-	EventPayloadType_StringifiedJSON = "stringifiedJSON" // equivalent to "json" (deprecated)
+	BlockTypeTX                     = "tx"              // corresponds to blocks containing regular transactions
+	BlockTypeConfig                 = "config"          // corresponds to blocks containing channel configurations and updates
+	EventPayloadTypeBytes           = "bytes"           // default data type of the event payload, no special processing is done before returning to the subscribing client
+	EventPayloadTypeString          = "string"          // event payload will be an UTF-8 encoded string
+	EventPayloadTypeJSON            = "json"            // event payload will be a structured map with UTF-8 encoded string values
+	EventPayloadTypeStringifiedJSON = "stringifiedJSON" // equivalent to "json" (deprecated)
 )
 
 // persistedFilter is the part of the filter we record to storage
 // BlockType:   optional. only notify on blocks of a specific type
-//              types are defined in github.com/hyperledger/fabric-protos-go/common:
-//              "config": for HeaderType_CONFIG, HeaderType_CONFIG_UPDATE
-//              "tx": for HeaderType_ENDORSER_TRANSACTION
-// ChaincodeId: optional, only notify on blocks containing events for chaincode Id
+//
+//	types are defined in github.com/hyperledger/fabric-protos-go/common:
+//	"config": for HeaderType_CONFIG, HeaderType_CONFIG_UPDATE
+//	"tx": for HeaderType_ENDORSER_TRANSACTION
+//
+// ChaincodeID: optional, only notify on blocks containing events for chaincode Id
 // Filter:      optional. regexp applied to the event name. can be used independent of Chaincode ID
 // FromBlock:   optional. "newest", "oldest", a number. default is "newest"
 type persistedFilter struct {
 	BlockType   string `json:"blockType,omitempty"`
-	ChaincodeId string `json:"chaincodeId,omitempty"`
+	ChaincodeID string `json:"chaincodeId,omitempty"`
 	EventFilter string `json:"eventFilter,omitempty"`
 }
 
@@ -45,7 +47,7 @@ type persistedFilter struct {
 type SubscriptionInfo struct {
 	TimeSorted
 	ID          string          `json:"id,omitempty"`
-	ChannelId   string          `json:"channel,omitempty"`
+	ChannelID   string          `json:"channel,omitempty"`
 	Path        string          `json:"path"`
 	Summary     string          `json:"-"`      // System generated name for the subscription
 	Name        string          `json:"name"`   // User provided name for the subscription, set to Summary if missing
@@ -62,9 +64,9 @@ func (info *SubscriptionInfo) GetID() string {
 }
 
 type EventEntry struct {
-	ChaincodeId      string      `json:"chaincodeId"`
+	ChaincodeID      string      `json:"chaincodeId"`
 	BlockNumber      uint64      `json:"blockNumber"`
-	TransactionId    string      `json:"transactionId"`
+	TransactionID    string      `json:"transactionId"`
 	TransactionIndex int         `json:"transactionIndex"`
 	EventIndex       int         `json:"eventIndex"`
 	EventName        string      `json:"eventName"`
@@ -73,10 +75,10 @@ type EventEntry struct {
 	SubID            string      `json:"subId"`
 }
 
-func GetKeyForEventClient(channelId string, chaincodeId string) string {
-	// key for a unique event client is <channelId>-<chaincodeId>
+func GetKeyForEventClient(channelID string, chaincodeID string) string {
+	// key for a unique event client is <channelID>-<chaincodeID>
 	// note that we don't allow "fromBlock" to be a key segment, because on restart
 	// the "fromBlock" will be set to the checkpoint which will be the same, thus failing
 	// to differentiate unique event clients
-	return fmt.Sprintf("%s-%s", channelId, chaincodeId)
+	return fmt.Sprintf("%s-%s", channelID, chaincodeID)
 }

@@ -82,10 +82,10 @@ func TestActionAndSubscriptionLifecyle(t *testing.T) {
 	sub := &api.SubscriptionInfo{
 		Name:      subscriptionName,
 		Stream:    stream.ID,
-		ChannelId: "testChannel",
+		ChannelID: "testChannel",
 	}
-	sub.Filter.ChaincodeId = "testChaincode"
-	err, _ = sm.addSubscription(sub)
+	sub.Filter.ChaincodeID = "testChaincode"
+	_, err = sm.addSubscription(sub)
 	assert.NoError(err)
 
 	// confirm that the lookup key entry has also been persisted alongside the main entry
@@ -174,7 +174,7 @@ func TestActionChildCleanup(t *testing.T) {
 		Name:   "testSub",
 		Stream: stream.ID,
 	}
-	err, _ = sm.addSubscription(sub)
+	_, err = sm.addSubscription(sub)
 	assert.NoError(err)
 	err = sm.deleteStream(sm.streams[stream.ID])
 	assert.NoError(err)
@@ -208,9 +208,9 @@ func TestStreamAndSubscriptionErrors(t *testing.T) {
 	sub := &api.SubscriptionInfo{
 		Name:      "testSub",
 		Stream:    stream.ID,
-		ChannelId: "testChannel",
+		ChannelID: "testChannel",
 	}
-	err, _ = sm.addSubscription(sub)
+	_, err = sm.addSubscription(sub)
 	assert.NoError(err)
 
 	err = sm.resetSubscription(sm.subscriptions[sub.ID], "badness")
@@ -243,14 +243,14 @@ func TestStreamAndSubscriptionDuplicateErrors(t *testing.T) {
 	sub := &api.SubscriptionInfo{
 		Name:      "testSub",
 		Stream:    stream.ID,
-		ChannelId: "testChannel",
+		ChannelID: "testChannel",
 	}
-	sub.Filter.BlockType = eventsapi.BlockType_TX
-	sub.Filter.ChaincodeId = "testChaincode"
-	err, _ = sm.addSubscription(sub)
+	sub.Filter.BlockType = eventsapi.BlockTypeTX
+	sub.Filter.ChaincodeID = "testChaincode"
+	_, err = sm.addSubscription(sub)
 	assert.NoError(err)
 
-	err, _ = sm.addSubscription(sub)
+	_, err = sm.addSubscription(sub)
 	assert.EqualError(err, "A subscription with the same channel ID, chaincode ID, block type and event filter already exists")
 
 	sm.db.Close()

@@ -36,6 +36,6 @@ func (_m *TxProcessor) Init(_a0 client.RPCClient) {
 }
 
 // OnMessage provides a mock function with given fields: _a0
-func (_m *TxProcessor) OnMessage(_a0 tx.TxContext) {
+func (_m *TxProcessor) OnMessage(_a0 tx.Context) {
 	_m.Called(_a0)
 }

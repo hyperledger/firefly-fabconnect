@@ -38,6 +38,7 @@ func (sm *TestSecurityModule) AuthRPC(authCtx interface{}, method string, args .
 		if method == "testrpc" {
 			return nil
 		}
+	default:
 	}
 	return fmt.Errorf("badness")
 }
@@ -49,6 +50,7 @@ func (sm *TestSecurityModule) AuthRPCSubscribe(authCtx interface{}, namespace st
 		if namespace == "testns" {
 			return nil
 		}
+	default:
 	}
 	return fmt.Errorf("badness")
 }
@@ -58,6 +60,7 @@ func (sm *TestSecurityModule) AuthEventStreams(authCtx interface{}) error {
 	switch authCtx.(type) {
 	case string:
 		return nil
+	default:
 	}
 	return fmt.Errorf("badness")
 }
@@ -67,6 +70,7 @@ func (sm *TestSecurityModule) AuthListAsyncReplies(authCtx interface{}) error {
 	switch authCtx.(type) {
 	case string:
 		return nil
+	default:
 	}
 	return fmt.Errorf("badness")
 }
@@ -76,6 +80,7 @@ func (sm *TestSecurityModule) AuthReadAsyncReplyByUUID(authCtx interface{}) erro
 	switch authCtx.(type) {
 	case string:
 		return nil
+	default:
 	}
 	return fmt.Errorf("badness")
 }

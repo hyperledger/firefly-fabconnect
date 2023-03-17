@@ -77,8 +77,8 @@ func GetAccessToken(ctx context.Context) string {
 	return ""
 }
 
-// AuthRPC authorize an RPC call
-func AuthRPC(ctx context.Context, method string, args ...interface{}) error {
+// RPC authorize an RPC call
+func RPC(ctx context.Context, method string, args ...interface{}) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
@@ -89,8 +89,8 @@ func AuthRPC(ctx context.Context, method string, args ...interface{}) error {
 	return nil
 }
 
-// AuthRPCSubscribe authorize a subscribe RPC call
-func AuthRPCSubscribe(ctx context.Context, namespace string, channel interface{}, args ...interface{}) error {
+// RPCSubscribe authorize a subscribe RPC call
+func RPCSubscribe(ctx context.Context, namespace string, channel interface{}, args ...interface{}) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
@@ -101,8 +101,8 @@ func AuthRPCSubscribe(ctx context.Context, namespace string, channel interface{}
 	return nil
 }
 
-// AuthEventStreams authorize the whole of event streams
-func AuthEventStreams(ctx context.Context) error {
+// EventStreams authorize the whole of event streams
+func EventStreams(ctx context.Context) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
@@ -113,8 +113,8 @@ func AuthEventStreams(ctx context.Context) error {
 	return nil
 }
 
-// AuthListAsyncReplies authorize the listing or searching of all replies
-func AuthListAsyncReplies(ctx context.Context) error {
+// ListAsyncReplies authorize the listing or searching of all replies
+func ListAsyncReplies(ctx context.Context) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
@@ -125,8 +125,8 @@ func AuthListAsyncReplies(ctx context.Context) error {
 	return nil
 }
 
-// AuthReadAsyncReplyByUUID authorize the query of an invidual reply by UUID
-func AuthReadAsyncReplyByUUID(ctx context.Context) error {
+// ReadAsyncReplyByUUID authorize the query of an invidual reply by UUID
+func ReadAsyncReplyByUUID(ctx context.Context) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {

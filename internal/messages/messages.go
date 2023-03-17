@@ -99,9 +99,9 @@ type QueryChaincode struct {
 	StrongRead bool     `json:"strongread"`
 }
 
-type GetTxById struct {
+type GetTxByID struct {
 	RequestCommon
-	TxId string `json:"txId"`
+	TxID string `json:"txId"`
 }
 
 type GetChainInfo struct {
@@ -114,9 +114,9 @@ type GetBlock struct {
 	BlockHash   []byte
 }
 
-type GetBlockByTxId struct {
+type GetBlockByTxID struct {
 	RequestCommon
-	TxId string
+	TxID string
 }
 
 // SendTransaction message instructs the bridge to install a contract

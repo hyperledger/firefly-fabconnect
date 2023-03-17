@@ -31,16 +31,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// KafkaCommon is the base interface for bridges that interact with Kafka
-type KafkaCommon interface {
+// Common is the base interface for bridges that interact with Kafka
+type Common interface {
 	ValidateConf() error
 	Start() error
 	Conf() conf.KafkaConf
-	Producer() KafkaProducer
+	Producer() Producer
 }
 
-// NewKafkaCommon constructs a new KafkaCommon instance
-func NewKafkaCommon(kf KafkaFactory, conf conf.KafkaConf, kafkaGoRoutines KafkaGoRoutines) (k KafkaCommon) {
+// NewKafkaCommon constructs a new Common instance
+func NewKafkaCommon(kf Factory, conf conf.KafkaConf, kafkaGoRoutines GoRoutines) (k Common) {
 	k = &kafkaCommon{
 		factory:         kf,
 		kafkaGoRoutines: kafkaGoRoutines,
@@ -53,14 +53,14 @@ func NewKafkaCommon(kf KafkaFactory, conf conf.KafkaConf, kafkaGoRoutines KafkaG
 // producer and a consumer-group
 type kafkaCommon struct {
 	conf            conf.KafkaConf
-	factory         KafkaFactory
-	client          KafkaClient
+	factory         Factory
+	client          Client
 	signals         chan os.Signal
-	consumer        KafkaConsumer
+	consumer        Consumer
 	consumerWG      sync.WaitGroup
-	producer        KafkaProducer
+	producer        Producer
 	producerWG      sync.WaitGroup
-	kafkaGoRoutines KafkaGoRoutines
+	kafkaGoRoutines GoRoutines
 	saramaLogger    saramaLogger
 }
 
@@ -68,17 +68,17 @@ func (k *kafkaCommon) Conf() conf.KafkaConf {
 	return k.conf
 }
 
-func (k *kafkaCommon) Producer() KafkaProducer {
+func (k *kafkaCommon) Producer() Producer {
 	return k.producer
 }
 
 // ValidateConf performs common Cobra PreRunE logic for Kafka related commands
 func (k *kafkaCommon) ValidateConf() error {
-	return KafkaValidateConf(k.conf)
+	return ValidateConf(k.conf)
 }
 
-// KafkaValidateConf validates supplied configuration
-func KafkaValidateConf(kconf conf.KafkaConf) (err error) {
+// ValidateConf validates supplied configuration
+func ValidateConf(kconf conf.KafkaConf) (err error) {
 	if kconf.TopicOut == "" {
 		return errors.Errorf(errors.ConfigKafkaMissingOutputTopic)
 	}
@@ -161,7 +161,7 @@ func (k *kafkaCommon) connect() (err error) {
 	}
 	log.Infof("Kafka Connected: %s", brokers)
 
-	return
+	return nil
 }
 
 func (k *kafkaCommon) createProducer() (err error) {
@@ -170,7 +170,7 @@ func (k *kafkaCommon) createProducer() (err error) {
 		log.Errorf("Failed to create Kafka producer: %s", err)
 		return
 	}
-	return
+	return nil
 }
 
 func (k *kafkaCommon) startProducer() (err error) {
@@ -240,5 +240,5 @@ func (k *kafkaCommon) Start() (err error) {
 		log.Infof("Kafka Bridge complete")
 		return
 	}
-	return
+	return nil
 }

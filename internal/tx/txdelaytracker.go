@@ -52,8 +52,8 @@ const (
 	ResetThreshold = 0.3
 )
 
-// TxnDelayTracker - helps manage delays when checking for txn receipts
-type TxDelayTracker interface {
+// DelayTracker - helps manage delays when checking for txn receipts
+type DelayTracker interface {
 	GetInitialDelay() (delay time.Duration)
 	GetRetryDelay(initialDelay time.Duration, retry int) (delay time.Duration)
 	ReportSuccess(timeTaken time.Duration)
@@ -72,11 +72,11 @@ type txDelayTracker struct {
 // tracer
 func (d *txDelayTracker) GetInitialDelay() (delay time.Duration) {
 	// We start with a fraction of the average
-	delay = time.Duration(int64(float64(d.avg())*InitialDelayFraction)) * time.Millisecond
+	delay = time.Duration(int64(d.avg()*InitialDelayFraction)) * time.Millisecond
 	d.count++
 	if (d.count % TracerFrequency) == 0 {
 		log.Debugf("Sending tracer at count=%d delay=%.2fs", d.count, delay.Seconds())
-		delay = delay / TracerDivisor
+		delay /= TracerDivisor
 	}
 	if delay < MinDelay {
 		delay = MinDelay
@@ -91,7 +91,7 @@ func (d *txDelayTracker) GetInitialDelay() (delay time.Duration) {
 func (d *txDelayTracker) GetRetryDelay(initialDelay time.Duration, retry int) (delay time.Duration) {
 	millis := FirstRetryDelayFraction * (float64(initialDelay.Nanoseconds()) / float64(time.Millisecond))
 	for i := 0; i < retry; i++ {
-		millis = millis * Factor
+		millis *= Factor
 		delay = time.Duration(millis) * time.Millisecond
 		if delay > MaxDelay {
 			delay = MaxDelay
@@ -165,7 +165,7 @@ func (d *txDelayTracker) reset() {
 }
 
 // NewTxnDelayTracker - constructs a new tracker
-func NewTxDelayTracker() TxDelayTracker {
+func NewTxDelayTracker() DelayTracker {
 	d := &txDelayTracker{
 		window: Window,
 	}

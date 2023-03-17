@@ -39,7 +39,7 @@ type Creator struct {
 
 type Transaction struct {
 	Type      string               `json:"type"`
-	TxId      string               `json:"tx_id"`
+	TxID      string               `json:"tx_id"`
 	Nonce     string               `json:"nonce"` // hex string
 	Creator   *Creator             `json:"creator"`
 	Status    string               `json:"status"`
@@ -52,7 +52,7 @@ type TransactionAction struct {
 	Nonce        string              `json:"nonce"` // hex string
 	Creator      *Creator            `json:"creator"`
 	TransientMap *map[string][]byte  `json:"transient_map"`
-	ChaincodeId  *peer.ChaincodeID   `json:"chaincode_id"`
+	ChaincodeID  *peer.ChaincodeID   `json:"chaincode_id"`
 	Input        *ChaincodeSpecInput `json:"input"`
 	ProposalHash string              `json:"proposal_hash"` // hex string
 	Event        *ChaincodeEvent     `json:"event"`

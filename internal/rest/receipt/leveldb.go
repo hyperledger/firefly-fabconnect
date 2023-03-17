@@ -54,7 +54,7 @@ func newLevelDBReceipts(conf *conf.ReceiptsDBConf) *levelDBReceipts {
 	}
 }
 
-func (m *levelDBReceipts) ValidateConf() error {
+func (l *levelDBReceipts) ValidateConf() error {
 	// leveldb creates the target directory on demand, no need to check for existence
 	return nil
 }
@@ -142,11 +142,12 @@ func (l *levelDBReceipts) GetReceipts(skip, limit int, ids []string, sinceEpochM
 	if from != "" || to != "" {
 		lookupKeysByFromAndTo = l.getLookupKeysByFromAndTo(from, to, start, endKey, limit)
 	}
-	if len(ids) > 0 && from == "" && to == "" {
+	switch {
+	case len(ids) > 0 && from == "" && to == "":
 		lookupKeys = lookupKeysByIDs
-	} else if len(ids) == 0 && (from != "" || to != "") {
+	case len(ids) == 0 && (from != "" || to != ""):
 		lookupKeys = lookupKeysByFromAndTo
-	} else if len(ids) > 0 && (from != "" || to != "") {
+	case len(ids) > 0 && (from != "" || to != ""):
 		lookupKeys = intersect(lookupKeysByIDs, lookupKeysByFromAndTo)
 	}
 	if lookupKeys != nil {
@@ -214,10 +215,9 @@ func (l *levelDBReceipts) GetReceipt(requestID string) (*map[string]interface{},
 	if err != nil {
 		if err == kvstore.ErrorNotFound {
 			return nil, nil
-		} else {
-			log.Errorf("Failed to retrieve the entry for the original key: %s. %s\n", requestID, err)
-			return nil, errors.Errorf(errors.LevelDBFailedRetriveOriginalKey, requestID, err)
 		}
+		log.Errorf("Failed to retrieve the entry for the original key: %s. %s\n", requestID, err)
+		return nil, errors.Errorf(errors.LevelDBFailedRetriveOriginalKey, requestID, err)
 	}
 	// returned val represents the composite key, use it to retrieve the actual content
 	lookupKey := string(val)
@@ -293,11 +293,12 @@ func (l *levelDBReceipts) getLookupKeysByFromAndTo(from, to string, start, end s
 	}
 
 	var result []string
-	if from != "" && to == "" {
+	switch {
+	case from != "" && to == "":
 		result = fromKeys
-	} else if from == "" && to != "" {
+	case from == "" && to != "":
 		result = toKeys
-	} else {
+	default:
 		// find the intersection of the 2 slices, note that both slices are sorted
 		result = intersect(fromKeys, toKeys)
 	}

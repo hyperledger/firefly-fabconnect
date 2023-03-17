@@ -61,17 +61,17 @@ func TestAccessToken(t *testing.T) {
 func TestAuthRPC(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.NoError(AuthRPC(context.Background(), "anything"))
+	assert.NoError(RPC(context.Background(), "anything"))
 
 	RegisterSecurityModule(&authtest.TestSecurityModule{})
 
-	assert.EqualError(AuthRPC(context.Background(), "anything"), "No auth context")
+	assert.EqualError(RPC(context.Background(), "anything"), "No auth context")
 
-	assert.NoError(AuthRPC(NewSystemAuthContext(), "anything"))
+	assert.NoError(RPC(NewSystemAuthContext(), "anything"))
 
 	ctx, _ := WithAuthContext(context.Background(), "testat")
-	assert.NoError(AuthRPC(ctx, "testrpc"))
-	assert.EqualError(AuthRPC(ctx, "anything"), "badness")
+	assert.NoError(RPC(ctx, "testrpc"))
+	assert.EqualError(RPC(ctx, "anything"), "badness")
 
 	RegisterSecurityModule(nil)
 
@@ -80,17 +80,17 @@ func TestAuthRPC(t *testing.T) {
 func TestAuthRPCSubscribe(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.NoError(AuthRPCSubscribe(context.Background(), "anything", nil))
+	assert.NoError(RPCSubscribe(context.Background(), "anything", nil))
 
 	RegisterSecurityModule(&authtest.TestSecurityModule{})
 
-	assert.EqualError(AuthRPCSubscribe(context.Background(), "anything", nil), "No auth context")
+	assert.EqualError(RPCSubscribe(context.Background(), "anything", nil), "No auth context")
 
-	assert.NoError(AuthRPCSubscribe(NewSystemAuthContext(), "anything", nil))
+	assert.NoError(RPCSubscribe(NewSystemAuthContext(), "anything", nil))
 
 	ctx, _ := WithAuthContext(context.Background(), "testat")
-	assert.NoError(AuthRPCSubscribe(ctx, "testns", nil))
-	assert.EqualError(AuthRPCSubscribe(ctx, "anything", nil), "badness")
+	assert.NoError(RPCSubscribe(ctx, "testns", nil))
+	assert.EqualError(RPCSubscribe(ctx, "anything", nil), "badness")
 
 	RegisterSecurityModule(nil)
 
@@ -99,16 +99,16 @@ func TestAuthRPCSubscribe(t *testing.T) {
 func TestAuthEventStreams(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.NoError(AuthEventStreams(context.Background()))
+	assert.NoError(EventStreams(context.Background()))
 
 	RegisterSecurityModule(&authtest.TestSecurityModule{})
 
-	assert.EqualError(AuthEventStreams(context.Background()), "No auth context")
+	assert.EqualError(EventStreams(context.Background()), "No auth context")
 
-	assert.NoError(AuthEventStreams(NewSystemAuthContext()))
+	assert.NoError(EventStreams(NewSystemAuthContext()))
 
 	ctx, _ := WithAuthContext(context.Background(), "testat")
-	assert.NoError(AuthEventStreams(ctx))
+	assert.NoError(EventStreams(ctx))
 
 	RegisterSecurityModule(nil)
 
@@ -117,16 +117,16 @@ func TestAuthEventStreams(t *testing.T) {
 func TestAuthListAsyncReplies(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.NoError(AuthListAsyncReplies(context.Background()))
+	assert.NoError(ListAsyncReplies(context.Background()))
 
 	RegisterSecurityModule(&authtest.TestSecurityModule{})
 
-	assert.EqualError(AuthListAsyncReplies(context.Background()), "No auth context")
+	assert.EqualError(ListAsyncReplies(context.Background()), "No auth context")
 
-	assert.NoError(AuthListAsyncReplies(NewSystemAuthContext()))
+	assert.NoError(ListAsyncReplies(NewSystemAuthContext()))
 
 	ctx, _ := WithAuthContext(context.Background(), "testat")
-	assert.NoError(AuthListAsyncReplies(ctx))
+	assert.NoError(ListAsyncReplies(ctx))
 
 	RegisterSecurityModule(nil)
 
@@ -135,16 +135,16 @@ func TestAuthListAsyncReplies(t *testing.T) {
 func TestAuthReadAsyncReplyByUUID(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.NoError(AuthReadAsyncReplyByUUID(context.Background()))
+	assert.NoError(ReadAsyncReplyByUUID(context.Background()))
 
 	RegisterSecurityModule(&authtest.TestSecurityModule{})
 
-	assert.EqualError(AuthReadAsyncReplyByUUID(context.Background()), "No auth context")
+	assert.EqualError(ReadAsyncReplyByUUID(context.Background()), "No auth context")
 
-	assert.NoError(AuthReadAsyncReplyByUUID(NewSystemAuthContext()))
+	assert.NoError(ReadAsyncReplyByUUID(NewSystemAuthContext()))
 
 	ctx, _ := WithAuthContext(context.Background(), "testat")
-	assert.NoError(AuthReadAsyncReplyByUUID(ctx))
+	assert.NoError(ReadAsyncReplyByUUID(ctx))
 
 	RegisterSecurityModule(nil)
 

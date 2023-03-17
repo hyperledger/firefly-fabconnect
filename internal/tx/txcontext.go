@@ -22,8 +22,8 @@ import (
 	"github.com/hyperledger/firefly-fabconnect/internal/messages"
 )
 
-// TxnContext is passed for each message that arrives at the bridge
-type TxContext interface {
+// Context is passed for each message that arrives at the bridge
+type Context interface {
 	// Return the Go context
 	Context() context.Context
 	// Get the headers of the message

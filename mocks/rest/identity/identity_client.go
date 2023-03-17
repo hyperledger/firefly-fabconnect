@@ -19,15 +19,15 @@ type IdentityClient struct {
 }
 
 // Enroll provides a mock function with given fields: res, req, params
-func (_m *IdentityClient) Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.IdentityResponse, *util.RestError) {
+func (_m *IdentityClient) Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Response, *util.RestError) {
 	ret := _m.Called(res, req, params)
 
-	var r0 *identity.IdentityResponse
-	if rf, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, httprouter.Params) *identity.IdentityResponse); ok {
+	var r0 *identity.Response
+	if rf, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, httprouter.Params) *identity.Response); ok {
 		r0 = rf(res, req, params)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*identity.IdentityResponse)
+			r0 = ret.Get(0).(*identity.Response)
 		}
 	}
 
@@ -119,15 +119,15 @@ func (_m *IdentityClient) Modify(res http.ResponseWriter, req *http.Request, par
 }
 
 // Reenroll provides a mock function with given fields: res, req, params
-func (_m *IdentityClient) Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.IdentityResponse, *util.RestError) {
+func (_m *IdentityClient) Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Response, *util.RestError) {
 	ret := _m.Called(res, req, params)
 
-	var r0 *identity.IdentityResponse
-	if rf, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, httprouter.Params) *identity.IdentityResponse); ok {
+	var r0 *identity.Response
+	if rf, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, httprouter.Params) *identity.Response); ok {
 		r0 = rf(res, req, params)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*identity.IdentityResponse)
+			r0 = ret.Get(0).(*identity.Response)
 		}
 	}
 

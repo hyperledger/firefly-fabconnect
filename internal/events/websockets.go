@@ -46,7 +46,7 @@ func newWebSocketAction(es *eventStream, spec *webSocketActionInfo) (*webSocketA
 
 func validateWebsocketConfig(spec *webSocketActionInfo) error {
 	if spec.Topic == "" {
-		return fmt.Errorf("Missing required parameter 'websocket.topic'")
+		return fmt.Errorf("missing required parameter 'websocket.topic'")
 	}
 	sd := spec.DistributionMode
 	if sd != "" && sd != DistributionModeBroadcast && sd != DistributionModeWLD {

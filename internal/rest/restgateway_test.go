@@ -69,7 +69,7 @@ func teardown() {
 	test.Teardown(tmpdir)
 }
 
-func newTestGateway(t *testing.T, mockDB ...bool) (*assert.Assertions, *RESTGateway, *sync.WaitGroup, *mockreceipt.ReceiptStorePersistence, *mockfabric.RPCClient, *mockidentity.IdentityClient) {
+func newTestGateway(t *testing.T, mockDB ...bool) (*assert.Assertions, *Gateway, *sync.WaitGroup, *mockreceipt.ReceiptStorePersistence, *mockfabric.RPCClient, *mockidentity.IdentityClient) {
 	assert := assert.New(t)
 	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
 	testConfig.HTTP.Port = lastPort
@@ -308,7 +308,7 @@ func TestIdentitiesEndpoints(t *testing.T) {
 	assert.Equal(2, len(result3))
 	assert.Equal("user1", result3["name"])
 
-	mockResult2 := &identity.IdentityResponse{
+	mockResult2 := &identity.Response{
 		Name:    "user1",
 		Success: true,
 	}

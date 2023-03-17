@@ -141,7 +141,7 @@ func (m *mongoReceipts) Init() (err error) {
 	}
 
 	log.Infof("Connected to MongoDB on %s DB=%s Collection=%s", m.config.MongoDB.URL, m.config.MongoDB.Database, m.config.MongoDB.Collection)
-	return
+	return nil
 }
 
 // AddReceipt processes an individual reply message, and contains all errors

@@ -20,8 +20,9 @@ package plugins
 type EventOperation int
 
 // SecurityModule is a code plug-point that can be implemented using a go plugin module.
-//  Build your plugin with a "SecurityModule" export that implements this interface,
-//  and configure the dynamic load path of your module in the configuration.
+//
+//	Build your plugin with a "SecurityModule" export that implements this interface,
+//	and configure the dynamic load path of your module in the configuration.
 type SecurityModule interface {
 
 	// VerifyToken - Authentication plugpoint. Verfies a token and returns a context object to store that will be returned to authorization points

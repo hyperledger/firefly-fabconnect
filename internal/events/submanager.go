@@ -161,9 +161,8 @@ func (s *subscriptionMGR) AddStream(res http.ResponseWriter, req *http.Request, 
 		eh := strings.ToLower(spec.ErrorHandling)
 		if eh != ErrorHandlingBlock && eh != ErrorHandlingSkip {
 			return nil, restutil.NewRestError("Unknown errorHandling type. Must be an empty string, 'skip' or 'block'")
-		} else {
-			spec.ErrorHandling = eh
 		}
+		spec.ErrorHandling = eh
 	}
 	if spec.Suspended != nil {
 		return nil, restutil.NewRestError("Can not set 'suspended'")
@@ -199,9 +198,8 @@ func (s *subscriptionMGR) UpdateStream(res http.ResponseWriter, req *http.Reques
 		eh := strings.ToLower(spec.ErrorHandling)
 		if eh != ErrorHandlingBlock && eh != ErrorHandlingSkip {
 			return nil, restutil.NewRestError("Unknown errorHandling type. Must be an empty string, 'skip' or 'block'", 400)
-		} else {
-			spec.ErrorHandling = eh
 		}
+		spec.ErrorHandling = eh
 	}
 	if spec.Suspended != nil {
 		return nil, restutil.NewRestError("Can not set 'suspended'")
@@ -226,7 +224,7 @@ func (s *subscriptionMGR) DeleteStream(res http.ResponseWriter, req *http.Reques
 
 	result := map[string]string{}
 	result["id"] = streamID
-	result["deleted"] = "true"
+	result["deleted"] = strconv.FormatBool(true)
 	return &result, nil
 }
 
@@ -243,7 +241,7 @@ func (s *subscriptionMGR) SuspendStream(res http.ResponseWriter, req *http.Reque
 
 	result := map[string]string{}
 	result["id"] = streamID
-	result["suspended"] = "true"
+	result["suspended"] = strconv.FormatBool(true)
 	return &result, nil
 }
 
@@ -260,7 +258,7 @@ func (s *subscriptionMGR) ResumeStream(res http.ResponseWriter, req *http.Reques
 
 	result := map[string]string{}
 	result["id"] = streamID
-	result["resumed"] = "true"
+	result["resumed"] = strconv.FormatBool(true)
 	return &result, nil
 }
 
@@ -285,7 +283,7 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 	if err := json.NewDecoder(req.Body).Decode(&spec); err != nil {
 		return nil, restutil.NewRestError(fmt.Sprintf(errors.RESTGatewaySubscriptionInvalid, err), 400)
 	}
-	if spec.ChannelId == "" {
+	if spec.ChannelID == "" {
 		return nil, restutil.NewRestError(`Missing required parameter "channel"`, 400)
 	}
 	if spec.Stream == "" {
@@ -295,18 +293,18 @@ func (s *subscriptionMGR) AddSubscription(res http.ResponseWriter, req *http.Req
 		return nil, restutil.NewRestError(`Missing required parameter "signer"`, 400)
 	}
 	pt := spec.PayloadType
-	if pt != "" && pt != eventsapi.EventPayloadType_String && pt != eventsapi.EventPayloadType_JSON {
+	if pt != "" && pt != eventsapi.EventPayloadTypeString && pt != eventsapi.EventPayloadTypeJSON {
 		return nil, restutil.NewRestError(`Parameter "payloadType" must be an empty string, "string" or "json"`, 400)
 	}
 	bt := spec.Filter.BlockType
-	if bt != "" && bt != eventsapi.BlockType_TX && bt != eventsapi.BlockType_Config {
+	if bt != "" && bt != eventsapi.BlockTypeTX && bt != eventsapi.BlockTypeConfig {
 		return nil, restutil.NewRestError(`Parameter "filter.blockType" must be an empty string, "tx" or "config"`, 400)
 	}
 	if err := validateFromBlock(spec.FromBlock); err != nil {
 		return nil, restutil.NewRestError(err.Error(), 400)
 	}
 
-	if err, statusCode := s.addSubscription(&spec); err != nil {
+	if statusCode, err := s.addSubscription(&spec); err != nil {
 		return nil, restutil.NewRestError(err.Error(), statusCode)
 	}
 	return &spec, nil
@@ -332,7 +330,7 @@ func (s *subscriptionMGR) ResetSubscription(res http.ResponseWriter, req *http.R
 	}
 	result := map[string]string{}
 	result["id"] = sub.info.ID
-	result["reset"] = "true"
+	result["reset"] = strconv.FormatBool(true)
 	return &result, nil
 }
 
@@ -349,7 +347,7 @@ func (s *subscriptionMGR) DeleteSubscription(res http.ResponseWriter, req *http.
 	}
 	result := map[string]string{}
 	result["id"] = sub.info.ID
-	result["deleted"] = "true"
+	result["deleted"] = strconv.FormatBool(true)
 	return &result, nil
 }
 
@@ -451,7 +449,7 @@ func (s *subscriptionMGR) getSubscriptions() []*eventsapi.SubscriptionInfo {
 	return l
 }
 
-func (s *subscriptionMGR) addSubscription(spec *eventsapi.SubscriptionInfo) (error, int) {
+func (s *subscriptionMGR) addSubscription(spec *eventsapi.SubscriptionInfo) (int, error) {
 	spec.TimeSorted = eventsapi.TimeSorted{
 		CreatedISO8601: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -463,9 +461,9 @@ func (s *subscriptionMGR) addSubscription(spec *eventsapi.SubscriptionInfo) (err
 		spec.FromBlock = FromBlockNewest
 	}
 	if spec.Filter.BlockType == "" {
-		spec.Filter.BlockType = eventsapi.BlockType_TX
+		spec.Filter.BlockType = eventsapi.BlockTypeTX
 	}
-	if spec.Filter.EventFilter == "" && spec.Filter.ChaincodeId != "" {
+	if spec.Filter.EventFilter == "" && spec.Filter.ChaincodeID != "" {
 		spec.Filter.EventFilter = ".*"
 	}
 
@@ -490,24 +488,24 @@ func (s *subscriptionMGR) addSubscription(spec *eventsapi.SubscriptionInfo) (err
 	_, err := s.db.Get(subscriptionKey)
 	if err == nil {
 		// a conflicting subscription already exists, return 400
-		return errors.Error("A subscription with the same channel ID, chaincode ID, block type and event filter already exists"), 400
+		return 400, errors.Error("A subscription with the same channel ID, chaincode ID, block type and event filter already exists")
 	}
 
 	// Create it
 	stream, err := s.streamByID(spec.Stream)
 	if err != nil {
-		return err, 500
+		return 500, err
 	}
 	sub, err := newSubscription(stream, s.rpc, spec)
 	if err != nil {
-		return err, 500
+		return 500, err
 	}
 	s.subscriptions[sub.info.ID] = sub
-	return s.storeSubscription(spec, subscriptionKey), 200
+	return 200, s.storeSubscription(spec, subscriptionKey)
 }
 
 func (s *subscriptionMGR) resetSubscription(sub *subscription, initialBlock string) error {
-	// Re-set the inital block on the subscription and save it
+	// Re-set the initial block on the subscription and save it
 	if initialBlock == "" || initialBlock == FromBlockNewest {
 		sub.info.FromBlock = FromBlockNewest
 	} else {
@@ -682,14 +680,14 @@ func validateFromBlock(fromBlock string) error {
 	// - "<a valid number>"
 	if fromBlock != "" && fromBlock != FromBlockNewest {
 		if _, err := strconv.Atoi(fromBlock); err != nil {
-			return fmt.Errorf("Invalid initial block: must be an integer, an empty string or 'newest'")
+			return fmt.Errorf("invalid initial block: must be an integer, an empty string or 'newest'")
 		}
 	}
 	return nil
 }
 
 func calculateLookupKey(spec *eventsapi.SubscriptionInfo) string {
-	compositeKey := fmt.Sprintf("%s-%s-%s-%s", spec.ChannelId, spec.Filter.ChaincodeId, spec.Filter.BlockType, spec.Filter.EventFilter)
+	compositeKey := fmt.Sprintf("%s-%s-%s-%s", spec.ChannelID, spec.Filter.ChaincodeID, spec.Filter.BlockType, spec.Filter.EventFilter)
 	hashKey := sha256.Sum256([]byte(compositeKey))
 	subscriptionKey := fmt.Sprintf("sub-idx-%x", hashKey)
 	return subscriptionKey

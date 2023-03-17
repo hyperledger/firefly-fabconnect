@@ -110,8 +110,8 @@ func (_m *RPCClient) QueryBlock(channelId string, signer string, blocknumber uin
 	return r0, r1, r2
 }
 
-// QueryBlockByTxId provides a mock function with given fields: channelId, signer, txId
-func (_m *RPCClient) QueryBlockByTxId(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
+// QueryBlockByTxID provides a mock function with given fields: channelId, signer, txId
+func (_m *RPCClient) QueryBlockByTxID(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
 	ret := _m.Called(channelId, signer, txId)
 
 	var r0 *utils.RawBlock

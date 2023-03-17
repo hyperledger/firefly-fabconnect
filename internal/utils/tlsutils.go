@@ -67,5 +67,5 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 		RootCAs:            caCertPool,
 		InsecureSkipVerify: tlsConfig.InsecureSkipVerify,
 	}
-	return
+	return t, nil
 }
