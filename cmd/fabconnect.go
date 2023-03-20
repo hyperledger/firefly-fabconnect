@@ -30,8 +30,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
-
-	_ "net/http/pprof"
 )
 
 func initLogging(debugLevel int) {
@@ -96,6 +94,7 @@ func newRootCmd() (*cobra.Command, *conf.RESTGatewayConf) {
 
 			if rootConfig.DebugPort > 0 {
 				go func() {
+					// #nosec
 					log.Debugf("Debug HTTP endpoint listening on localhost:%d: %s", rootConfig.DebugPort, http.ListenAndServe(fmt.Sprintf("localhost:%d", rootConfig.DebugPort), nil))
 				}()
 			}

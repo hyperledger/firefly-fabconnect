@@ -2,6 +2,10 @@ run:
   tests: false
   skip-dirs:
   - "mocks"
+issues:
+  exclude-rules:
+    - path: internal/events/test_helper.go
+      text: "unused"
 linters-settings:
   golint: {}
   gocritic:

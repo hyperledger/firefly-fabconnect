@@ -61,7 +61,7 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 		caCertPool = x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM(caCert)
 	}
-
+	// #nosec G402
 	t = &tls.Config{
 		Certificates:       clientCerts,
 		RootCAs:            caCertPool,

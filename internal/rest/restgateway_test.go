@@ -964,7 +964,7 @@ func TestEventsAPI(t *testing.T) {
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
-	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
+	assert.Equal("invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
 
 	// POST /subscriptions failed calls due to bad "payloadType" value
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
@@ -1087,7 +1087,7 @@ func TestEventsAPI(t *testing.T) {
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
-	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
+	assert.Equal("invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
 
 	// DELETE /subscriptions/:subId failed calls due to bad ID
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/badId", g.config.HTTP.Port))

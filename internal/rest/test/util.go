@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -149,7 +149,7 @@ J4OVv51lNtDLT9k=
 
 	// set up CA certs
 	certPath := path.Join(tmpdir, "test.crt")
-	_ = ioutil.WriteFile(certPath, []byte(testCert), 0644)
+	_ = ioutil.WriteFile(certPath, []byte(testCert), 0600)
 	// modify ca cert path
 	ccp := strings.Replace(testRPCConfig, "/tmp-cert", certPath, 1)
 	// set up crypto path for each org
@@ -161,7 +161,7 @@ J4OVv51lNtDLT9k=
 	ccp = strings.Replace(ccp, "/tmp-crypto-path-org2", org2MSPPath, 1)
 	// set up CCP
 	ccpPath := path.Join(tmpdir, "ccp.yml")
-	_ = ioutil.WriteFile(ccpPath, []byte(ccp), 0644)
+	_ = ioutil.WriteFile(ccpPath, []byte(ccp), 0600)
 	testConfigJSON = strings.Replace(testConfigJSON, "/test-config-path", ccpPath, 1)
 	// setup receipt store
 	receiptStorePath := path.Join(tmpdir, "receipts")
@@ -170,8 +170,8 @@ J4OVv51lNtDLT9k=
 	}
 	testConfigJSON = strings.Replace(testConfigJSON, "/test-receipt-path", receiptStorePath, 1)
 	// write the config file
-	_ = ioutil.WriteFile(path.Join(tmpdir, "config.json"), []byte(testConfigJSON), 0644)
-	_ = ioutil.WriteFile(path.Join(tmpdir, "config-bad.json"), []byte(testConfigJSONBad), 0644)
+	_ = ioutil.WriteFile(path.Join(tmpdir, "config.json"), []byte(testConfigJSON), 0600)
+	_ = ioutil.WriteFile(path.Join(tmpdir, "config-bad.json"), []byte(testConfigJSONBad), 0600)
 
 	// init the default config
 	testConfig := &conf.RESTGatewayConf{}

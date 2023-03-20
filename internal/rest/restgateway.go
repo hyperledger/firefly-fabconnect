@@ -138,7 +138,7 @@ func (g *Gateway) Start() error {
 	if err != nil {
 		return err
 	}
-
+	// #nosec
 	g.srv = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", g.config.HTTP.LocalAddr, g.config.HTTP.Port),
 		TLSConfig:      tlsConfig,

@@ -521,7 +521,7 @@ func TestLevelDBReceiptsGetReceiptErrorGeneratedID(t *testing.T) {
 	}
 
 	_, err := r.GetReceipt("receipt1")
-	assert.Regexp("Failed to retrieve the entry for the generated ID: receipt1. pop", err)
+	assert.Regexp("failed to retrieve the entry for the generated ID: receipt1. pop", err)
 }
 
 func TestLevelDBReceiptsGetReceiptBadDataID(t *testing.T) {

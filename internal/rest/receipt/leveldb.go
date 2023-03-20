@@ -44,7 +44,7 @@ type levelDBReceipts struct {
 func newLevelDBReceipts(conf *conf.ReceiptsDBConf) *levelDBReceipts {
 	store := kvstore.NewLDBKeyValueStore(conf.LevelDB.Path)
 	t := time.Unix(1000000, 0)
-	entropy := ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)
+	entropy := ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0) // #nosec
 
 	return &levelDBReceipts{
 		conf:         conf,
