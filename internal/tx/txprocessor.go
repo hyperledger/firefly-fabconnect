@@ -44,13 +44,11 @@ type TxProcessor interface {
 var highestID = 1000000
 
 type inflightTx struct {
-	id               int
-	signer           string
-	initialWaitDelay time.Duration
-	txContext        TxContext
-	tx               *fabric.Tx
-	wg               sync.WaitGroup
-	rpc              client.RPCClient
+	id        int
+	signer    string
+	txContext TxContext
+	tx        *fabric.Tx
+	rpc       client.RPCClient
 }
 
 func (i *inflightTx) String() string {
@@ -62,13 +60,12 @@ func (i *inflightTx) String() string {
 }
 
 type txProcessor struct {
-	maxTXWaitTime     time.Duration
-	inflightTxsLock   *sync.Mutex
-	inflightTxs       []*inflightTx
-	inflightTxDelayer TxDelayTracker
-	rpc               client.RPCClient
-	config            *conf.RESTGatewayConf
-	concurrencySlots  chan bool
+	maxTXWaitTime    time.Duration
+	inflightTxsLock  *sync.Mutex
+	inflightTxs      []*inflightTx
+	rpc              client.RPCClient
+	config           *conf.RESTGatewayConf
+	concurrencySlots chan bool
 }
 
 // NewTxnProcessor constructor for message procss
@@ -77,11 +74,10 @@ func NewTxProcessor(conf *conf.RESTGatewayConf) TxProcessor {
 		conf.SendConcurrency = defaultSendConcurrency
 	}
 	p := &txProcessor{
-		inflightTxsLock:   &sync.Mutex{},
-		inflightTxs:       []*inflightTx{},
-		inflightTxDelayer: NewTxDelayTracker(),
-		config:            conf,
-		concurrencySlots:  make(chan bool, conf.SendConcurrency),
+		inflightTxsLock:  &sync.Mutex{},
+		inflightTxs:      []*inflightTx{},
+		config:           conf,
+		concurrencySlots: make(chan bool, conf.SendConcurrency),
 	}
 	return p
 }
@@ -97,8 +93,9 @@ func (p *txProcessor) GetRPCClient() client.RPCClient {
 
 // OnMessage checks the type and dispatches to the correct logic
 // ** From this point on the processor MUST ensure Reply is called
-//    on txnContext eventually in all scenarios.
-//    It cannot return an error synchronously from this function **
+//
+//	on txnContext eventually in all scenarios.
+//	It cannot return an error synchronously from this function **
 func (p *txProcessor) OnMessage(txContext TxContext) {
 
 	var unmarshalErr error
@@ -142,7 +139,6 @@ func (p *txProcessor) addInflightWrapper(txContext TxContext, msg *messages.Requ
 
 	before := len(p.inflightTxs)
 	p.inflightTxs = append(p.inflightTxs, inflight)
-	inflight.initialWaitDelay = p.inflightTxDelayer.GetInitialDelay() // Must call under lock
 
 	// Clear lock before logging
 	p.inflightTxsLock.Unlock()
@@ -171,90 +167,30 @@ func (p *txProcessor) cancelInFlight(inflight *inflightTx, submitted bool) {
 	log.Infof("In-flight %d complete. signer=%s sub=%t before=%d after=%d", inflight.id, inflight.signer, submitted, before, after)
 }
 
-// waitForCompletion is the goroutine to track a transaction through
-// to completion and send the result
-func (p *txProcessor) waitForCompletion(inflight *inflightTx, initialWaitDelay time.Duration) {
+func (p *txProcessor) processCompletion(inflight *inflightTx, tx *fabric.Tx) {
 
-	// The initial delay is passed in, based on updates from all the other
-	// go routines that are tracking transactions. The idea is to minimize
-	// both latency beyond the block period, and avoiding spamming the node
-	// with REST calls for long block periods, or when there is a backlog
-	replyWaitStart := time.Now().UTC()
-	time.Sleep(initialWaitDelay)
+	receipt := inflight.tx.Receipt
+	isSuccess := receipt.IsSuccess()
+	log.Infof("Receipt for %s obtained Success=%t", inflight.tx.Receipt.TransactionID, isSuccess)
 
-	var isMined, timedOut bool
-	var err error
-	var retries int
-	var elapsed time.Duration
-	for !isMined && !timedOut {
-
-		if isMined, err = inflight.tx.GetTXReceipt(inflight.txContext.Context(), p.rpc); err != nil {
-			// We wait even on connectivity errors, as we've submitted the transaction and
-			// we want to provide a receipt if connectivity resumes within the timeout
-			log.Infof("Failed to get receipt for %s (retries=%d): %s", inflight, retries, err)
-		}
-
-		elapsed = time.Now().UTC().Sub(replyWaitStart)
-		timedOut = elapsed > p.maxTXWaitTime
-		if !isMined && !timedOut {
-			// Need to have the inflight lock to calculate the delay, but not
-			// while we're waiting
-			p.inflightTxsLock.Lock()
-			delayBeforeRetry := p.inflightTxDelayer.GetRetryDelay(initialWaitDelay, retries+1)
-			p.inflightTxsLock.Unlock()
-
-			log.Debugf("Receipt not available after %.2fs (retries=%d): %s", elapsed.Seconds(), retries, inflight)
-			time.Sleep(delayBeforeRetry)
-			retries++
-		}
-	}
-
-	if timedOut {
-		if err != nil {
-			inflight.txContext.SendErrorReplyWithTX(500, errors.Errorf(errors.TransactionSendReceiptCheckError, retries, err), inflight.tx.Hash)
-		} else {
-			inflight.txContext.SendErrorReplyWithTX(408, errors.Errorf(errors.TransactionSendReceiptCheckTimeout), inflight.tx.Hash)
-		}
+	// Build our reply
+	var reply messages.TransactionReceipt
+	if isSuccess {
+		reply.Headers.MsgType = messages.MsgTypeTransactionSuccess
 	} else {
-		// Update the stats
-		p.inflightTxsLock.Lock()
-		p.inflightTxDelayer.ReportSuccess(elapsed)
-		p.inflightTxsLock.Unlock()
-
-		receipt := inflight.tx.Receipt
-		isSuccess := receipt.IsSuccess()
-		log.Infof("Receipt for %s obtained after %.2fs Success=%t", inflight.tx.Receipt.TransactionID, elapsed.Seconds(), isSuccess)
-
-		// Build our reply
-		var reply messages.TransactionReceipt
-		if isSuccess {
-			reply.Headers.MsgType = messages.MsgTypeTransactionSuccess
-		} else {
-			reply.Headers.MsgType = messages.MsgTypeTransactionFailure
-		}
-
-		reply.Status = receipt.Status.String()
-		reply.BlockNumber = receipt.BlockNumber
-		reply.Signer = receipt.Signer
-		reply.SignerMSP = receipt.SignerMSP
-		reply.TransactionHash = receipt.TransactionID
-
-		inflight.txContext.Reply(&reply)
+		reply.Headers.MsgType = messages.MsgTypeTransactionFailure
 	}
+
+	reply.Status = receipt.Status.String()
+	reply.BlockNumber = receipt.BlockNumber
+	reply.Signer = receipt.Signer
+	reply.SignerMSP = receipt.SignerMSP
+	reply.TransactionHash = receipt.TransactionID
+
+	inflight.txContext.Reply(&reply)
 
 	// We've submitted the transaction, even if we didn't get a receipt within our timeout.
 	p.cancelInFlight(inflight, true)
-	inflight.wg.Done()
-}
-
-// addInflight adds a transaction to the inflight list, and kick off
-// a goroutine to check for its completion and send the result
-func (p *txProcessor) trackMining(inflight *inflightTx, tx *fabric.Tx) {
-
-	// Kick off the goroutine to track it to completion
-	inflight.tx = tx
-	inflight.wg.Add(1)
-	go p.waitForCompletion(inflight, inflight.initialWaitDelay)
 
 }
 
@@ -287,6 +223,7 @@ func (p *txProcessor) OnSendTransactionMessage(txContext TxContext, msg *message
 	}
 
 	tx := fabric.NewSendTx(msg, inflight.signer)
+	inflight.tx = tx
 	p.sendTransactionCommon(txContext, inflight, tx)
 }
 
@@ -313,5 +250,6 @@ func (p *txProcessor) sendAndTrackMining(txContext TxContext, inflight *inflight
 		return
 	}
 
-	p.trackMining(inflight, tx)
+	// receipt is already available once the "Send()" call returns
+	p.processCompletion(inflight, tx)
 }

@@ -30,7 +30,7 @@ clean:
 	$(VGO) clean
 	rm -f *.so ${BINARY_NAME}
 builddeps:
-	$(VGO) get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2
+	$(VGO) get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
 deps: builddeps
 	$(VGO) get
 mockery: .ALWAYS
