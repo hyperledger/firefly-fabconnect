@@ -18,7 +18,6 @@ package kvstore
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -27,7 +26,8 @@ import (
 )
 
 func tempdir(t *testing.T) string {
-	dir, _ := ioutil.TempDir("", "fly")
+	dir, err := os.MkdirTemp("", "fly")
+	assert.NoError(t, err)
 	t.Logf("tmpdir/create: %s", dir)
 	return dir
 }
@@ -41,7 +41,8 @@ func TestLevelDBPutGet(t *testing.T) {
 	assert := assert.New(t)
 	dir := tempdir(t)
 	defer cleanup(t, dir)
-	kv := NewLDBKeyValueStore(path.Join(dir, "db"))
+	dbpath := path.Join(dir, "db")
+	kv := NewLDBKeyValueStore(dbpath)
 	err := kv.Init()
 	assert.NoError(err)
 	err = kv.Put("things", []byte("stuff"))
@@ -81,7 +82,7 @@ func TestLevelDBBadPath(t *testing.T) {
 	dir := tempdir(t)
 	defer cleanup(t, dir)
 	dbPath := path.Join(dir, "badness")
-	_ = ioutil.WriteFile(dbPath, []byte{}, 0644)
+	_ = os.WriteFile(dbPath, []byte{}, 0644)
 	kv := NewLDBKeyValueStore(dbPath)
 	err := kv.Init()
 	assert.Regexp("Failed to open DB", err.Error())
