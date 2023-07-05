@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"runtime/pprof"
 	"strings"
 
 	"github.com/hyperledger/firefly-fabconnect/internal/auth"
@@ -102,7 +101,6 @@ func (r *router) addRoutes() {
 
 	r.httpRouter.GET("/ws", r.wsHandler)
 	r.httpRouter.GET("/status", r.statusHandler)
-	r.httpRouter.POST("/pprof", r.dumpGoRoutines)
 }
 
 func (r *router) newAccessTokenContextHandler() http.Handler {
@@ -446,11 +444,6 @@ func (r *router) resetSubscription(res http.ResponseWriter, req *http.Request, p
 		return
 	}
 	marshalAndReply(res, req, result)
-}
-
-func (r *router) dumpGoRoutines(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
-	log.Infof("--> %s %s", req.Method, req.URL)
-	_ = pprof.Lookup("goroutine").WriteTo(res, 1)
 }
 
 func restAsyncReply(res http.ResponseWriter, req *http.Request, asyncResponse *messages.AsyncSentMsg) {
