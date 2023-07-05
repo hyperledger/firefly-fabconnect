@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -94,15 +95,23 @@ func newRootCmd() (*cobra.Command, *conf.RESTGatewayConf) {
 
 			initLogging(rootConfig.DebugLevel)
 
-			if rootConfig.DebugPort > 0 {
-				go func() {
-					log.Debugf("Debug HTTP endpoint listening on localhost:%d: %s", rootConfig.DebugPort, http.ListenAndServe(fmt.Sprintf("localhost:%d", rootConfig.DebugPort), nil))
-				}()
-			}
-
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if rootConfig.DebugPort > 0 {
+				router := NewDebugRouter()
+				router.addRoutes()
+				debugServer := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", rootConfig.DebugPort), Handler: router.router, ReadHeaderTimeout: 30 * time.Second}
+				go func() {
+					_ = debugServer.ListenAndServe()
+				}()
+				log.Infof("Debug HTTP endpoint listening on 127.0.0.1:%d", rootConfig.DebugPort)
+
+				defer func() {
+					log.Infof("Shutting down the debug server")
+					_ = debugServer.Close()
+				}()
+			}
 			err := startServer(restGatewayConf, restGateway)
 			if err != nil {
 				return err
@@ -112,7 +121,7 @@ func newRootCmd() (*cobra.Command, *conf.RESTGatewayConf) {
 	}
 
 	rootCmd.Flags().IntVarP(&rootConfig.DebugLevel, "debug", "d", 1, "0=error, 1=info, 2=debug")
-	rootCmd.Flags().IntVarP(&rootConfig.DebugPort, "debugPort", "Z", 6060, "Port for pprof HTTP endpoints (localhost only)")
+	rootCmd.Flags().IntVarP(&rootConfig.DebugPort, "debugPort", "Z", 0, "Port for pprof HTTP endpoints (localhost only)")
 	rootCmd.Flags().BoolVarP(&rootConfig.PrintYAML, "print-yaml-confg", "Y", false, "Print YAML config snippet and exit")
 	rootCmd.Flags().StringVarP(&rootConfig.Filename, "configfile", "f", "", "Configuration file, must be one of .yml, .yaml, or .json")
 	conf.CobraInit(rootCmd, restGatewayConf)
