@@ -207,3 +207,21 @@ func TestKafkaSuccess(t *testing.T) {
 	assert.Equal([]string{"broker1", "broker2"}, restGatewayConf.Kafka.Brokers)
 	test.Teardown(tmpdir)
 }
+
+func TestDebugServer(t *testing.T) {
+	assert := assert.New(t)
+
+	tmpdir, _ := test.Setup()
+	rootCmd, _ := newRootCmd()
+	rootCmd.RunE = runNothing
+	args := []string{
+		"-f", path.Join(tmpdir, "config.json"),
+		"--debugPort", "6060",
+	}
+	rootCmd.SetArgs(args)
+	os.Unsetenv("FC_HTTP_PORT")
+	err := rootCmd.Execute()
+	assert.NoError(err)
+	assert.Equal(6060, rootConfig.DebugPort)
+	test.Teardown(tmpdir)
+}

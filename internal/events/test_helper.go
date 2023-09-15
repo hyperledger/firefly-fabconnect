@@ -16,7 +16,6 @@ package events
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -32,7 +31,7 @@ import (
 )
 
 func tempdir(t *testing.T) string {
-	dir, _ := ioutil.TempDir("", "fly")
+	dir, _ := os.MkdirTemp("", "fly")
 	t.Logf("tmpdir/create: %s", dir)
 	return dir
 }
