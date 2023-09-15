@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/protobuf/proto" //nolint
 	"github.com/hyperledger/fabric-protos-go/common"
+	"github.com/hyperledger/fabric-protos-go/peer/lifecycle"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,6 +84,9 @@ func TestDecodeEndorserBlockLifecycleTxs(t *testing.T) {
 	assert.Equal("_lifecycle", cpp.Input.ChaincodeSpec.ChaincodeId.Name)
 	assert.Equal("UNDEFINED", cpp.Input.ChaincodeSpec.Type)
 	assert.Equal("ApproveChaincodeDefinitionForMyOrg", cpp.Input.ChaincodeSpec.Input.Args[0])
+	assert.Equal(int64(1), cpp.Input.ChaincodeSpec.Input.Args[1].(*lifecycle.ApproveChaincodeDefinitionForMyOrgArgs).Sequence)
+	assert.Equal("asset_transfer", cpp.Input.ChaincodeSpec.Input.Args[1].(*lifecycle.ApproveChaincodeDefinitionForMyOrgArgs).Name)
+	assert.Equal("1.1.0.u0ypz4p14q", cpp.Input.ChaincodeSpec.Input.Args[1].(*lifecycle.ApproveChaincodeDefinitionForMyOrgArgs).Version)
 }
 
 func TestDecodeConfigBlock(t *testing.T) {
