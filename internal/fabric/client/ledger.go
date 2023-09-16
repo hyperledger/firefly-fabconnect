@@ -41,7 +41,7 @@ type ledgerClientWrapper struct {
 	mu                  sync.Mutex
 }
 
-func newLedgerClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *ledgerClientWrapper {
+func newLedgerClient(_ core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *ledgerClientWrapper {
 	w := &ledgerClientWrapper{
 		sdk:                 sdk,
 		idClient:            idClient,

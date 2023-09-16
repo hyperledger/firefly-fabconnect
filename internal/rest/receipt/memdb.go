@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -48,7 +48,7 @@ func (m *memoryReceipts) Init() error {
 	return nil
 }
 
-func (m *memoryReceipts) GetReceipts(skip, limit int, ids []string, sinceEpochMS int64, from, to, start string) (*[]map[string]interface{}, error) {
+func (m *memoryReceipts) GetReceipts(skip, limit int, ids []string, sinceEpochMS int64, from, to, _ string) (*[]map[string]interface{}, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
@@ -84,7 +84,7 @@ func (m *memoryReceipts) GetReceipt(requestID string) (*map[string]interface{}, 
 	return nil, nil
 }
 
-func (m *memoryReceipts) AddReceipt(requestID string, receipt *map[string]interface{}) error {
+func (m *memoryReceipts) AddReceipt(_ string, receipt *map[string]interface{}) error {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 

@@ -61,7 +61,7 @@ func newWebhookAction(es *eventStream, spec *webhookActionInfo) (*webhookAction,
 }
 
 // attemptWebhookAction performs a single attempt of a webhook action
-func (w *webhookAction) attemptBatch(batchNumber, attempt uint64, events []*api.EventEntry) error {
+func (w *webhookAction) attemptBatch(_, attempt uint64, events []*api.EventEntry) error {
 	// We perform DNS resolution before each attempt, to exclude private IP address ranges from the target
 	esID := w.es.spec.ID
 	u, _ := url.Parse(w.spec.URL)

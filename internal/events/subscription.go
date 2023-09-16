@@ -69,7 +69,7 @@ func restoreSubscription(stream *eventStream, rpc client.RPCClient, i *eventsapi
 	return s, nil
 }
 
-func (s *subscription) setInitialBlockHeight(ctx context.Context) (uint64, error) {
+func (s *subscription) setInitialBlockHeight(_ context.Context) (uint64, error) {
 	log.Debugf(`%s: Setting initial block height. "fromBlock" value in the subscription is %s`, s.info.ID, s.info.FromBlock)
 	if s.info.FromBlock != "" && s.info.FromBlock != FromBlockNewest {
 		fromBlock, err := strconv.ParseUint(s.info.FromBlock, 10, 64)
@@ -94,7 +94,7 @@ func (s *subscription) setCheckpointBlockHeight(i uint64) {
 	log.Infof("%s: checkpoint restored block height for subscription: %d", s.info.ID, i)
 }
 
-func (s *subscription) restartFilter(ctx context.Context, since uint64) error {
+func (s *subscription) restartFilter(_ context.Context, since uint64) error {
 	reg, blockEventNotifier, ccEventNotifier, err := s.client.SubscribeEvent(s.info, since)
 	if err != nil {
 		return errors.Errorf(errors.RPCCallReturnedError, "SubscribeEvent", err)

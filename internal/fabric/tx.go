@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/fabric/client"
-	"github.com/hyperledger/firefly-fabconnect/internal/messages"
+	fabricClient "github.com/hyperledger/firefly-fabconnect/internal/fabric/client"
+	messaging "github.com/hyperledger/firefly-fabconnect/internal/messages"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Txn wraps a Fabric transaction, along with the logic to send it over
@@ -38,11 +38,11 @@ type Tx struct {
 	Args          []string
 	TransientMap  map[string]string
 	Hash          string
-	Receipt       *client.TxReceipt
+	Receipt       *fabricClient.TxReceipt
 	Signer        string
 }
 
-func NewSendTx(msg *messages.SendTransaction, signer string) *Tx {
+func NewSendTx(msg *messaging.SendTransaction, _ string) *Tx {
 	return &Tx{
 		ChannelID:     msg.Headers.ChannelID,
 		ChaincodeName: msg.Headers.ChaincodeName,
@@ -55,7 +55,7 @@ func NewSendTx(msg *messages.SendTransaction, signer string) *Tx {
 }
 
 // GetTXReceipt gets the receipt for the transaction
-func (tx *Tx) GetTXReceipt(ctx context.Context, rpc client.RPCClient) (bool, error) {
+func (tx *Tx) GetTXReceipt(_ context.Context, _ fabricClient.RPCClient) (bool, error) {
 	tx.lock.Lock()
 	isMined := tx.Receipt.BlockNumber > 0
 	tx.lock.Unlock()
@@ -63,10 +63,10 @@ func (tx *Tx) GetTXReceipt(ctx context.Context, rpc client.RPCClient) (bool, err
 }
 
 // Send sends an individual transaction
-func (tx *Tx) Send(ctx context.Context, rpc client.RPCClient) error {
+func (tx *Tx) Send(_ context.Context, rpc fabricClient.RPCClient) error {
 	start := time.Now().UTC()
 
-	var receipt *client.TxReceipt
+	var receipt *fabricClient.TxReceipt
 	var err error
 	receipt, err = rpc.Invoke(tx.ChannelID, tx.Signer, tx.ChaincodeName, tx.Function, tx.Args, tx.TransientMap, tx.IsInit)
 	tx.lock.Lock()
@@ -75,9 +75,9 @@ func (tx *Tx) Send(ctx context.Context, rpc client.RPCClient) error {
 
 	callTime := time.Now().UTC().Sub(start)
 	if err != nil {
-		log.Warnf("TX:%s Failed to send: %s [%.2fs]", tx.Hash, err, callTime.Seconds())
+		logrus.Warnf("TX:%s Failed to send: %s [%.2fs]", tx.Hash, err, callTime.Seconds())
 	} else {
-		log.Infof("TX:%s Sent OK [%.2fs]", tx.Hash, callTime.Seconds())
+		logrus.Infof("TX:%s Sent OK [%.2fs]", tx.Hash, callTime.Seconds())
 	}
 	return err
 }

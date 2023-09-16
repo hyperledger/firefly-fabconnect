@@ -37,7 +37,7 @@ linters:
   disable:
     - structcheck
   enable:
-    - depguard
+    # - depguard
     - dogsled
     - errcheck
     - goconst

@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	internalErrors "github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/messages"
 	restutil "github.com/hyperledger/firefly-fabconnect/internal/rest/utils"
 	"github.com/hyperledger/firefly-fabconnect/internal/tx"
@@ -85,12 +85,12 @@ func (t *syncTxInflight) Unmarshal(msg interface{}) error {
 	return nil
 }
 
-func (t *syncTxInflight) SendErrorReply(status int, err error) {
+func (t *syncTxInflight) SendErrorReply(_ int, err error) {
 	t.replyProcessor.ReplyWithError(err)
 }
 
 func (t *syncTxInflight) SendErrorReplyWithTX(status int, err error, txHash string) {
-	t.SendErrorReply(status, errors.Errorf(errors.RESTGatewaySyncWrapErrorWithTXDetail, txHash, err))
+	t.SendErrorReply(status, internalErrors.Errorf(internalErrors.RESTGatewaySyncWrapErrorWithTXDetail, txHash, err))
 }
 
 func (t *syncTxInflight) Reply(replyMessage messages.ReplyWithHeaders) {
@@ -123,7 +123,7 @@ type syncResponder struct {
 }
 
 func (i *syncResponder) ReplyWithError(err error) {
-	errors.RestErrReply(i.res, i.req, err, 500)
+	internalErrors.RestErrReply(i.res, i.req, err, 500)
 	i.done = true
 	i.waiter.Broadcast()
 }
@@ -184,7 +184,7 @@ func (d *dispatcher) QueryChaincode(res http.ResponseWriter, req *http.Request, 
 	start := time.Now().UTC()
 	msg, err := restutil.BuildQueryMessage(res, req, params)
 	if err != nil {
-		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		internalErrors.RestErrReply(res, req, err.Error, err.StatusCode)
 		return
 	}
 
@@ -192,7 +192,7 @@ func (d *dispatcher) QueryChaincode(res http.ResponseWriter, req *http.Request, 
 	callTime := time.Now().UTC().Sub(start)
 	if err1 != nil {
 		log.Warnf("Query [chaincode=%s, func=%s] failed to send: %s [%.2fs]", msg.Headers.ChaincodeName, msg.Function, err1, callTime.Seconds())
-		errors.RestErrReply(res, req, err1, 500)
+		internalErrors.RestErrReply(res, req, err1, 500)
 		return
 	}
 	log.Infof("Query [chaincode=%s, func=%s] [%.2fs]", msg.Headers.ChaincodeName, msg.Function, callTime.Seconds())
@@ -207,7 +207,7 @@ func (d *dispatcher) GetTxByID(res http.ResponseWriter, req *http.Request, param
 	start := time.Now().UTC()
 	msg, err := restutil.BuildTxByIDMessage(res, req, params)
 	if err != nil {
-		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		internalErrors.RestErrReply(res, req, err.Error, err.StatusCode)
 		return
 	}
 
@@ -215,7 +215,7 @@ func (d *dispatcher) GetTxByID(res http.ResponseWriter, req *http.Request, param
 	callTime := time.Now().UTC().Sub(start)
 	if err1 != nil {
 		log.Warnf("Query transaction %s failed to send: %s [%.2fs]", msg.TxID, err1, callTime.Seconds())
-		errors.RestErrReply(res, req, err1, 500)
+		internalErrors.RestErrReply(res, req, err1, 500)
 		return
 	}
 	log.Infof("Query transaction %s [%.2fs]", msg.TxID, callTime.Seconds())
@@ -228,13 +228,13 @@ func (d *dispatcher) GetTxByID(res http.ResponseWriter, req *http.Request, param
 func (d *dispatcher) GetChainInfo(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	msg, err := restutil.BuildGetChainInfoMessage(res, req, params)
 	if err != nil {
-		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		internalErrors.RestErrReply(res, req, err.Error, err.StatusCode)
 		return
 	}
 
 	result, err1 := d.processor.GetRPCClient().QueryChainInfo(msg.Headers.ChannelID, msg.Headers.Signer)
 	if err1 != nil {
-		errors.RestErrReply(res, req, err1, 500)
+		internalErrors.RestErrReply(res, req, err1, 500)
 		return
 	}
 	var reply messages.LedgerQueryResult
@@ -250,13 +250,13 @@ func (d *dispatcher) GetChainInfo(res http.ResponseWriter, req *http.Request, pa
 func (d *dispatcher) GetBlock(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	msg, err := restutil.BuildGetBlockMessage(res, req, params)
 	if err != nil {
-		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		internalErrors.RestErrReply(res, req, err.Error, err.StatusCode)
 		return
 	}
 
 	rawblock, block, err1 := d.processor.GetRPCClient().QueryBlock(msg.Headers.ChannelID, msg.Headers.Signer, msg.BlockNumber, msg.BlockHash)
 	if err1 != nil {
-		errors.RestErrReply(res, req, err1, 500)
+		internalErrors.RestErrReply(res, req, err1, 500)
 		return
 	}
 	var reply messages.LedgerQueryResult
@@ -271,13 +271,13 @@ func (d *dispatcher) GetBlock(res http.ResponseWriter, req *http.Request, params
 func (d *dispatcher) GetBlockByTxID(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	msg, err := restutil.BuildGetBlockByTxIDMessage(res, req, params)
 	if err != nil {
-		errors.RestErrReply(res, req, err.Error, err.StatusCode)
+		internalErrors.RestErrReply(res, req, err.Error, err.StatusCode)
 		return
 	}
 
 	rawblock, block, err1 := d.processor.GetRPCClient().QueryBlockByTxID(msg.Headers.ChannelID, msg.Headers.Signer, msg.TxID)
 	if err1 != nil {
-		errors.RestErrReply(res, req, err1, 500)
+		internalErrors.RestErrReply(res, req, err1, 500)
 		return
 	}
 	var reply messages.LedgerQueryResult

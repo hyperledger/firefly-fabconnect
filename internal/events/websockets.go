@@ -56,7 +56,7 @@ func validateWebsocketConfig(spec *webSocketActionInfo) error {
 }
 
 // attemptBatch attempts to deliver a batch over socket IO
-func (w *webSocketAction) attemptBatch(batchNumber, attempt uint64, events []*api.EventEntry) error {
+func (w *webSocketAction) attemptBatch(batchNumber, _ uint64, events []*api.EventEntry) error {
 	var err error
 
 	// Get a blocking channel to send and receive on our chosen namespace

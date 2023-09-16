@@ -158,7 +158,7 @@ const (
 	// LevelDBFailedRetriveOriginalKey problem retrieving entry - original key
 	LevelDBFailedRetriveOriginalKey = "Failed to retrieve the entry for the original key: %s. %s"
 	// LevelDBFailedRetriveGeneratedID problem retrieving entry - generated ID
-	LevelDBFailedRetriveGeneratedID = "Failed to retrieve the entry for the generated ID: %s. %s"
+	LevelDBFailedRetriveGeneratedID = "failed to retrieve the entry for the generated ID: %s. %s"
 
 	// KVStoreDBLoad failed to init DB
 	KVStoreDBLoad = "Failed to open DB at %s: %s"

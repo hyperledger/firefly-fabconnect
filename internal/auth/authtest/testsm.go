@@ -32,7 +32,7 @@ func (sm *TestSecurityModule) VerifyToken(tok string) (interface{}, error) {
 }
 
 // AuthRPC of TEST MODULE checks if a token matches a fixed string
-func (sm *TestSecurityModule) AuthRPC(authCtx interface{}, method string, args ...interface{}) error {
+func (sm *TestSecurityModule) AuthRPC(authCtx interface{}, method string, _ ...interface{}) error {
 	switch authCtx.(type) {
 	case string:
 		if method == "testrpc" {
@@ -44,7 +44,7 @@ func (sm *TestSecurityModule) AuthRPC(authCtx interface{}, method string, args .
 }
 
 // AuthRPCSubscribe of TEST MODULE checks if a namespace matches a fixed string
-func (sm *TestSecurityModule) AuthRPCSubscribe(authCtx interface{}, namespace string, channel interface{}, args ...interface{}) error {
+func (sm *TestSecurityModule) AuthRPCSubscribe(authCtx interface{}, namespace string, _ interface{}, _ ...interface{}) error {
 	switch authCtx.(type) {
 	case string:
 		if namespace == "testns" {

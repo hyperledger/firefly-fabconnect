@@ -199,10 +199,9 @@ func (l *levelDBReceipts) getReceiptsNoFilter(itr kvstore.KVIterator, skip, limi
 			if err != nil {
 				log.Errorf("Failed to decode stored receipt for request ID %s\n", itr.Key())
 				continue
-			} else {
-				receipt["_sequenceKey"] = key
-				results = append(results, receipt)
 			}
+			receipt["_sequenceKey"] = key
+			results = append(results, receipt)
 		}
 		index++
 	}
@@ -264,9 +263,8 @@ func (l *levelDBReceipts) getLookupKeysByIDs(ids []string, start, end string) []
 		if err != nil {
 			log.Warnf("Failed to locate entry for key ID %s", id)
 			continue
-		} else {
-			result = append(result, string(val))
 		}
+		result = append(result, string(val))
 	}
 	sort.Strings(result)
 	// since our query searches in descending order, while sort.SearchString requires ascending order

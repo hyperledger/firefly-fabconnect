@@ -129,20 +129,20 @@ func (r *router) wsHandler(res http.ResponseWriter, req *http.Request, params ht
 	r.ws.NewConnection(res, req, params)
 }
 
-func (r *router) statusHandler(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (r *router) statusHandler(res http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	reply, _ := json.Marshal(&statusMsg{OK: true})
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(200)
 	_, _ = res.Write(reply)
 }
 
-func (r *router) serveSwagger(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *router) serveSwagger(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	fs := http.FileServer(http.Dir("./openapi"))
 	fs.ServeHTTP(res, req)
 }
 
-func (r *router) serveSwaggerUI(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *router) serveSwaggerUI(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	res.Header().Add("Content-Type", "text/html")
 	_, _ = res.Write(utils.SwaggerUIHTML(req.Context()))
@@ -448,7 +448,7 @@ func (r *router) resetSubscription(res http.ResponseWriter, req *http.Request, p
 	marshalAndReply(res, req, result)
 }
 
-func (r *router) dumpGoRoutines(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *router) dumpGoRoutines(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	_ = pprof.Lookup("goroutine").WriteTo(res, 1)
 }

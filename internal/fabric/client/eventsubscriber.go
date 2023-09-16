@@ -44,7 +44,7 @@ type eventClientWrapper struct {
 	mu                 sync.Mutex
 }
 
-func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *eventClientWrapper {
+func newEventClient(_ core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *eventClientWrapper {
 	w := &eventClientWrapper{
 		sdk:                sdk,
 		idClient:           idClient,

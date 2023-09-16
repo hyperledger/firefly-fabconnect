@@ -19,7 +19,7 @@ package auth
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	internalErrors "github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/pkg/plugins"
 )
 
@@ -82,7 +82,7 @@ func RPC(ctx context.Context, method string, args ...interface{}) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthRPC(authCtx, method, args...)
 	}
@@ -94,7 +94,7 @@ func RPCSubscribe(ctx context.Context, namespace string, channel interface{}, ar
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthRPCSubscribe(authCtx, namespace, channel, args...)
 	}
@@ -106,7 +106,7 @@ func EventStreams(ctx context.Context) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthEventStreams(authCtx)
 	}
@@ -118,7 +118,7 @@ func ListAsyncReplies(ctx context.Context) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthListAsyncReplies(authCtx)
 	}
@@ -130,7 +130,7 @@ func ReadAsyncReplyByUUID(ctx context.Context) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthReadAsyncReplyByUUID(authCtx)
 	}

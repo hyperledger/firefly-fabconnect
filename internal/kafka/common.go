@@ -116,8 +116,7 @@ func (k *kafkaCommon) connect() (err error) {
 
 	log.Debugf("Kafka Bootstrap brokers: %s", k.conf.Brokers)
 	if len(k.conf.Brokers) == 0 || k.conf.Brokers[0] == "" {
-		err = errors.Errorf(errors.ConfigKafkaMissingBrokers)
-		return
+		return errors.Errorf(errors.ConfigKafkaMissingBrokers)
 	}
 
 	sarama.Logger = k.saramaLogger
@@ -125,7 +124,7 @@ func (k *kafkaCommon) connect() (err error) {
 
 	var tlsConfig *tls.Config
 	if tlsConfig, err = utils.CreateTLSConfiguration(&k.conf.TLS); err != nil {
-		return
+		return nil
 	}
 
 	if k.conf.SASL.Username != "" && k.conf.SASL.Password != "" {
@@ -153,7 +152,7 @@ func (k *kafkaCommon) connect() (err error) {
 
 	if k.client, err = k.factory.NewClient(k, clientConf); err != nil {
 		log.Errorf("Failed to create Kafka client: %s", err)
-		return
+		return nil
 	}
 	var brokers []string
 	for _, broker := range k.client.Brokers() {
@@ -213,19 +212,19 @@ func (k *kafkaCommon) startConsumer() (err error) {
 func (k *kafkaCommon) Start() (err error) {
 
 	if err = k.connect(); err != nil {
-		return
+		return nil
 	}
 	if err = k.createConsumer(); err != nil {
-		return
+		return nil
 	}
 	if err = k.createProducer(); err != nil {
-		return
+		return nil
 	}
 	if err = k.startConsumer(); err != nil {
-		return
+		return nil
 	}
 	if err = k.startProducer(); err != nil {
-		return
+		return nil
 	}
 
 	log.Debugf("Kafka initialization complete")
@@ -238,7 +237,7 @@ func (k *kafkaCommon) Start() (err error) {
 		k.consumerWG.Wait()
 
 		log.Infof("Kafka Bridge complete")
-		return
+		return nil
 	}
 	return nil
 }

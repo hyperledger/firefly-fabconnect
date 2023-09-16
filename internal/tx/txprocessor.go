@@ -167,7 +167,7 @@ func (p *txProcessor) cancelInFlight(inflight *inflightTx, submitted bool) {
 	log.Infof("In-flight %d complete. signer=%s sub=%t before=%d after=%d", inflight.id, inflight.signer, submitted, before, after)
 }
 
-func (p *txProcessor) processCompletion(inflight *inflightTx, tx *fabric.Tx) {
+func (p *txProcessor) processCompletion(inflight *inflightTx, _ *fabric.Tx) {
 
 	receipt := inflight.tx.Receipt
 	isSuccess := receipt.IsSuccess()

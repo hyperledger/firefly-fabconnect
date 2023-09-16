@@ -31,14 +31,14 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 
 	if !AllOrNoneReqd(tlsConfig.ClientCertsFile, tlsConfig.ClientKeyFile) {
 		err = errors.Errorf(errors.ConfigTLSCertOrKey)
-		return
+		return nil, err
 	}
 
 	mutualAuth := tlsConfig.ClientCertsFile != "" && tlsConfig.ClientKeyFile != ""
 	log.Debugf("Kafka TLS Enabled=%t Insecure=%t MutualAuth=%t ClientCertsFile=%s PrivateKeyFile=%s CACertsFile=%s",
 		tlsConfig.Enabled, tlsConfig.InsecureSkipVerify, mutualAuth, tlsConfig.ClientCertsFile, tlsConfig.ClientKeyFile, tlsConfig.CACertsFile)
 	if !tlsConfig.Enabled {
-		return
+		return nil, nil
 	}
 
 	var clientCerts []tls.Certificate
@@ -46,7 +46,7 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 		var cert tls.Certificate
 		if cert, err = tls.LoadX509KeyPair(tlsConfig.ClientCertsFile, tlsConfig.ClientKeyFile); err != nil {
 			log.Errorf("Unable to load client key/certificate: %s", err)
-			return
+			return nil, nil
 		}
 		clientCerts = append(clientCerts, cert)
 	}
@@ -56,7 +56,7 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 		var caCert []byte
 		if caCert, err = os.ReadFile(tlsConfig.CACertsFile); err != nil {
 			log.Errorf("Unable to load CA certificates: %s", err)
-			return
+			return nil, nil
 		}
 		caCertPool = x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM(caCert)

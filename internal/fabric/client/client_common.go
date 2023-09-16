@@ -84,7 +84,7 @@ func createChannelClient(channelProvider context.ChannelProvider) (*channel.Clie
 	return channel.New(channelProvider)
 }
 
-func newReceipt(responsePayload []byte, status *fab.TxStatusEvent, signerID *msp.IdentityIdentifier) *TxReceipt {
+func newReceipt(_ []byte, status *fab.TxStatusEvent, signerID *msp.IdentityIdentifier) *TxReceipt {
 	return &TxReceipt{
 		SignerMSP:     signerID.MSPID,
 		Signer:        signerID.ID,

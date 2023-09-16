@@ -23,10 +23,10 @@ import (
 	"path"
 	"strings"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/conf"
+	config "github.com/hyperledger/firefly-fabconnect/internal/conf"
 )
 
-func Setup() (string, *conf.RESTGatewayConf) {
+func Setup() (string, *config.RESTGatewayConf) {
 	var testConfigJSON = `{
   "maxInFlight": 10,
   "maxTXWaitTime": 60,
@@ -148,7 +148,7 @@ J4OVv51lNtDLT9k=
 
 	// set up CA certs
 	certPath := path.Join(tmpdir, "test.crt")
-	_ = os.WriteFile(certPath, []byte(testCert), 0644)
+	_ = os.WriteFile(certPath, []byte(testCert), 0644) // #nosec
 	// modify ca cert path
 	ccp := strings.Replace(testRPCConfig, "/tmp-cert", certPath, 1)
 	// set up crypto path for each org
@@ -160,7 +160,7 @@ J4OVv51lNtDLT9k=
 	ccp = strings.Replace(ccp, "/tmp-crypto-path-org2", org2MSPPath, 1)
 	// set up CCP
 	ccpPath := path.Join(tmpdir, "ccp.yml")
-	_ = os.WriteFile(ccpPath, []byte(ccp), 0644)
+	_ = os.WriteFile(ccpPath, []byte(ccp), 0644) // #nosec
 	testConfigJSON = strings.Replace(testConfigJSON, "/test-config-path", ccpPath, 1)
 	// setup receipt store
 	receiptStorePath := path.Join(tmpdir, "receipts")
@@ -169,11 +169,11 @@ J4OVv51lNtDLT9k=
 	}
 	testConfigJSON = strings.Replace(testConfigJSON, "/test-receipt-path", receiptStorePath, 1)
 	// write the config file
-	_ = os.WriteFile(path.Join(tmpdir, "config.json"), []byte(testConfigJSON), 0644)
-	_ = os.WriteFile(path.Join(tmpdir, "config-bad.json"), []byte(testConfigJSONBad), 0644)
+	_ = os.WriteFile(path.Join(tmpdir, "config.json"), []byte(testConfigJSON), 0644)        // #nosec
+	_ = os.WriteFile(path.Join(tmpdir, "config-bad.json"), []byte(testConfigJSONBad), 0644) // #nosec
 
 	// init the default config
-	testConfig := &conf.RESTGatewayConf{}
+	testConfig := &config.RESTGatewayConf{}
 	err := json.Unmarshal([]byte(testConfigJSON), testConfig)
 	if err != nil {
 		fmt.Printf("Failed to unmarshal config file from JSON: %s. %s", testConfigJSON, err)

@@ -291,20 +291,16 @@ func (block *RawBlock) decodeActionPayload(_actionPayload *ActionPayload, payloa
 	_chaincodeProposalPayload := &ChaincodeProposalPayload{}
 	_actionPayload.ChaincodeProposalPayload = _chaincodeProposalPayload
 
-	cap := &peer.ChaincodeActionPayload{}
-	if err := proto.Unmarshal(payload, cap); err != nil {
+	capPayload := &peer.ChaincodeActionPayload{}
+	if err := proto.Unmarshal(payload, capPayload); err != nil {
 		return errors.Wrap(err, "error decoding chaincode action payload")
 	}
 
-	if err := block.decodeActionPayloadAction(_actionPayloadAction, cap.Action); err != nil {
+	if err := block.decodeActionPayloadAction(_actionPayloadAction, capPayload.Action); err != nil {
 		return err
 	}
 
-	if err := block.decodeActionPayloadChaincodeProposalPayload(_chaincodeProposalPayload, cap.ChaincodeProposalPayload); err != nil {
-		return err
-	}
-
-	return nil
+	return block.decodeActionPayloadChaincodeProposalPayload(_chaincodeProposalPayload, capPayload.ChaincodeProposalPayload)
 }
 
 func (block *RawBlock) decodeActionPayloadChaincodeProposalPayload(chaincodeProposalPayload *ChaincodeProposalPayload, bytes []byte) error {
@@ -367,10 +363,7 @@ func (block *RawBlock) decodeActionPayloadChaincodeProposalPayload(chaincodeProp
 func (block *RawBlock) decodeActionPayloadAction(_actionPayloadAction *ActionPayloadAction, action *peer.ChaincodeEndorsedAction) error {
 	_proposalResponsePayload := &ProposalResponsePayload{}
 	_actionPayloadAction.ProposalResponsePayload = _proposalResponsePayload
-	if err := block.decodeProposalResponsePayload(_proposalResponsePayload, action.ProposalResponsePayload); err != nil {
-		return err
-	}
-	return nil
+	return block.decodeProposalResponsePayload(_proposalResponsePayload, action.ProposalResponsePayload)
 }
 
 func (block *RawBlock) decodeProposalResponsePayload(_proposalResponsePayload *ProposalResponsePayload, proposalResponsePayload []byte) error {
@@ -383,10 +376,7 @@ func (block *RawBlock) decodeProposalResponsePayload(_proposalResponsePayload *P
 
 	_extension := &Extension{}
 	_proposalResponsePayload.Extension = _extension
-	if err := block.decodeProposalResponsePayloadExtension(_extension, prp.Extension); err != nil {
-		return err
-	}
-	return nil
+	return block.decodeProposalResponsePayloadExtension(_extension, prp.Extension)
 }
 
 func (block *RawBlock) decodeProposalResponsePayloadExtension(_extension *Extension, extension []byte) error {
@@ -451,9 +441,9 @@ func UnmarshalTransaction(txBytes []byte) (*peer.Transaction, error) {
 
 // UnmarshalChaincodeActionPayload unmarshals bytes to a ChaincodeActionPayload
 func UnmarshalChaincodeActionPayload(capBytes []byte) (*peer.ChaincodeActionPayload, error) {
-	cap := &peer.ChaincodeActionPayload{}
-	err := proto.Unmarshal(capBytes, cap)
-	return cap, errors.Wrap(err, "error unmarshaling ChaincodeActionPayload")
+	capPayload := &peer.ChaincodeActionPayload{}
+	err := proto.Unmarshal(capBytes, capPayload)
+	return capPayload, errors.Wrap(err, "error unmarshaling ChaincodeActionPayload")
 }
 
 // UnmarshalProposalResponsePayload unmarshals bytes to a ProposalResponsePayload

@@ -80,7 +80,7 @@ func (t *msgContext) SendErrorReply(status int, err error) {
 	t.SendErrorReplyWithTX(status, err, "")
 }
 
-func (t *msgContext) SendErrorReplyWithTX(status int, err error, txHash string) {
+func (t *msgContext) SendErrorReplyWithTX(_ int, err error, txHash string) {
 	log.Warnf("Failed to process message %s: %s", t, err)
 	origBytes, _ := json.Marshal(t.msg)
 	errMsg := messages.NewErrorReply(err, origBytes)
@@ -108,7 +108,7 @@ func (t *msgContext) String() string {
 	return fmt.Sprintf("MsgContext[%s/%s]", t.headers.MsgType, t.msgID)
 }
 
-func (w *directHandler) dispatchMsg(ctx context.Context, key, msgID string, msg *messages.SendTransaction, ack bool) (string, int, error) {
+func (w *directHandler) dispatchMsg(ctx context.Context, key, msgID string, msg *messages.SendTransaction, _ bool) (string, int, error) {
 	w.inFlightMutex.Lock()
 
 	numInFlight := len(w.inFlight)

@@ -190,7 +190,7 @@ func (r *receiptStore) writeReceipt(requestID string, receipt map[string]interfa
 }
 
 // getReplies handles a HTTP request for recent replies
-func (r *receiptStore) GetReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *receiptStore) GetReceipts(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 
 	err := auth.ListAsyncReplies(req.Context())

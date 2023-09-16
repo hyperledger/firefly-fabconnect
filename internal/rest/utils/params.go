@@ -81,7 +81,7 @@ func getQueryParamNoCase(name string, req *http.Request) []string {
 	return nil
 }
 
-func BuildQueryMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.QueryChaincode, *RestError) {
+func BuildQueryMessage(_ http.ResponseWriter, req *http.Request, _ httprouter.Params) (*messages.QueryChaincode, *RestError) {
 	body, err := utils.ParseJSONPayload(req)
 	if err != nil {
 		return nil, NewRestError(err.Error(), 400)
@@ -139,7 +139,7 @@ func BuildQueryMessage(res http.ResponseWriter, req *http.Request, params httpro
 	return &msg, nil
 }
 
-func BuildTxByIDMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetTxByID, *RestError) {
+func BuildTxByIDMessage(_ http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetTxByID, *RestError) {
 	var body map[string]interface{}
 	err := req.ParseForm()
 	if err != nil {
@@ -164,7 +164,7 @@ func BuildTxByIDMessage(res http.ResponseWriter, req *http.Request, params httpr
 	return &msg, nil
 }
 
-func BuildGetChainInfoMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetChainInfo, *RestError) {
+func BuildGetChainInfoMessage(_ http.ResponseWriter, req *http.Request, _ httprouter.Params) (*messages.GetChainInfo, *RestError) {
 	var body map[string]interface{}
 	err := req.ParseForm()
 	if err != nil {
@@ -188,7 +188,7 @@ func BuildGetChainInfoMessage(res http.ResponseWriter, req *http.Request, params
 	return &msg, nil
 }
 
-func BuildGetBlockMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetBlock, *RestError) {
+func BuildGetBlockMessage(_ http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetBlock, *RestError) {
 	var body map[string]interface{}
 	err := req.ParseForm()
 	if err != nil {
@@ -228,7 +228,7 @@ func BuildGetBlockMessage(res http.ResponseWriter, req *http.Request, params htt
 	return &msg, nil
 }
 
-func BuildGetBlockByTxIDMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetBlockByTxID, *RestError) {
+func BuildGetBlockByTxIDMessage(_ http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.GetBlockByTxID, *RestError) {
 	var body map[string]interface{}
 	err := req.ParseForm()
 	if err != nil {
@@ -251,7 +251,7 @@ func BuildGetBlockByTxIDMessage(res http.ResponseWriter, req *http.Request, para
 	return &msg, nil
 }
 
-func BuildTxMessage(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*messages.SendTransaction, *TxOpts, *RestError) {
+func BuildTxMessage(_ http.ResponseWriter, req *http.Request, _ httprouter.Params) (*messages.SendTransaction, *TxOpts, *RestError) {
 	body, err := utils.ParseJSONPayload(req)
 	if err != nil {
 		return nil, nil, NewRestError(err.Error(), 400)

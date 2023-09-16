@@ -43,7 +43,7 @@ type identityManagerProvider struct {
 }
 
 // IdentityManager returns the organization's identity manager
-func (p *identityManagerProvider) IdentityManager(orgName string) (msp.IdentityManager, bool) {
+func (p *identityManagerProvider) IdentityManager(_ string) (msp.IdentityManager, bool) {
 	return p.identityManager, true
 }
 
@@ -130,7 +130,7 @@ func (w *idClientWrapper) GetClientOrg() string {
 }
 
 // the rpcWrapper is also an implementation of the interface internal/rest/idenity/IdentityClient
-func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RegisterResponse, *restutil.RestError) {
+func (w *idClientWrapper) Register(_ http.ResponseWriter, req *http.Request, _ httprouter.Params) (*identity.RegisterResponse, *restutil.RestError) {
 	regreq := identity.Identity{}
 	decoder := json.NewDecoder(req.Body)
 	decoder.DisallowUnknownFields()
@@ -173,7 +173,7 @@ func (w *idClientWrapper) Register(res http.ResponseWriter, req *http.Request, p
 	return &result, nil
 }
 
-func (w *idClientWrapper) Modify(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RegisterResponse, *restutil.RestError) {
+func (w *idClientWrapper) Modify(_ http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RegisterResponse, *restutil.RestError) {
 	username := params.ByName("username")
 	regreq := identity.Identity{}
 	decoder := json.NewDecoder(req.Body)
@@ -210,7 +210,7 @@ func (w *idClientWrapper) Modify(res http.ResponseWriter, req *http.Request, par
 	return &result, nil
 }
 
-func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Response, *restutil.RestError) {
+func (w *idClientWrapper) Enroll(_ http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Response, *restutil.RestError) {
 	username := params.ByName("username")
 	enreq := identity.EnrollRequest{}
 	decoder := json.NewDecoder(req.Body)
@@ -251,7 +251,7 @@ func (w *idClientWrapper) Enroll(res http.ResponseWriter, req *http.Request, par
 	return &result, nil
 }
 
-func (w *idClientWrapper) Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Response, *restutil.RestError) {
+func (w *idClientWrapper) Reenroll(_ http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Response, *restutil.RestError) {
 	username := params.ByName("username")
 	enreq := identity.EnrollRequest{}
 	decoder := json.NewDecoder(req.Body)
@@ -288,7 +288,7 @@ func (w *idClientWrapper) Reenroll(res http.ResponseWriter, req *http.Request, p
 	return &result, nil
 }
 
-func (w *idClientWrapper) Revoke(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RevokeResponse, *restutil.RestError) {
+func (w *idClientWrapper) Revoke(_ http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RevokeResponse, *restutil.RestError) {
 	username := params.ByName("username")
 	enreq := identity.RevokeRequest{}
 	decoder := json.NewDecoder(req.Body)
@@ -326,7 +326,7 @@ func (w *idClientWrapper) Revoke(res http.ResponseWriter, req *http.Request, par
 	return &result, nil
 }
 
-func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*identity.Identity, *restutil.RestError) {
+func (w *idClientWrapper) List(_ http.ResponseWriter, _ *http.Request, params httprouter.Params) ([]*identity.Identity, *restutil.RestError) {
 	result, err := w.caClient.GetAllIdentities(params.ByName("caname"))
 	if err != nil {
 		return nil, restutil.NewRestError(err.Error(), 500)
@@ -350,7 +350,7 @@ func (w *idClientWrapper) List(res http.ResponseWriter, req *http.Request, param
 	return ret, nil
 }
 
-func (w *idClientWrapper) Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Identity, *restutil.RestError) {
+func (w *idClientWrapper) Get(_ http.ResponseWriter, _ *http.Request, params httprouter.Params) (*identity.Identity, *restutil.RestError) {
 	username := params.ByName("username")
 	result, err := w.caClient.GetIdentity(username, params.ByName("caname"))
 	if err != nil {

@@ -84,7 +84,7 @@ func (c *saramaKafkaClient) Brokers() []*sarama.Broker {
 	return c.client.Brokers()
 }
 
-func (c *saramaKafkaClient) NewProducer(k Common) (Producer, error) {
+func (c *saramaKafkaClient) NewProducer(_ Common) (Producer, error) {
 	return sarama.NewAsyncProducerFromClient(c.client)
 }
 
@@ -186,7 +186,7 @@ func (h *saramaKafkaConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSe
 	return nil
 }
 
-func (h *saramaKafkaConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+func (h *saramaKafkaConsumerGroupHandler) ConsumeClaim(_ sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
 		h.messages <- msg
 	}
