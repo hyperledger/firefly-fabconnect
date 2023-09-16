@@ -138,6 +138,7 @@ func (g *Gateway) Start() error {
 	if err != nil {
 		return err
 	}
+	// TODO: Fix linting: G112: Potential Slowloris Attack because ReadHeaderTimeout is not configured in the http.Server
 	// #nosec
 	g.srv = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", g.config.HTTP.LocalAddr, g.config.HTTP.Port),

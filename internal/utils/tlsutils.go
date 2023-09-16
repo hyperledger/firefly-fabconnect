@@ -61,6 +61,7 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 		caCertPool = x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM(caCert)
 	}
+	// TODO: Fix linting: G402: TLS InsecureSkipVerify may be true.
 	// #nosec G402
 	t = &tls.Config{
 		Certificates:       clientCerts,
