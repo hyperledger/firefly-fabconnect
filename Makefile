@@ -16,8 +16,10 @@ test: deps lint
 coverage.html:
 	$(VGO) tool cover -html=coverage.txt
 coverage: test coverage.html
-lint:
-	GOGC=20 $(shell go list -f '{{.Target}}' github.com/golangci/golangci-lint/cmd/golangci-lint) run -v --timeout 5m
+lint: ${LINT}
+		GOGC=20 $(LINT) run -v --timeout 5m
+${LINT}:
+		$(VGO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.47.3
 firefly-nocgo: ${GOFILES}		
 	CGO_ENABLED=0 $(VGO) build -o ${BINARY_NAME}-nocgo -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v
 firefly: ${GOFILES}
@@ -30,7 +32,7 @@ clean:
 	$(VGO) clean
 	rm -f *.so ${BINARY_NAME}
 builddeps:
-	$(VGO) get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2
+	$(VGO) get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
 deps: builddeps
 	$(VGO) get
 mockery: .ALWAYS
@@ -43,11 +45,11 @@ mocks: mockery ${GOFILES}
 	${MOCKERY} --case underscore --dir internal/fabric/dep --name CAClient --output mocks/fabric/dep --outpkg mockfabricdep
 	${MOCKERY} --case underscore --dir internal/kvstore --name KVStore --output mocks/kvstore --outpkg mockkvstore
 	${MOCKERY} --case underscore --dir internal/kvstore --name KVIterator --output mocks/kvstore --outpkg mockkvstore
-	${MOCKERY} --case underscore --dir internal/rest/async --name AsyncDispatcher --output mocks/rest/async --outpkg mockasync
-	${MOCKERY} --case underscore --dir internal/rest/identity --name IdentityClient --output mocks/rest/identity --outpkg mockidentity
-	${MOCKERY} --case underscore --dir internal/rest/receipt --name ReceiptStore --output mocks/rest/receipt --outpkg mockreceipt
+	${MOCKERY} --case underscore --dir internal/rest/async --name Dispatcher --output mocks/rest/async --outpkg mockasync
+	${MOCKERY} --case underscore --dir internal/rest/identity --name Client --output mocks/rest/identity --outpkg mockidentity
+	${MOCKERY} --case underscore --dir internal/rest/receipt --name Store --output mocks/rest/receipt --outpkg mockreceipt
 	${MOCKERY} --case underscore --dir internal/rest/receipt/api --name ReceiptStorePersistence --output mocks/rest/receipt/api --outpkg mockreceiptapi
-	${MOCKERY} --case underscore --dir internal/rest/sync --name SyncDispatcher --output mocks/rest/sync --outpkg mocksync
-	${MOCKERY} --case underscore --dir internal/tx --name TxProcessor --output mocks/tx --outpkg mocktx
+	${MOCKERY} --case underscore --dir internal/rest/sync --name Dispatcher --output mocks/rest/sync --outpkg mocksync
+	${MOCKERY} --case underscore --dir internal/tx --name Processor --output mocks/tx --outpkg mocktx
 	${MOCKERY} --case underscore --dir internal/ws --name WebSocketServer --output mocks/ws --outpkg mockws
 	${MOCKERY} --case underscore --dir internal/ws --name WebSocketChannels --output mocks/ws --outpkg mockws

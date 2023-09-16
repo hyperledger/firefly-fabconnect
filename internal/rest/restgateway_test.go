@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -164,7 +163,7 @@ func TestIdentitiesEndpointsErrorHandling(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{}`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`{}`))),
 	}
 	resp, _ := http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
@@ -175,7 +174,7 @@ func TestIdentitiesEndpointsErrorHandling(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`not json`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`not json`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
@@ -187,7 +186,7 @@ func TestIdentitiesEndpointsErrorHandling(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPut,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`not json`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`not json`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
@@ -199,7 +198,7 @@ func TestIdentitiesEndpointsErrorHandling(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`not json`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`not json`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
@@ -211,7 +210,7 @@ func TestIdentitiesEndpointsErrorHandling(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{}`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`{}`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
@@ -223,7 +222,7 @@ func TestIdentitiesEndpointsErrorHandling(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`not json`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`not json`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
@@ -282,7 +281,7 @@ func TestIdentitiesEndpoints(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"name":"user1"}`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`{"name":"user1"}`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
@@ -299,7 +298,7 @@ func TestIdentitiesEndpoints(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPut,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"name":"user1","attributes":{"org":"beta"}}`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`{"name":"user1","attributes":{"org":"beta"}}`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
@@ -320,7 +319,7 @@ func TestIdentitiesEndpoints(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"secret":"user1"}`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`{"secret":"user1"}`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
@@ -336,7 +335,7 @@ func TestIdentitiesEndpoints(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"name":"user1"}`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`{"name":"user1"}`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
@@ -362,7 +361,7 @@ func TestIdentitiesEndpoints(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(`{"name":"user1"}`))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(`{"name":"user1"}`))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
@@ -434,26 +433,26 @@ func TestQueryEndpoints(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
 	assert.Equal("{\"error\":\"Must specify target chaincode function\"}", string(bodyBytes))
 
-	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"func\":\"\"}")))
+	req.Body = io.NopCloser(bytes.NewReader([]byte("{\"func\":\"\"}")))
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
 	assert.Equal("{\"error\":\"Target chaincode function must not be empty\"}", string(bodyBytes))
 
-	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"func\":\"CreateAsset\"}")))
+	req.Body = io.NopCloser(bytes.NewReader([]byte("{\"func\":\"CreateAsset\"}")))
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(400, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
 	assert.Equal("{\"error\":\"must specify args\"}", string(bodyBytes))
 
-	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"func\":\"CreateAsset\",\"args\":[]}")))
+	req.Body = io.NopCloser(bytes.NewReader([]byte("{\"func\":\"CreateAsset\",\"args\":[]}")))
 	resp, _ = http.DefaultClient.Do(req)
 	assert.Equal(200, resp.StatusCode)
 	bodyBytes, _ = io.ReadAll(resp.Body)
@@ -614,7 +613,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}"))),
 	}
 	resp, _ := http.DefaultClient.Do(req)
 	result1 := make(map[string]interface{})
@@ -677,7 +676,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPatch,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-2\",\"type\":\"webhook\",\"batchSize\":5,\"errorHandling\":\"block\",\"batchTimeoutMS\":100,\"webhook\":{\"url\":\"https://webhook.site/def\"}}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-2\",\"type\":\"webhook\",\"batchSize\":5,\"errorHandling\":\"block\",\"batchTimeoutMS\":100,\"webhook\":{\"url\":\"https://webhook.site/def\"}}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	result4 := make(map[string]interface{})
@@ -696,7 +695,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -712,7 +711,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	result5 := make(map[string]interface{})
@@ -727,7 +726,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -745,7 +744,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	result6 := make(map[string]interface{})
@@ -760,7 +759,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("not json"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("not json"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -773,7 +772,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"random\"}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"random\"}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -786,7 +785,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\"}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\"}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -799,7 +798,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\":badUrl\"}}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\":badUrl\"}}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -812,7 +811,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"websocket\",\"websocket\":{\"topic\":\"apple\",\"distributionMode\":\"banana\"}}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"websocket\",\"websocket\":{\"topic\":\"apple\",\"distributionMode\":\"banana\"}}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -824,7 +823,7 @@ func TestEventsAPI(t *testing.T) {
 	_ = g.sm.Init(mockedKV4)
 	mockedKV4.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
 	mockedKV4.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
-	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}")))
+	req.Body = io.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-1\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}")))
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(500, resp.StatusCode)
@@ -836,7 +835,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPatch,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"updated-name\"}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"name\":\"updated-name\"}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -849,7 +848,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPatch,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("not json"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("not json"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -861,7 +860,7 @@ func TestEventsAPI(t *testing.T) {
 	_ = g.sm.Init(mockedKV5)
 	mockedKV5.On("Put", mock.Anything, mock.Anything).Return(fmt.Errorf("bang!"))
 	mockedKV5.On("Get", mock.Anything).Return([]byte{}, leveldb.ErrNotFound)
-	req.Body = ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"updated-name\"}")))
+	req.Body = io.NopCloser(bytes.NewReader([]byte("{\"name\":\"updated-name\"}")))
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(500, resp.StatusCode)
@@ -878,7 +877,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(payload))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	result7 := make(map[string]interface{})
@@ -903,7 +902,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("non json"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("non json"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -917,7 +916,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(payload))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -931,7 +930,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(payload))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -945,7 +944,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(payload))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -959,7 +958,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(payload))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -973,7 +972,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(payload))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -987,7 +986,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte(payload))),
+		Body:   io.NopCloser(bytes.NewReader([]byte(payload))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -1041,7 +1040,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"100\"}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"100\"}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	result10 := make(map[string]interface{})
@@ -1056,7 +1055,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"100\"}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"100\"}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -1069,7 +1068,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("not json"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("not json"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -1082,7 +1081,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"0x10\"}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"initialBlock\":\"0x10\"}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
@@ -1156,7 +1155,7 @@ func TestEventsAPI(t *testing.T) {
 		URL:    url,
 		Method: http.MethodPost,
 		Header: header,
-		Body:   ioutil.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-2\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}"))),
+		Body:   io.NopCloser(bytes.NewReader([]byte("{\"name\":\"test-2\",\"type\":\"webhook\",\"webhook\":{\"url\":\"https://webhook.site/abc\"}}"))),
 	}
 	resp, _ = http.DefaultClient.Do(req)
 	result12 := make(map[string]interface{})

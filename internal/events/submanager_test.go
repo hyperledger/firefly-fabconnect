@@ -15,8 +15,8 @@
 package events
 
 import (
-	"io/ioutil"
 	"net/http/httptest"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -50,7 +50,7 @@ func TestInitLevelDBFail(t *testing.T) {
 	assert := assert.New(t)
 	dir := tempdir(t)
 	defer cleanup(t, dir)
-	_ = ioutil.WriteFile(path.Join(dir, "db"), []byte("I am not a directory"), 0644)
+	_ = os.WriteFile(path.Join(dir, "db"), []byte("I am not a directory"), 0644)
 	sm := newTestSubscriptionManager()
 	sm.config.LevelDB.Path = path.Join(dir, "db")
 	err := sm.Init()

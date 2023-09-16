@@ -26,8 +26,8 @@ import (
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric-protos-go/peer/lifecycle"
 	"github.com/hyperledger/firefly-fabconnect/internal/events/api"
-	"github.com/hyperledger/firefly-fabconnect/internal/utils"
 	"github.com/pkg/errors"
 )
 
@@ -333,9 +333,29 @@ func (block *RawBlock) decodeActionPayloadChaincodeProposalPayload(chaincodeProp
 		chaincodeInput := &ChaincodeSpecInput{}
 		chaincodeSpec.Input = chaincodeInput
 
-		chaincodeInputArgs := make([]string, len(ccSpec.ChaincodeSpec.Input.Args))
-		for j, arg := range ccSpec.ChaincodeSpec.Input.Args {
-			chaincodeInputArgs[j] = string(arg)
+		chaincodeInputArgs := make([]interface{}, len(ccSpec.ChaincodeSpec.Input.Args))
+		if chaincodeSpec.ChaincodeID.Name == "_lifecycle" {
+			funcName := string(ccSpec.ChaincodeSpec.Input.Args[0])
+			chaincodeInputArgs[0] = funcName
+			argsBytes := ccSpec.ChaincodeSpec.Input.Args[1]
+
+			if funcName == "ApproveChaincodeDefinitionForMyOrg" {
+				approveArgs := &lifecycle.ApproveChaincodeDefinitionForMyOrgArgs{}
+				if err := proto.Unmarshal(argsBytes, approveArgs); err != nil {
+					return errors.Wrap(err, "error decoding args for ApproveChaincodeDefinitionForMyOrg")
+				}
+				chaincodeInputArgs[1] = approveArgs
+			} else if funcName == "CommitChaincodeDefinition" {
+				commitArgs := &lifecycle.CommitChaincodeDefinitionArgs{}
+				if err := proto.Unmarshal(argsBytes, commitArgs); err != nil {
+					return errors.Wrap(err, "error decoding args for CommitChaincodeDefinition")
+				}
+				chaincodeInputArgs[1] = commitArgs
+			}
+		} else {
+			for j, arg := range ccSpec.ChaincodeSpec.Input.Args {
+				chaincodeInputArgs[j] = string(arg)
+			}
 		}
 		chaincodeInput.Args = chaincodeInputArgs
 		chaincodeInput.IsInit = ccSpec.ChaincodeSpec.Input.IsInit
@@ -388,7 +408,7 @@ func (block *RawBlock) decodeProposalResponsePayloadExtension(_extension *Extens
 	_chaincodeEvent.ChaincodeID = ccevt.ChaincodeId
 	_chaincodeEvent.TxID = ccevt.TxId
 	_chaincodeEvent.EventName = ccevt.EventName
-	_chaincodeEvent.Payload = utils.DecodePayload(ccevt.Payload)
+	_chaincodeEvent.Payload = ccevt.Payload
 
 	return nil
 }

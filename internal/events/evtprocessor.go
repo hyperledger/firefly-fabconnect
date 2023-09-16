@@ -73,8 +73,6 @@ func (ep *evtProcessor) processEventEntry(subInfo *api.SubscriptionInfo, entry *
 		payloadType = api.EventPayloadTypeBytes
 	}
 
-	// if the payload comes from the block decoder, it's already decoded into a map
-	// first check if it's still a byte array
 	payloadBytes, ok := entry.Payload.([]byte)
 	if ok {
 		switch payloadType {

@@ -17,7 +17,6 @@ package receipt
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
@@ -42,9 +41,9 @@ func TestMain(m *testing.M) {
 }
 
 func setup() {
-	tmpdir, _ = ioutil.TempDir("", "leveldbreceipt_test")
+	tmpdir, _ = os.MkdirTemp("", "leveldbreceipt_test")
 	// create a file to use as the path for LevelDB in order to generate an error
-	_ = ioutil.WriteFile(path.Join(tmpdir, "dummyfile"), []byte("dummy content"), 0644)
+	_ = os.WriteFile(path.Join(tmpdir, "dummyfile"), []byte("dummy content"), 0644)
 }
 
 func teardown() {

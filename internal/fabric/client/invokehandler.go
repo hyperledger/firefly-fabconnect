@@ -55,6 +55,11 @@ func (h *TxSubmitAndListenHandler) Handle(requestContext *invoke.RequestContext,
 
 	select {
 	case txStatus := <-statusNotifier:
+		if txStatus == nil {
+			requestContext.Error = status.New(status.EventServerStatus, int32(pb.TxValidationCode_INVALID_OTHER_REASON),
+				"channel closed due to unregister", nil)
+			return
+		}
 		requestContext.Response.TxValidationCode = txStatus.TxValidationCode
 		h.txStatusEvent.BlockNumber = txStatus.BlockNumber
 		h.txStatusEvent.SourceURL = txStatus.SourceURL

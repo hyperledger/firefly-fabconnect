@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	fabcontext "github.com/hyperledger/fabric-sdk-go/pkg/context"
@@ -51,6 +52,7 @@ type idClientWrapper struct {
 	identityMgr    msp.IdentityManager
 	caClient       dep.CAClient
 	listeners      []SignerUpdateListener
+	cache          *lru.Cache[string, msp.SigningIdentity]
 }
 
 func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserStore) (*idClientWrapper, error) {
@@ -96,17 +98,31 @@ func newIdentityClient(configProvider core.ConfigProvider, userStore msp.UserSto
 		return nil, errors.Errorf("CA Client creation failed. %s", err)
 	}
 	var listeners []SignerUpdateListener
+	cache, err := lru.New[string, msp.SigningIdentity](100)
+	if err != nil {
+		return nil, errors.Errorf("Failed to create cache. %s", err)
+	}
 	idc := &idClientWrapper{
 		identityConfig: identityConfig,
 		identityMgr:    mgr,
 		caClient:       caClient,
 		listeners:      listeners,
+		cache:          cache,
 	}
 	return idc, nil
 }
 
 func (w *idClientWrapper) GetSigningIdentity(name string) (msp.SigningIdentity, error) {
-	return w.identityMgr.GetSigningIdentity(name)
+	// check the cache first
+	if cached, ok := w.cache.Get(name); ok {
+		return cached, nil
+	}
+	id, err := w.identityMgr.GetSigningIdentity(name)
+	if err != nil {
+		return nil, err
+	}
+	w.cache.Add(name, id)
+	return id, nil
 }
 
 func (w *idClientWrapper) GetClientOrg() string {

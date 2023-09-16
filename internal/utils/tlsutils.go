@@ -19,7 +19,7 @@ package utils
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
+	"os"
 
 	"github.com/hyperledger/firefly-fabconnect/internal/conf"
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
@@ -54,7 +54,7 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 	var caCertPool *x509.CertPool
 	if tlsConfig.CACertsFile != "" {
 		var caCert []byte
-		if caCert, err = ioutil.ReadFile(tlsConfig.CACertsFile); err != nil {
+		if caCert, err = os.ReadFile(tlsConfig.CACertsFile); err != nil {
 			log.Errorf("Unable to load CA certificates: %s", err)
 			return
 		}

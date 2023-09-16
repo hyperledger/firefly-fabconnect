@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -112,7 +112,7 @@ func (w *webhookAction) attemptBatch(batchNumber, attempt uint64, events []*api.
 			ok := (res.StatusCode >= 200 && res.StatusCode < 300)
 			log.Infof("%s: POST <-- %s [%d] ok=%t", esID, u.String(), res.StatusCode, ok)
 			if !ok || log.IsLevelEnabled(log.DebugLevel) {
-				bodyBytes, _ := ioutil.ReadAll(res.Body)
+				bodyBytes, _ := io.ReadAll(res.Body)
 				log.Infof("%s: Response body: %s", esID, string(bodyBytes))
 			}
 			if !ok {

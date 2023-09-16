@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/protobuf/proto" //nolint
 	"github.com/hyperledger/fabric-protos-go/common"
+	"github.com/hyperledger/fabric-protos-go/peer/lifecycle"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,10 +51,9 @@ func TestDecodeEndorserBlockWithEvents(t *testing.T) {
 	assert.Regexp("[0-9a-f]{64}", event.TxID)
 	assert.Regexp("[0-9]+", event.Timestamp)
 	assert.Equal("AssetCreated", event.EventName)
-	m, ok := event.Payload.(map[string]interface{})
+	m, ok := event.Payload.([]byte)
 	assert.Equal(true, ok)
-	assert.Equal("asset05", m["ID"])
-	assert.Equal(float64(123000), m["appraisedValue"])
+	assert.Equal("{\"ID\":\"asset05\",\"color\":\"red\",\"size\":10,\"owner\":\"Tom\",\"appraisedValue\":123000}", string(m))
 
 	cpp := action.Payload.ChaincodeProposalPayload
 	assert.Equal("asset_transfer", cpp.Input.ChaincodeSpec.ChaincodeID.Name)
@@ -84,6 +84,9 @@ func TestDecodeEndorserBlockLifecycleTxs(t *testing.T) {
 	assert.Equal("_lifecycle", cpp.Input.ChaincodeSpec.ChaincodeID.Name)
 	assert.Equal("UNDEFINED", cpp.Input.ChaincodeSpec.Type)
 	assert.Equal("ApproveChaincodeDefinitionForMyOrg", cpp.Input.ChaincodeSpec.Input.Args[0])
+	assert.Equal(int64(1), cpp.Input.ChaincodeSpec.Input.Args[1].(*lifecycle.ApproveChaincodeDefinitionForMyOrgArgs).Sequence)
+	assert.Equal("asset_transfer", cpp.Input.ChaincodeSpec.Input.Args[1].(*lifecycle.ApproveChaincodeDefinitionForMyOrgArgs).Name)
+	assert.Equal("1.1.0.u0ypz4p14q", cpp.Input.ChaincodeSpec.Input.Args[1].(*lifecycle.ApproveChaincodeDefinitionForMyOrgArgs).Version)
 }
 
 func TestDecodeConfigBlock(t *testing.T) {
