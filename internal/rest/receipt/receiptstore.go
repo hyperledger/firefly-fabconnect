@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -43,7 +43,7 @@ const (
 
 var uuidCharsVerifier, _ = regexp.Compile("^[0-9a-zA-Z-]+$")
 
-type ReceiptStore interface {
+type Store interface {
 	Init(ws.WebSocketChannels, ...api.ReceiptStorePersistence) error
 	ValidateConf() error
 	ProcessReceipt(msgBytes []byte)
@@ -58,15 +58,16 @@ type receiptStore struct {
 	ws          ws.WebSocketChannels
 }
 
-func NewReceiptStore(config *conf.RESTGatewayConf) ReceiptStore {
+func NewReceiptStore(config *conf.RESTGatewayConf) Store {
 	var receiptStorePersistence api.ReceiptStorePersistence
-	if config.Receipts.LevelDB.Path != "" {
+	switch {
+	case config.Receipts.LevelDB.Path != "":
 		leveldbStore := newLevelDBReceipts(&config.Receipts)
 		receiptStorePersistence = leveldbStore
-	} else if config.Receipts.MongoDB.URL != "" {
+	case config.Receipts.MongoDB.URL != "":
 		mongoStore := newMongoReceipts(&config.Receipts)
 		receiptStorePersistence = mongoStore
-	} else {
+	default:
 		memStore := newMemoryReceipts(&config.Receipts)
 		receiptStorePersistence = memStore
 	}
@@ -92,10 +93,9 @@ func (r *receiptStore) Init(ws ws.WebSocketChannels, mocked ...api.ReceiptStoreP
 		// only used in test code to pass in a mocked impl
 		r.persistence = mocked[0]
 		return nil
-	} else {
-		// the regular runtime does this
-		return r.persistence.Init()
 	}
+	// the regular runtime does this
+	return r.persistence.Init()
 }
 
 func (r *receiptStore) extractHeaders(parsedMsg map[string]interface{}) map[string]interface{} {
@@ -190,10 +190,10 @@ func (r *receiptStore) writeReceipt(requestID string, receipt map[string]interfa
 }
 
 // getReplies handles a HTTP request for recent replies
-func (r *receiptStore) GetReceipts(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *receiptStore) GetReceipts(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 
-	err := auth.AuthListAsyncReplies(req.Context())
+	err := auth.ListAsyncReplies(req.Context())
 	if err != nil {
 		log.Errorf("Error querying replies: %s", err)
 		errors.RestErrReply(res, req, errors.Errorf(errors.Unauthorized), 401)
@@ -281,7 +281,7 @@ func (r *receiptStore) GetReceipts(res http.ResponseWriter, req *http.Request, p
 func (r *receiptStore) GetReceipt(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 
-	err := auth.AuthReadAsyncReplyByUUID(req.Context())
+	err := auth.ReadAsyncReplyByUUID(req.Context())
 	if err != nil {
 		log.Errorf("Error querying reply: %s", err)
 		errors.RestErrReply(res, req, errors.Errorf(errors.Unauthorized), 401)

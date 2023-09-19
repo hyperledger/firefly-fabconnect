@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,14 +31,14 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 
 	if !AllOrNoneReqd(tlsConfig.ClientCertsFile, tlsConfig.ClientKeyFile) {
 		err = errors.Errorf(errors.ConfigTLSCertOrKey)
-		return
+		return nil, err
 	}
 
 	mutualAuth := tlsConfig.ClientCertsFile != "" && tlsConfig.ClientKeyFile != ""
 	log.Debugf("Kafka TLS Enabled=%t Insecure=%t MutualAuth=%t ClientCertsFile=%s PrivateKeyFile=%s CACertsFile=%s",
 		tlsConfig.Enabled, tlsConfig.InsecureSkipVerify, mutualAuth, tlsConfig.ClientCertsFile, tlsConfig.ClientKeyFile, tlsConfig.CACertsFile)
 	if !tlsConfig.Enabled {
-		return
+		return nil, nil
 	}
 
 	var clientCerts []tls.Certificate
@@ -46,7 +46,7 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 		var cert tls.Certificate
 		if cert, err = tls.LoadX509KeyPair(tlsConfig.ClientCertsFile, tlsConfig.ClientKeyFile); err != nil {
 			log.Errorf("Unable to load client key/certificate: %s", err)
-			return
+			return nil, nil
 		}
 		clientCerts = append(clientCerts, cert)
 	}
@@ -56,16 +56,17 @@ func CreateTLSConfiguration(tlsConfig *conf.TLSConfig) (t *tls.Config, err error
 		var caCert []byte
 		if caCert, err = os.ReadFile(tlsConfig.CACertsFile); err != nil {
 			log.Errorf("Unable to load CA certificates: %s", err)
-			return
+			return nil, nil
 		}
 		caCertPool = x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM(caCert)
 	}
-
+	// TODO: Fix linting: G402: TLS InsecureSkipVerify may be true.
+	// #nosec G402
 	t = &tls.Config{
 		Certificates:       clientCerts,
 		RootCAs:            caCertPool,
 		InsecureSkipVerify: tlsConfig.InsecureSkipVerify,
 	}
-	return
+	return t, nil
 }

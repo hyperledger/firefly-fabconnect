@@ -68,7 +68,7 @@ func teardown() {
 	test.Teardown(tmpdir)
 }
 
-func newTestGateway(t *testing.T, mockDB ...bool) (*assert.Assertions, *RESTGateway, *sync.WaitGroup, *mockreceipt.ReceiptStorePersistence, *mockfabric.RPCClient, *mockidentity.IdentityClient) {
+func newTestGateway(t *testing.T, mockDB ...bool) (*assert.Assertions, *Gateway, *sync.WaitGroup, *mockreceipt.ReceiptStorePersistence, *mockfabric.RPCClient, *mockidentity.IdentityClient) {
 	assert := assert.New(t)
 	auth.RegisterSecurityModule(&authtest.TestSecurityModule{})
 	testConfig.HTTP.Port = lastPort
@@ -307,7 +307,7 @@ func TestIdentitiesEndpoints(t *testing.T) {
 	assert.Equal(2, len(result3))
 	assert.Equal("user1", result3["name"])
 
-	mockResult2 := &identity.IdentityResponse{
+	mockResult2 := &identity.Response{
 		Name:    "user1",
 		Success: true,
 	}
@@ -963,7 +963,7 @@ func TestEventsAPI(t *testing.T) {
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
-	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
+	assert.Equal("invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
 
 	// POST /subscriptions failed calls due to bad "payloadType" value
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions", g.config.HTTP.Port))
@@ -1086,7 +1086,7 @@ func TestEventsAPI(t *testing.T) {
 	resp, _ = http.DefaultClient.Do(req)
 	_ = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.Equal(400, resp.StatusCode)
-	assert.Equal("Invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
+	assert.Equal("invalid initial block: must be an integer, an empty string or 'newest'", errorResp.Message)
 
 	// DELETE /subscriptions/:subId failed calls due to bad ID
 	url, _ = url.Parse(fmt.Sprintf("http://localhost:%d/subscriptions/badId", g.config.HTTP.Port))

@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -33,10 +33,10 @@ const (
 	defaultSendConcurrency = 1
 )
 
-// TxProcessor interface is called for each message, as is responsible
+// Processor interface is called for each message, as is responsible
 // for tracking all in-flight messages
-type TxProcessor interface {
-	OnMessage(TxContext)
+type Processor interface {
+	OnMessage(Context)
 	Init(client.RPCClient)
 	GetRPCClient() client.RPCClient
 }
@@ -46,7 +46,7 @@ var highestID = 1000000
 type inflightTx struct {
 	id        int
 	signer    string
-	txContext TxContext
+	txContext Context
 	tx        *fabric.Tx
 	rpc       client.RPCClient
 }
@@ -69,7 +69,7 @@ type txProcessor struct {
 }
 
 // NewTxnProcessor constructor for message procss
-func NewTxProcessor(conf *conf.RESTGatewayConf) TxProcessor {
+func NewTxProcessor(conf *conf.RESTGatewayConf) Processor {
 	if conf.SendConcurrency == 0 {
 		conf.SendConcurrency = defaultSendConcurrency
 	}
@@ -96,7 +96,7 @@ func (p *txProcessor) GetRPCClient() client.RPCClient {
 //
 //	on txnContext eventually in all scenarios.
 //	It cannot return an error synchronously from this function **
-func (p *txProcessor) OnMessage(txContext TxContext) {
+func (p *txProcessor) OnMessage(txContext Context) {
 
 	var unmarshalErr error
 	headers := txContext.Headers()
@@ -121,7 +121,7 @@ func (p *txProcessor) OnMessage(txContext TxContext) {
 // newInflightWrapper uses the supplied transaction, the inflight txn list.
 // Builds a new wrapper containing this information, that can be added to
 // the inflight list if the transaction is submitted
-func (p *txProcessor) addInflightWrapper(txContext TxContext, msg *messages.RequestCommon) (inflight *inflightTx, err error) {
+func (p *txProcessor) addInflightWrapper(txContext Context, msg *messages.RequestCommon) (inflight *inflightTx, err error) {
 
 	inflight = &inflightTx{
 		txContext: txContext,
@@ -167,7 +167,7 @@ func (p *txProcessor) cancelInFlight(inflight *inflightTx, submitted bool) {
 	log.Infof("In-flight %d complete. signer=%s sub=%t before=%d after=%d", inflight.id, inflight.signer, submitted, before, after)
 }
 
-func (p *txProcessor) processCompletion(inflight *inflightTx, tx *fabric.Tx) {
+func (p *txProcessor) processCompletion(inflight *inflightTx, _ *fabric.Tx) {
 
 	receipt := inflight.tx.Receipt
 	isSuccess := receipt.IsSuccess()
@@ -194,7 +194,7 @@ func (p *txProcessor) processCompletion(inflight *inflightTx, tx *fabric.Tx) {
 
 }
 
-// func (p *txProcessor) OnDeployContractMessage(txnContext TxContext, msg *messages.DeployContract) {
+// func (p *txProcessor) OnDeployContractMessage(txnContext Context, msg *messages.DeployContract) {
 
 // 	inflight, err := p.addInflightWrapper(txnContext, &msg.TransactionCommon)
 // 	if err != nil {
@@ -214,7 +214,7 @@ func (p *txProcessor) processCompletion(inflight *inflightTx, tx *fabric.Tx) {
 // 	p.sendTransactionCommon(txnContext, inflight, tx)
 // }
 
-func (p *txProcessor) OnSendTransactionMessage(txContext TxContext, msg *messages.SendTransaction) {
+func (p *txProcessor) OnSendTransactionMessage(txContext Context, msg *messages.SendTransaction) {
 
 	inflight, err := p.addInflightWrapper(txContext, &msg.RequestCommon)
 	if err != nil {
@@ -227,7 +227,7 @@ func (p *txProcessor) OnSendTransactionMessage(txContext TxContext, msg *message
 	p.sendTransactionCommon(txContext, inflight, tx)
 }
 
-func (p *txProcessor) sendTransactionCommon(txContext TxContext, inflight *inflightTx, tx *fabric.Tx) {
+func (p *txProcessor) sendTransactionCommon(txContext Context, inflight *inflightTx, tx *fabric.Tx) {
 	if p.config.SendConcurrency > 1 {
 		// The above must happen synchronously for each partition in Kafka - as it is where we assign the nonce.
 		// However, the send to the node can happen at high concurrency.
@@ -239,7 +239,7 @@ func (p *txProcessor) sendTransactionCommon(txContext TxContext, inflight *infli
 	}
 }
 
-func (p *txProcessor) sendAndTrackMining(txContext TxContext, inflight *inflightTx, tx *fabric.Tx) {
+func (p *txProcessor) sendAndTrackMining(txContext Context, inflight *inflightTx, tx *fabric.Tx) {
 	err := tx.Send(txContext.Context(), inflight.rpc)
 	if p.config.SendConcurrency > 1 {
 		<-p.concurrencySlots // return our slot as soon as send is complete, to let an awaiting send go

@@ -39,7 +39,7 @@ func TestEventPayloadUnmarshaling(t *testing.T) {
 	p := newEvtProcessor("abc", stream)
 	subInfo := &api.SubscriptionInfo{
 		ID:          "abc",
-		PayloadType: api.EventPayloadType_StringifiedJSON,
+		PayloadType: api.EventPayloadTypeStringifiedJSON,
 	}
 	jsonstring := "{\"ID\":\"asset1072\",\"color\":\"yellow\",\"size\":10,\"owner\":\"Tom\",\"appraisedValue\":1300}"
 	entry := &api.EventEntry{
@@ -50,7 +50,7 @@ func TestEventPayloadUnmarshaling(t *testing.T) {
 	decoded := entry.Payload.(map[string]interface{})
 	assert.Equal("asset1072", decoded["ID"])
 
-	subInfo.PayloadType = api.EventPayloadType_String
+	subInfo.PayloadType = api.EventPayloadTypeString
 	entry.Payload = []byte(jsonstring)
 	err = p.processEventEntry(subInfo, entry)
 	assert.NoError(err)

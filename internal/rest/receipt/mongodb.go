@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -118,7 +118,7 @@ func (m *mongoReceipts) Init() (err error) {
 	err = m.mgo.Connect(m.config.MongoDB.URL, time.Duration(m.config.MongoDB.ConnectTimeoutMS)*time.Millisecond)
 	if err != nil {
 		err = errors.Errorf(errors.ReceiptStoreMongoDBConnect, err)
-		return
+		return err
 	}
 	m.collection = m.mgo.GetCollection(m.config.MongoDB.Database, m.config.MongoDB.Collection)
 	if collErr := m.collection.Create(&mgo.CollectionInfo{
@@ -136,22 +136,21 @@ func (m *mongoReceipts) Init() (err error) {
 		Sparse:     true,
 	}
 	if err = m.collection.EnsureIndex(index); err != nil {
-		err = errors.Errorf(errors.ReceiptStoreMongoDBIndex, err)
-		return
+		return errors.Errorf(errors.ReceiptStoreMongoDBIndex, err)
 	}
 
 	log.Infof("Connected to MongoDB on %s DB=%s Collection=%s", m.config.MongoDB.URL, m.config.MongoDB.Database, m.config.MongoDB.Collection)
-	return
+	return nil
 }
 
 // AddReceipt processes an individual reply message, and contains all errors
 // To account for any transitory failures writing to mongoDB, it retries adding receipt with a backoff
-func (m *mongoReceipts) AddReceipt(requestID string, receipt *map[string]interface{}) (err error) {
+func (m *mongoReceipts) AddReceipt(_ string, receipt *map[string]interface{}) (err error) {
 	return m.collection.Insert(*receipt)
 }
 
 // GetReceipts Returns recent receipts with skip & limit
-func (m *mongoReceipts) GetReceipts(skip, limit int, ids []string, sinceEpochMS int64, from, to, start string) (*[]map[string]interface{}, error) {
+func (m *mongoReceipts) GetReceipts(skip, limit int, ids []string, sinceEpochMS int64, from, to, _ string) (*[]map[string]interface{}, error) {
 	filter := bson.M{}
 	if len(ids) > 0 {
 		filter["_id"] = bson.M{

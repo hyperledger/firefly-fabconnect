@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -34,8 +34,8 @@ import (
 
 // kafkaHandler provides the HTTP -> Kafka bridge functionality
 type kafkaHandler struct {
-	kafka       kafka.KafkaCommon
-	receipts    receipt.ReceiptStore
+	kafka       kafka.Common
+	receipts    receipt.Store
 	sendCond    *sync.Cond
 	pendingMsgs map[string]bool
 	successMsgs map[string]*sarama.ProducerMessage
@@ -44,7 +44,7 @@ type kafkaHandler struct {
 }
 
 // newWebhooksKafka constructor
-func newKafkaHandler(kconf conf.KafkaConf, receipts receipt.ReceiptStore) *kafkaHandler {
+func newKafkaHandler(kconf conf.KafkaConf, receipts receipt.Store) *kafkaHandler {
 	w := &kafkaHandler{
 		receipts:    receipts,
 		sendCond:    sync.NewCond(&sync.Mutex{}),
@@ -80,7 +80,7 @@ func (w *kafkaHandler) waitForSend(msgID string) (msg *sarama.ProducerMessage, e
 }
 
 // ConsumerMessagesLoop - consume replies
-func (w *kafkaHandler) ConsumerMessagesLoop(consumer kafka.KafkaConsumer, producer kafka.KafkaProducer, wg *sync.WaitGroup) {
+func (w *kafkaHandler) ConsumerMessagesLoop(consumer kafka.Consumer, _ kafka.Producer, wg *sync.WaitGroup) {
 	for msg := range consumer.Messages() {
 		w.receipts.ProcessReceipt(msg.Value)
 
@@ -91,7 +91,7 @@ func (w *kafkaHandler) ConsumerMessagesLoop(consumer kafka.KafkaConsumer, produc
 }
 
 // ProducerErrorLoop - consume errors
-func (w *kafkaHandler) ProducerErrorLoop(consumer kafka.KafkaConsumer, producer kafka.KafkaProducer, wg *sync.WaitGroup) {
+func (w *kafkaHandler) ProducerErrorLoop(_ kafka.Consumer, producer kafka.Producer, wg *sync.WaitGroup) {
 	log.Debugf("Kafka handler listening for errors sending to Kafka")
 	for err := range producer.Errors() {
 		log.Errorf("Error sending message: %s", err)
@@ -112,7 +112,7 @@ func (w *kafkaHandler) ProducerErrorLoop(consumer kafka.KafkaConsumer, producer 
 }
 
 // ProducerSuccessLoop - consume successes
-func (w *kafkaHandler) ProducerSuccessLoop(consumer kafka.KafkaConsumer, producer kafka.KafkaProducer, wg *sync.WaitGroup) {
+func (w *kafkaHandler) ProducerSuccessLoop(_ kafka.Consumer, producer kafka.Producer, wg *sync.WaitGroup) {
 	log.Debugf("Kafka handler listening for successful sends to Kafka")
 	for msg := range producer.Successes() {
 		log.Infof("Kafka handler sent message ok: %s", msg.Metadata)

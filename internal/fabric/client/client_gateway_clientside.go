@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -76,66 +76,65 @@ func newRPCClientWithClientSideGateway(configProvider core.ConfigProvider, txTim
 	return w, nil
 }
 
-func (w *gwRPCWrapper) Invoke(channelId, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*TxReceipt, error) {
-	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelId, chaincodeName, method, isInit, args)
+func (w *gwRPCWrapper) Invoke(channelID, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*TxReceipt, error) {
+	log.Tracef("RPC [%s:%s:%s:isInit=%t] --> %+v", channelID, chaincodeName, method, isInit, args)
 
-	result, txStatus, err := w.sendTransaction(channelId, signer, chaincodeName, method, args, transientMap, isInit)
+	result, txStatus, err := w.sendTransaction(channelID, signer, chaincodeName, method, args, transientMap, isInit)
 	if err != nil {
-		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelId, chaincodeName, method, isInit, err)
+		log.Errorf("Failed to send transaction [%s:%s:%s:isInit=%t]. %s", channelID, chaincodeName, method, isInit, err)
 		return nil, err
 	}
-	signingId, err := w.idClient.GetSigningIdentity(signer)
+	signingID, err := w.idClient.GetSigningIdentity(signer)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Tracef("RPC [%s:%s:%s:isInit=%t] <-- %+v", channelId, chaincodeName, method, isInit, result)
-	return newReceipt(result, txStatus, signingId.Identifier()), err
+	log.Tracef("RPC [%s:%s:%s:isInit=%t] <-- %+v", channelID, chaincodeName, method, isInit, result)
+	return newReceipt(result, txStatus, signingID.Identifier()), err
 }
 
-func (w *gwRPCWrapper) Query(channelId, signer, chaincodeName, method string, args []string, strongread bool) ([]byte, error) {
-	log.Tracef("RPC [%s:%s:%s] --> %+v", channelId, chaincodeName, method, args)
+func (w *gwRPCWrapper) Query(channelID, signer, chaincodeName, method string, args []string, strongread bool) ([]byte, error) {
+	log.Tracef("RPC [%s:%s:%s] --> %+v", channelID, chaincodeName, method, args)
 
-	client, err := w.getChannelClient(channelId, signer)
+	client, err := w.getChannelClient(channelID, signer)
 	if err != nil {
 		return nil, errors.Errorf("Failed to get channel client. %s", err)
 	}
 
 	if strongread {
-		client, err := w.getGatewayClient(channelId, signer)
+		client, err := w.getGatewayClient(channelID, signer)
 		if err != nil {
 			return nil, errors.Errorf("Failed to get gateway client. %s", err)
 		}
 		contractClient := client.GetContract(chaincodeName)
 		result, err := contractClient.EvaluateTransaction(method, args...)
 		if err != nil {
-			log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
+			log.Errorf("Failed to send query [%s:%s:%s]. %s", channelID, chaincodeName, method, err)
 			return nil, err
 		}
 
-		log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
+		log.Tracef("RPC [%s:%s:%s] <-- %+v", channelID, chaincodeName, method, result)
 		return result, nil
-	} else {
-		peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
-		if err != nil {
-			return nil, err
-		}
-
-		bytes := convertStringArray(args)
-		req := channel.Request{
-			ChaincodeID: chaincodeName,
-			Fcn:         method,
-			Args:        bytes,
-		}
-		result, err := client.Query(req, channel.WithRetry(retry.DefaultChannelOpts), channel.WithTargetEndpoints(peerEndpoint))
-		if err != nil {
-			log.Errorf("Failed to send query [%s:%s:%s]. %s", channelId, chaincodeName, method, err)
-			return nil, err
-		}
-
-		log.Tracef("RPC [%s:%s:%s] <-- %+v", channelId, chaincodeName, method, result)
-		return result.Payload, nil
 	}
+	peerEndpoint, err := getFirstPeerEndpointFromConfig(w.configProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes := convertStringArray(args)
+	req := channel.Request{
+		ChaincodeID: chaincodeName,
+		Fcn:         method,
+		Args:        bytes,
+	}
+	result, err := client.Query(req, channel.WithRetry(retry.DefaultChannelOpts), channel.WithTargetEndpoints(peerEndpoint))
+	if err != nil {
+		log.Errorf("Failed to send query [%s:%s:%s]. %s", channelID, chaincodeName, method, err)
+		return nil, err
+	}
+
+	log.Tracef("RPC [%s:%s:%s] <-- %+v", channelID, chaincodeName, method, result)
+	return result.Payload, nil
 }
 
 func (w *gwRPCWrapper) SignerUpdated(signer string) {
@@ -153,9 +152,9 @@ func (w *gwRPCWrapper) Close() error {
 	return nil
 }
 
-func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) ([]byte, *fab.TxStatusEvent, error) {
+func (w *gwRPCWrapper) sendTransaction(signer, channelID, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) ([]byte, *fab.TxStatusEvent, error) {
 	convertedMap := convertStringMap(transientMap)
-	tx, notifier, err := w.txPreparer(w, signer, channelId, chaincodeName, method, isInit, convertedMap)
+	tx, notifier, err := w.txPreparer(w, signer, channelID, chaincodeName, method, isInit, convertedMap)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -172,13 +171,13 @@ func (w *gwRPCWrapper) sendTransaction(signer, channelId, chaincodeName, method 
 		return result, txStatus, nil
 	case <-ctx.Done():
 		cancel()
-		return nil, nil, errors.Errorf("Failed to get status event for transaction (channel=%s, chaincode=%s, func=%s)", channelId, chaincodeName, method)
+		return nil, nil, errors.Errorf("Failed to get status event for transaction (channel=%s, chaincode=%s, func=%s)", channelID, chaincodeName, method)
 	}
 }
 
 // channel clients for transactions are created with the gateway API, so that the internal handling of using
 // the discovery service and selecting the right set of endorsers are automated
-func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient *gateway.Network, err error) {
+func (w *gwRPCWrapper) getGatewayClient(channelID, signer string) (gatewayClient *gateway.Network, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	gatewayClientsForSigner := w.gwGatewayClients[signer]
@@ -194,14 +193,14 @@ func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient
 		w.gwGatewayClients[signer] = gatewayClientsForSigner
 	}
 
-	gatewayClient = gatewayClientsForSigner[channelId]
+	gatewayClient = gatewayClientsForSigner[channelID]
 	if gatewayClient == nil {
 		client := w.gwClients[signer]
-		gatewayClient, err = w.networkCreator(client, channelId)
+		gatewayClient, err = w.networkCreator(client, channelID)
 		if err != nil {
 			return nil, err
 		}
-		gatewayClientsForSigner[channelId] = gatewayClient
+		gatewayClientsForSigner[channelID] = gatewayClient
 	}
 	return gatewayClient, nil
 }
@@ -209,7 +208,7 @@ func (w *gwRPCWrapper) getGatewayClient(channelId, signer string) (gatewayClient
 // channel clients for queries are created with the channel client API, so that we can dictate the target
 // peer to be the single peer that this fabconnect instance is attached to. This is more useful than trying to
 // do a "strong read" across multiple peers
-func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient *channel.Client, err error) {
+func (w *gwRPCWrapper) getChannelClient(channelID, signer string) (channelClient *channel.Client, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	channelClientsForSigner := w.gwChannelClients[signer]
@@ -218,20 +217,20 @@ func (w *gwRPCWrapper) getChannelClient(channelId, signer string) (channelClient
 		w.gwChannelClients[signer] = channelClientsForSigner
 	}
 
-	channelClient = channelClientsForSigner[channelId]
+	channelClient = channelClientsForSigner[channelID]
 	if channelClient == nil {
 		sdk := w.ledgerClientWrapper.sdk
 		org, err := getOrgFromConfig(w.configProvider)
 		if err != nil {
 			return nil, err
 		}
-		clientChannelContext := sdk.ChannelContext(channelId, fabsdk.WithUser(signer), fabsdk.WithOrg(org))
+		clientChannelContext := sdk.ChannelContext(channelID, fabsdk.WithUser(signer), fabsdk.WithOrg(org))
 		// Channel client is used to query and execute transactions (Org1 is default org)
 		channelClient, err = w.channelCreator(clientChannelContext)
 		if err != nil {
 			return nil, errors.Errorf("Failed to create new channel client: %s", err)
 		}
-		channelClientsForSigner[channelId] = channelClient
+		channelClientsForSigner[channelID] = channelClient
 	}
 	return channelClient, nil
 }
@@ -240,12 +239,12 @@ func createGateway(configProvider core.ConfigProvider, signer string, txTimeout 
 	return gateway.Connect(gateway.WithConfig(configProvider), gateway.WithUser(signer), gateway.WithTimeout(time.Duration(txTimeout)*time.Second))
 }
 
-func getNetwork(gateway *gateway.Gateway, channelId string) (*gateway.Network, error) {
-	return gateway.GetNetwork(channelId)
+func getNetwork(gateway *gateway.Gateway, channelID string) (*gateway.Network, error) {
+	return gateway.GetNetwork(channelID)
 }
 
-func prepareTx(w *gwRPCWrapper, signer, channelId, chaincodeName, method string, isInit bool, transientMap map[string][]byte) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
-	channelClient, err := w.getGatewayClient(signer, channelId)
+func prepareTx(w *gwRPCWrapper, signer, channelID, chaincodeName, method string, isInit bool, transientMap map[string][]byte) (*gateway.Transaction, <-chan *fab.TxStatusEvent, error) {
+	channelClient, err := w.getGatewayClient(signer, channelID)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -46,7 +46,7 @@ func newWebSocketAction(es *eventStream, spec *webSocketActionInfo) (*webSocketA
 
 func validateWebsocketConfig(spec *webSocketActionInfo) error {
 	if spec.Topic == "" {
-		return fmt.Errorf("Missing required parameter 'websocket.topic'")
+		return fmt.Errorf("missing required parameter 'websocket.topic'")
 	}
 	sd := spec.DistributionMode
 	if sd != "" && sd != DistributionModeBroadcast && sd != DistributionModeWLD {
@@ -56,7 +56,7 @@ func validateWebsocketConfig(spec *webSocketActionInfo) error {
 }
 
 // attemptBatch attempts to deliver a batch over socket IO
-func (w *webSocketAction) attemptBatch(batchNumber, attempt uint64, events []*api.EventEntry) error {
+func (w *webSocketAction) attemptBatch(batchNumber, _ uint64, events []*api.EventEntry) error {
 	var err error
 
 	// Get a blocking channel to send and receive on our chosen namespace

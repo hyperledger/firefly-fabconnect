@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -44,7 +44,7 @@ type levelDBReceipts struct {
 func newLevelDBReceipts(conf *conf.ReceiptsDBConf) *levelDBReceipts {
 	store := kvstore.NewLDBKeyValueStore(conf.LevelDB.Path)
 	t := time.Unix(1000000, 0)
-	entropy := ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)
+	entropy := ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0) // #nosec
 
 	return &levelDBReceipts{
 		conf:         conf,
@@ -54,7 +54,7 @@ func newLevelDBReceipts(conf *conf.ReceiptsDBConf) *levelDBReceipts {
 	}
 }
 
-func (m *levelDBReceipts) ValidateConf() error {
+func (l *levelDBReceipts) ValidateConf() error {
 	// leveldb creates the target directory on demand, no need to check for existence
 	return nil
 }
@@ -142,11 +142,12 @@ func (l *levelDBReceipts) GetReceipts(skip, limit int, ids []string, sinceEpochM
 	if from != "" || to != "" {
 		lookupKeysByFromAndTo = l.getLookupKeysByFromAndTo(from, to, start, endKey, limit)
 	}
-	if len(ids) > 0 && from == "" && to == "" {
+	switch {
+	case len(ids) > 0 && from == "" && to == "":
 		lookupKeys = lookupKeysByIDs
-	} else if len(ids) == 0 && (from != "" || to != "") {
+	case len(ids) == 0 && (from != "" || to != ""):
 		lookupKeys = lookupKeysByFromAndTo
-	} else if len(ids) > 0 && (from != "" || to != "") {
+	case len(ids) > 0 && (from != "" || to != ""):
 		lookupKeys = intersect(lookupKeysByIDs, lookupKeysByFromAndTo)
 	}
 	if lookupKeys != nil {
@@ -198,10 +199,9 @@ func (l *levelDBReceipts) getReceiptsNoFilter(itr kvstore.KVIterator, skip, limi
 			if err != nil {
 				log.Errorf("Failed to decode stored receipt for request ID %s\n", itr.Key())
 				continue
-			} else {
-				receipt["_sequenceKey"] = key
-				results = append(results, receipt)
 			}
+			receipt["_sequenceKey"] = key
+			results = append(results, receipt)
 		}
 		index++
 	}
@@ -214,10 +214,9 @@ func (l *levelDBReceipts) GetReceipt(requestID string) (*map[string]interface{},
 	if err != nil {
 		if err == kvstore.ErrorNotFound {
 			return nil, nil
-		} else {
-			log.Errorf("Failed to retrieve the entry for the original key: %s. %s\n", requestID, err)
-			return nil, errors.Errorf(errors.LevelDBFailedRetriveOriginalKey, requestID, err)
 		}
+		log.Errorf("Failed to retrieve the entry for the original key: %s. %s\n", requestID, err)
+		return nil, errors.Errorf(errors.LevelDBFailedRetriveOriginalKey, requestID, err)
 	}
 	// returned val represents the composite key, use it to retrieve the actual content
 	lookupKey := string(val)
@@ -264,9 +263,8 @@ func (l *levelDBReceipts) getLookupKeysByIDs(ids []string, start, end string) []
 		if err != nil {
 			log.Warnf("Failed to locate entry for key ID %s", id)
 			continue
-		} else {
-			result = append(result, string(val))
 		}
+		result = append(result, string(val))
 	}
 	sort.Strings(result)
 	// since our query searches in descending order, while sort.SearchString requires ascending order
@@ -293,11 +291,12 @@ func (l *levelDBReceipts) getLookupKeysByFromAndTo(from, to string, start, end s
 	}
 
 	var result []string
-	if from != "" && to == "" {
+	switch {
+	case from != "" && to == "":
 		result = fromKeys
-	} else if from == "" && to != "" {
+	case from == "" && to != "":
 		result = toKeys
-	} else {
+	default:
 		// find the intersection of the 2 slices, note that both slices are sorted
 		result = intersect(fromKeys, toKeys)
 	}

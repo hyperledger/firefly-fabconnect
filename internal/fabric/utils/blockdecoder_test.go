@@ -43,12 +43,12 @@ func TestDecodeEndorserBlockWithEvents(t *testing.T) {
 	assert.Equal("u0o4mkkzs6", action.Header.Creator.Mspid)
 
 	apa := action.Payload.Action
-	assert.Equal("asset_transfer", apa.ProposalResponsePayload.Extension.ChaincodeId.Name)
-	assert.Equal("1.1.0.u0ypz4p14q", apa.ProposalResponsePayload.Extension.ChaincodeId.Version)
+	assert.Equal("asset_transfer", apa.ProposalResponsePayload.Extension.ChaincodeID.Name)
+	assert.Equal("1.1.0.u0ypz4p14q", apa.ProposalResponsePayload.Extension.ChaincodeID.Version)
 
 	event := apa.ProposalResponsePayload.Extension.Events
-	assert.Equal("asset_transfer", event.ChaincodeId)
-	assert.Regexp("[0-9a-f]{64}", event.TxId)
+	assert.Equal("asset_transfer", event.ChaincodeID)
+	assert.Regexp("[0-9a-f]{64}", event.TxID)
 	assert.Regexp("[0-9]+", event.Timestamp)
 	assert.Equal("AssetCreated", event.EventName)
 	m, ok := event.Payload.([]byte)
@@ -56,7 +56,7 @@ func TestDecodeEndorserBlockWithEvents(t *testing.T) {
 	assert.Equal("{\"ID\":\"asset05\",\"color\":\"red\",\"size\":10,\"owner\":\"Tom\",\"appraisedValue\":123000}", string(m))
 
 	cpp := action.Payload.ChaincodeProposalPayload
-	assert.Equal("asset_transfer", cpp.Input.ChaincodeSpec.ChaincodeId.Name)
+	assert.Equal("asset_transfer", cpp.Input.ChaincodeSpec.ChaincodeID.Name)
 	assert.Equal("CreateAsset", cpp.Input.ChaincodeSpec.Input.Args[0])
 }
 
@@ -77,11 +77,11 @@ func TestDecodeEndorserBlockLifecycleTxs(t *testing.T) {
 	assert.Equal("u0o4mkkzs6", action.Header.Creator.Mspid)
 
 	apa := action.Payload.Action
-	assert.Equal("_lifecycle", apa.ProposalResponsePayload.Extension.ChaincodeId.Name)
-	assert.Equal("syscc", apa.ProposalResponsePayload.Extension.ChaincodeId.Version)
+	assert.Equal("_lifecycle", apa.ProposalResponsePayload.Extension.ChaincodeID.Name)
+	assert.Equal("syscc", apa.ProposalResponsePayload.Extension.ChaincodeID.Version)
 
 	cpp := action.Payload.ChaincodeProposalPayload
-	assert.Equal("_lifecycle", cpp.Input.ChaincodeSpec.ChaincodeId.Name)
+	assert.Equal("_lifecycle", cpp.Input.ChaincodeSpec.ChaincodeID.Name)
 	assert.Equal("UNDEFINED", cpp.Input.ChaincodeSpec.Type)
 	assert.Equal("ApproveChaincodeDefinitionForMyOrg", cpp.Input.ChaincodeSpec.Input.Args[0])
 	assert.Equal(int64(1), cpp.Input.ChaincodeSpec.Input.Args[1].(*lifecycle.ApproveChaincodeDefinitionForMyOrgArgs).Sequence)
@@ -115,10 +115,10 @@ func TestGetEvents(t *testing.T) {
 	events := GetEvents(testblock)
 	assert.Equal(1, len(events))
 	entry := events[0]
-	assert.Equal("asset_transfer", entry.ChaincodeId)
+	assert.Equal("asset_transfer", entry.ChaincodeID)
 	assert.Equal(uint64(16), entry.BlockNumber)
 	assert.Equal("AssetCreated", entry.EventName)
-	assert.Regexp("[0-9a-f]{64}", entry.TransactionId)
+	assert.Regexp("[0-9a-f]{64}", entry.TransactionID)
 	assert.Equal(0, entry.TransactionIndex)
 	assert.Equal(int64(1641861241312746000), entry.Timestamp)
 }

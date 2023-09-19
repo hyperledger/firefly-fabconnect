@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -49,13 +49,13 @@ func newSubscription(stream *eventStream, rpc client.RPCClient, i *eventsapi.Sub
 		ep:          newEvtProcessor(i.ID, stream),
 		filterStale: true,
 	}
-	i.Summary = fmt.Sprintf(`FromBlock=%s,Chaincode=%s,Filter=%s`, i.FromBlock, i.Filter.ChaincodeId, i.Filter.EventFilter)
+	i.Summary = fmt.Sprintf(`FromBlock=%s,Chaincode=%s,Filter=%s`, i.FromBlock, i.Filter.ChaincodeID, i.Filter.EventFilter)
 	// If a name was not provided by the end user, set it to the system generated summary
 	if i.Name == "" {
 		log.Debugf("No name provided for subscription, using auto-generated ID:%s", i.ID)
 		i.Name = i.ID
 	}
-	log.Infof("Created subscription ID:%s Chaincode: %s name:%s", i.ID, i.Filter.ChaincodeId, i.Name)
+	log.Infof("Created subscription ID:%s Chaincode: %s name:%s", i.ID, i.Filter.ChaincodeID, i.Name)
 	return s, nil
 }
 
@@ -69,7 +69,7 @@ func restoreSubscription(stream *eventStream, rpc client.RPCClient, i *eventsapi
 	return s, nil
 }
 
-func (s *subscription) setInitialBlockHeight(ctx context.Context) (uint64, error) {
+func (s *subscription) setInitialBlockHeight(_ context.Context) (uint64, error) {
 	log.Debugf(`%s: Setting initial block height. "fromBlock" value in the subscription is %s`, s.info.ID, s.info.FromBlock)
 	if s.info.FromBlock != "" && s.info.FromBlock != FromBlockNewest {
 		fromBlock, err := strconv.ParseUint(s.info.FromBlock, 10, 64)
@@ -79,7 +79,7 @@ func (s *subscription) setInitialBlockHeight(ctx context.Context) (uint64, error
 		log.Infof("%s: initial block height for subscription: %d", s.info.ID, fromBlock)
 		return fromBlock, nil
 	}
-	result, err := s.client.QueryChainInfo(s.info.ChannelId, s.info.Signer)
+	result, err := s.client.QueryChainInfo(s.info.ChannelID, s.info.Signer)
 	if err != nil {
 		return 0, errors.Errorf(errors.RPCCallReturnedError, "QSCC GetChainInfo()", err)
 	}
@@ -94,7 +94,7 @@ func (s *subscription) setCheckpointBlockHeight(i uint64) {
 	log.Infof("%s: checkpoint restored block height for subscription: %d", s.info.ID, i)
 }
 
-func (s *subscription) restartFilter(ctx context.Context, since uint64) error {
+func (s *subscription) restartFilter(_ context.Context, since uint64) error {
 	reg, blockEventNotifier, ccEventNotifier, err := s.client.SubscribeEvent(s.info, since)
 	if err != nil {
 		return errors.Errorf(errors.RPCCallReturnedError, "SubscribeEvent", err)
@@ -131,9 +131,9 @@ func (s *subscription) processNewEvents() {
 				return
 			}
 			event := &eventsapi.EventEntry{
-				ChaincodeId:   ccEvent.ChaincodeID,
+				ChaincodeID:   ccEvent.ChaincodeID,
 				BlockNumber:   ccEvent.BlockNumber,
-				TransactionId: ccEvent.TxID,
+				TransactionID: ccEvent.TxID,
 				EventName:     ccEvent.EventName,
 				Payload:       ccEvent.Payload,
 			}
@@ -157,7 +157,7 @@ func (s *subscription) getEventTimestamp(evt *eventsapi.EventEntry) {
 		return
 	}
 	// we didn't find the timestamp in our cache, query the node for the block header where we can find the timestamp
-	_, block, err := s.client.QueryBlock(s.info.ChannelId, s.info.Signer, evt.BlockNumber, nil)
+	_, block, err := s.client.QueryBlock(s.info.ChannelID, s.info.Signer, evt.BlockNumber, nil)
 	if err != nil {
 		log.Errorf("Unable to retrieve block[%s] timestamp: %s", blockNumber, err)
 		evt.Timestamp = 0 // set to 0, we were not able to retrieve the timestamp.

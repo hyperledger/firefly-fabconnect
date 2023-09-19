@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -52,12 +52,12 @@ type RegistrationWrapper struct {
 }
 
 type RPCClient interface {
-	Invoke(channelId, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*TxReceipt, error)
-	Query(channelId, signer, chaincodeName, method string, args []string, strongread bool) ([]byte, error)
-	QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error)
-	QueryBlock(channelId string, signer string, blocknumber uint64, blockhash []byte) (*utils.RawBlock, *utils.Block, error)
-	QueryBlockByTxId(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error)
-	QueryTransaction(channelId, signer, txId string) (map[string]interface{}, error)
+	Invoke(channelID, signer, chaincodeName, method string, args []string, transientMap map[string]string, isInit bool) (*TxReceipt, error)
+	Query(channelID, signer, chaincodeName, method string, args []string, strongread bool) ([]byte, error)
+	QueryChainInfo(channelID, signer string) (*fab.BlockchainInfoResponse, error)
+	QueryBlock(channelID string, signer string, blocknumber uint64, blockhash []byte) (*utils.RawBlock, *utils.Block, error)
+	QueryBlockByTxID(channelID string, signer string, txID string) (*utils.RawBlock, *utils.Block, error)
+	QueryTransaction(channelID, signer, txID string) (map[string]interface{}, error)
 	SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error)
 	Unregister(*RegistrationWrapper)
 	Close() error

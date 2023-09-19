@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	ws "github.com/gorilla/websocket"
-	log "github.com/sirupsen/logrus"
+	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 
 	"github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/internal/utils"
@@ -32,7 +32,7 @@ import (
 type webSocketConnection struct {
 	id        string
 	server    *webSocketServer
-	conn      *ws.Conn
+	conn      *websocket.Conn
 	mux       sync.Mutex
 	closed    bool
 	topics    map[string]*webSocketTopic
@@ -48,7 +48,7 @@ type webSocketCommandMessage struct {
 	Message string `json:"message,omitempty"`
 }
 
-func newConnection(server *webSocketServer, conn *ws.Conn) *webSocketConnection {
+func newConnection(server *webSocketServer, conn *websocket.Conn) *webSocketConnection {
 	wsc := &webSocketConnection{
 		id:        utils.UUIDv4(),
 		server:    server,
@@ -77,7 +77,7 @@ func (c *webSocketConnection) close() {
 		c.server.cycleTopic(t)
 	}
 	c.server.connectionClosed(c)
-	log.Infof("WS/%s: Disconnected", c.id)
+	logrus.Infof("WS/%s: Disconnected", c.id)
 }
 
 func (c *webSocketConnection) sender() {
@@ -102,7 +102,7 @@ func (c *webSocketConnection) sender() {
 	for {
 		chosen, value, ok := reflect.Select(cases)
 		if !ok {
-			log.Infof("WS/%s: Closing", c.id)
+			logrus.Infof("WS/%s: Closing", c.id)
 			return
 		}
 
@@ -113,7 +113,7 @@ func (c *webSocketConnection) sender() {
 			// Message from one of the existing topics
 			err := c.conn.WriteJSON(value.Interface())
 			if err != nil {
-				log.Errorf("Failed to send JSON message: %s", err)
+				logrus.Errorf("Failed to send JSON message: %s", err)
 			}
 		}
 	}
@@ -136,20 +136,20 @@ func (c *webSocketConnection) listenReplies() {
 
 func (c *webSocketConnection) listen() {
 	defer c.close()
-	log.Infof("WS/%s: Connected", c.id)
+	logrus.Infof("WS/%s: Connected", c.id)
 	for {
 		var msg webSocketCommandMessage
 		err := c.conn.ReadJSON(&msg)
 		if err != nil {
-			log.Errorf("WS/%s: Error: %s", c.id, err)
+			logrus.Errorf("WS/%s: Error: %s", c.id, err)
 			return
 		}
-		log.Debugf("WS/%s: Received: %+v", c.id, msg)
+		logrus.Debugf("WS/%s: Received: %+v", c.id, msg)
 
 		t := c.server.getTopic(msg.Topic)
 		switch strings.ToLower(msg.Type) {
 		case "listen":
-			log.Debugf("Client requested listening on topic: \"%s\"", t.topic)
+			logrus.Debugf("Client requested listening on topic: \"%s\"", t.topic)
 			c.listenTopic(t)
 		case "listenreplies":
 			c.listenReplies()
@@ -158,7 +158,7 @@ func (c *webSocketConnection) listen() {
 		case "error":
 			c.handleAckOrError(t, errors.Errorf(errors.EventStreamsWebSocketErrorFromClient, msg.Message))
 		default:
-			log.Errorf("WS/%s: Unexpected message type: %+v", c.id, msg)
+			logrus.Errorf("WS/%s: Unexpected message type: %+v", c.id, msg)
 		}
 	}
 }
@@ -167,10 +167,10 @@ func (c *webSocketConnection) handleAckOrError(t *webSocketTopic, err error) {
 	isError := err != nil
 	select {
 	case <-time.After(c.server.processingTimeout):
-		log.Errorf("WS/%s: response (error='%t') on topic '%s'. We were not available to process it after %.2f seconds. Closing connection", c.id, isError, t.topic, c.server.processingTimeout.Seconds())
+		logrus.Errorf("WS/%s: response (error='%t') on topic '%s'. We were not available to process it after %.2f seconds. Closing connection", c.id, isError, t.topic, c.server.processingTimeout.Seconds())
 		c.close()
 	case t.receiverChannel <- err:
-		log.Debugf("WS/%s: response (error='%t') on topic '%s' passed on for processing", c.id, isError, t.topic)
+		logrus.Debugf("WS/%s: response (error='%t') on topic '%s' passed on for processing", c.id, isError, t.topic)
 		break
 	}
 }

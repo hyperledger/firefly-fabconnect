@@ -1,11 +1,13 @@
-// Copyright 2021 Kaleido
-
+// Copyright © 2023 Kaleido, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -68,15 +70,15 @@ func (ep *evtProcessor) processEventEntry(subInfo *api.SubscriptionInfo, entry *
 	entry.SubID = subInfo.ID
 	payloadType := subInfo.PayloadType
 	if payloadType == "" {
-		payloadType = api.EventPayloadType_Bytes
+		payloadType = api.EventPayloadTypeBytes
 	}
 
 	payloadBytes, ok := entry.Payload.([]byte)
 	if ok {
 		switch payloadType {
-		case api.EventPayloadType_String:
+		case api.EventPayloadTypeString:
 			entry.Payload = string(payloadBytes)
-		case api.EventPayloadType_StringifiedJSON, api.EventPayloadType_JSON:
+		case api.EventPayloadTypeStringifiedJSON, api.EventPayloadTypeJSON:
 			structuredMap := make(map[string]interface{})
 			err := json.Unmarshal(payloadBytes, &structuredMap)
 			if err != nil {
@@ -93,7 +95,7 @@ func (ep *evtProcessor) processEventEntry(subInfo *api.SubscriptionInfo, entry *
 	}
 
 	// Ok, now we have the full event in a friendly map output. Pass it down to the stream
-	log.Infof("%s: Dispatching event. BlockNumber=%d TxId=%s", subInfo.ID, result.event.BlockNumber, result.event.TransactionId)
+	log.Infof("%s: Dispatching event. BlockNumber=%d TxId=%s", subInfo.ID, result.event.BlockNumber, result.event.TransactionID)
 	ep.stream.eventHandler(&result)
 	return nil
 }

@@ -1,3 +1,19 @@
+// Copyright © 2023 Kaleido, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package client
 
 import (
@@ -68,7 +84,7 @@ func createChannelClient(channelProvider context.ChannelProvider) (*channel.Clie
 	return channel.New(channelProvider)
 }
 
-func newReceipt(responsePayload []byte, status *fab.TxStatusEvent, signerID *msp.IdentityIdentifier) *TxReceipt {
+func newReceipt(_ []byte, status *fab.TxStatusEvent, signerID *msp.IdentityIdentifier) *TxReceipt {
 	return &TxReceipt{
 		SignerMSP:     signerID.MSPID,
 		Signer:        signerID.ID,
@@ -95,55 +111,55 @@ func convertStringMap(_map map[string]string) map[string][]byte {
 	return result
 }
 
-func (w *commonRPCWrapper) QueryChainInfo(channelId, signer string) (*fab.BlockchainInfoResponse, error) {
-	log.Tracef("RPC [%s] --> QueryChainInfo", channelId)
+func (w *commonRPCWrapper) QueryChainInfo(channelID, signer string) (*fab.BlockchainInfoResponse, error) {
+	log.Tracef("RPC [%s] --> QueryChainInfo", channelID)
 
-	result, err := w.ledgerClientWrapper.queryChainInfo(channelId, signer)
+	result, err := w.ledgerClientWrapper.queryChainInfo(channelID, signer)
 	if err != nil {
-		log.Errorf("Failed to query chain info on channel %s. %s", channelId, err)
+		log.Errorf("Failed to query chain info on channel %s. %s", channelID, err)
 		return nil, err
 	}
 
-	log.Tracef("RPC [%s] <-- %+v", channelId, result)
+	log.Tracef("RPC [%s] <-- %+v", channelID, result)
 	return result, nil
 }
 
-func (w *commonRPCWrapper) QueryBlock(channelId string, signer string, blockNumber uint64, blockhash []byte) (*utils.RawBlock, *utils.Block, error) {
-	log.Tracef("RPC [%s] --> QueryBlock %v", channelId, blockNumber)
+func (w *commonRPCWrapper) QueryBlock(channelID string, signer string, blockNumber uint64, blockhash []byte) (*utils.RawBlock, *utils.Block, error) {
+	log.Tracef("RPC [%s] --> QueryBlock %v", channelID, blockNumber)
 
-	rawblock, block, err := w.ledgerClientWrapper.queryBlock(channelId, signer, blockNumber, blockhash)
+	rawblock, block, err := w.ledgerClientWrapper.queryBlock(channelID, signer, blockNumber, blockhash)
 	if err != nil {
-		log.Errorf("Failed to query block %v on channel %s. %s", blockNumber, channelId, err)
+		log.Errorf("Failed to query block %v on channel %s. %s", blockNumber, channelID, err)
 		return nil, nil, err
 	}
 
-	log.Tracef("RPC [%s] <-- success", channelId)
+	log.Tracef("RPC [%s] <-- success", channelID)
 	return rawblock, block, nil
 }
 
-func (w *commonRPCWrapper) QueryBlockByTxId(channelId string, signer string, txId string) (*utils.RawBlock, *utils.Block, error) {
-	log.Tracef("RPC [%s] --> QueryBlockByTxId %s", channelId, txId)
+func (w *commonRPCWrapper) QueryBlockByTxID(channelID string, signer string, txID string) (*utils.RawBlock, *utils.Block, error) {
+	log.Tracef("RPC [%s] --> QueryBlockByTxID %s", channelID, txID)
 
-	rawblock, block, err := w.ledgerClientWrapper.queryBlockByTxId(channelId, signer, txId)
+	rawblock, block, err := w.ledgerClientWrapper.queryBlockByTxID(channelID, signer, txID)
 	if err != nil {
-		log.Errorf("Failed to query block by transaction Id %s on channel %s. %s", txId, channelId, err)
+		log.Errorf("Failed to query block by transaction Id %s on channel %s. %s", txID, channelID, err)
 		return nil, nil, err
 	}
 
-	log.Tracef("RPC [%s] <-- success", channelId)
+	log.Tracef("RPC [%s] <-- success", channelID)
 	return rawblock, block, nil
 }
 
-func (w *commonRPCWrapper) QueryTransaction(channelId, signer, txId string) (map[string]interface{}, error) {
-	log.Tracef("RPC [%s] --> QueryTransaction %s", channelId, txId)
+func (w *commonRPCWrapper) QueryTransaction(channelID, signer, txID string) (map[string]interface{}, error) {
+	log.Tracef("RPC [%s] --> QueryTransaction %s", channelID, txID)
 
-	result, err := w.ledgerClientWrapper.queryTransaction(channelId, signer, txId)
+	result, err := w.ledgerClientWrapper.queryTransaction(channelID, signer, txID)
 	if err != nil {
-		log.Errorf("Failed to query transaction on channel %s. %s", channelId, err)
+		log.Errorf("Failed to query transaction on channel %s. %s", channelID, err)
 		return nil, err
 	}
 
-	log.Tracef("RPC [%s] <-- %+v", channelId, result)
+	log.Tracef("RPC [%s] <-- %+v", channelID, result)
 	return result, nil
 }
 
@@ -151,7 +167,7 @@ func (w *commonRPCWrapper) QueryTransaction(channelId, signer, txId string) (map
 func (w *commonRPCWrapper) SubscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
 	reg, blockEventCh, ccEventCh, err := w.eventClientWrapper.subscribeEvent(subInfo, since)
 	if err != nil {
-		log.Errorf("Failed to subscribe to event [%s:%s:%s]. %s", subInfo.Stream, subInfo.ChannelId, subInfo.Filter.ChaincodeId, err)
+		log.Errorf("Failed to subscribe to event [%s:%s:%s]. %s", subInfo.Stream, subInfo.ChannelID, subInfo.Filter.ChaincodeID, err)
 		return nil, nil, nil, err
 	}
 	return reg, blockEventCh, ccEventCh, nil

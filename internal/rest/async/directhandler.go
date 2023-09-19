@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,15 +35,15 @@ import (
 
 type directHandler struct {
 	initialized   bool
-	receipts      receipt.ReceiptStore
+	receipts      receipt.Store
 	conf          *conf.RESTGatewayConf
-	processor     tx.TxProcessor
+	processor     tx.Processor
 	inFlightMutex sync.Mutex
 	inFlight      map[string]*msgContext
 	stopChan      chan error
 }
 
-func newDirectHandler(conf *conf.RESTGatewayConf, processor tx.TxProcessor, receiptstore receipt.ReceiptStore) *directHandler {
+func newDirectHandler(conf *conf.RESTGatewayConf, processor tx.Processor, receiptstore receipt.Store) *directHandler {
 	return &directHandler{
 		processor: processor,
 		receipts:  receiptstore,
@@ -80,7 +80,7 @@ func (t *msgContext) SendErrorReply(status int, err error) {
 	t.SendErrorReplyWithTX(status, err, "")
 }
 
-func (t *msgContext) SendErrorReplyWithTX(status int, err error, txHash string) {
+func (t *msgContext) SendErrorReplyWithTX(_ int, err error, txHash string) {
 	log.Warnf("Failed to process message %s: %s", t, err)
 	origBytes, _ := json.Marshal(t.msg)
 	errMsg := messages.NewErrorReply(err, origBytes)
@@ -108,7 +108,7 @@ func (t *msgContext) String() string {
 	return fmt.Sprintf("MsgContext[%s/%s]", t.headers.MsgType, t.msgID)
 }
 
-func (w *directHandler) dispatchMsg(ctx context.Context, key, msgID string, msg *messages.SendTransaction, ack bool) (string, int, error) {
+func (w *directHandler) dispatchMsg(ctx context.Context, key, msgID string, msg *messages.SendTransaction, _ bool) (string, int, error) {
 	w.inFlightMutex.Lock()
 
 	numInFlight := len(w.inFlight)

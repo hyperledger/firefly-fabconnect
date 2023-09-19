@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,7 +19,7 @@ package auth
 import (
 	"context"
 
-	"github.com/hyperledger/firefly-fabconnect/internal/errors"
+	internalErrors "github.com/hyperledger/firefly-fabconnect/internal/errors"
 	"github.com/hyperledger/firefly-fabconnect/pkg/plugins"
 )
 
@@ -77,60 +77,60 @@ func GetAccessToken(ctx context.Context) string {
 	return ""
 }
 
-// AuthRPC authorize an RPC call
-func AuthRPC(ctx context.Context, method string, args ...interface{}) error {
+// RPC authorize an RPC call
+func RPC(ctx context.Context, method string, args ...interface{}) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthRPC(authCtx, method, args...)
 	}
 	return nil
 }
 
-// AuthRPCSubscribe authorize a subscribe RPC call
-func AuthRPCSubscribe(ctx context.Context, namespace string, channel interface{}, args ...interface{}) error {
+// RPCSubscribe authorize a subscribe RPC call
+func RPCSubscribe(ctx context.Context, namespace string, channel interface{}, args ...interface{}) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthRPCSubscribe(authCtx, namespace, channel, args...)
 	}
 	return nil
 }
 
-// AuthEventStreams authorize the whole of event streams
-func AuthEventStreams(ctx context.Context) error {
+// EventStreams authorize the whole of event streams
+func EventStreams(ctx context.Context) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthEventStreams(authCtx)
 	}
 	return nil
 }
 
-// AuthListAsyncReplies authorize the listing or searching of all replies
-func AuthListAsyncReplies(ctx context.Context) error {
+// ListAsyncReplies authorize the listing or searching of all replies
+func ListAsyncReplies(ctx context.Context) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthListAsyncReplies(authCtx)
 	}
 	return nil
 }
 
-// AuthReadAsyncReplyByUUID authorize the query of an invidual reply by UUID
-func AuthReadAsyncReplyByUUID(ctx context.Context) error {
+// ReadAsyncReplyByUUID authorize the query of an invidual reply by UUID
+func ReadAsyncReplyByUUID(ctx context.Context) error {
 	if securityModule != nil && !IsSystemContext(ctx) {
 		authCtx := GetAuthContext(ctx)
 		if authCtx == nil {
-			return errors.Errorf(errors.SecurityModuleNoAuthContext)
+			return internalErrors.Errorf(internalErrors.SecurityModuleNoAuthContext)
 		}
 		return securityModule.AuthReadAsyncReplyByUUID(authCtx)
 	}

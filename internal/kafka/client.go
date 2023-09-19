@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,38 +29,38 @@ const (
 	kafkaConsumerReconnectDelaySecs = 5
 )
 
-// KafkaGoRoutines defines goroutines for processing Kafka messages from KafkaCommon
-type KafkaGoRoutines interface {
-	ConsumerMessagesLoop(consumer KafkaConsumer, producer KafkaProducer, wg *sync.WaitGroup)
-	ProducerErrorLoop(consumer KafkaConsumer, producer KafkaProducer, wg *sync.WaitGroup)
-	ProducerSuccessLoop(consumer KafkaConsumer, producer KafkaProducer, wg *sync.WaitGroup)
+// GoRoutines defines goroutines for processing Kafka messages from KafkaCommon
+type GoRoutines interface {
+	ConsumerMessagesLoop(consumer Consumer, producer Producer, wg *sync.WaitGroup)
+	ProducerErrorLoop(consumer Consumer, producer Producer, wg *sync.WaitGroup)
+	ProducerSuccessLoop(consumer Consumer, producer Producer, wg *sync.WaitGroup)
 }
 
-// KafkaProducer provides the interface passed from KafkaCommon to produce messages (subset of sarama)
-type KafkaProducer interface {
+// Producer provides the interface passed from KafkaCommon to produce messages (subset of sarama)
+type Producer interface {
 	AsyncClose()
 	Input() chan<- *sarama.ProducerMessage
 	Successes() <-chan *sarama.ProducerMessage
 	Errors() <-chan *sarama.ProducerError
 }
 
-// KafkaConsumer provides the interface passed from KafkaCommon to consume messages
-type KafkaConsumer interface {
+// Consumer provides the interface passed from KafkaCommon to consume messages
+type Consumer interface {
 	Close() error
 	Messages() <-chan *sarama.ConsumerMessage
 	Errors() <-chan error
 	MarkOffset(*sarama.ConsumerMessage, string)
 }
 
-// KafkaFactory builds new clients
-type KafkaFactory interface {
-	NewClient(KafkaCommon, *sarama.Config) (KafkaClient, error)
+// Factory builds new clients
+type Factory interface {
+	NewClient(Common, *sarama.Config) (Client, error)
 }
 
-// KafkaClient is the kafka client
-type KafkaClient interface {
-	NewProducer(KafkaCommon) (KafkaProducer, error)
-	NewConsumer(KafkaCommon) (KafkaConsumer, error)
+// Client is the kafka client
+type Client interface {
+	NewProducer(Common) (Producer, error)
+	NewConsumer(Common) (Consumer, error)
 	Brokers() []*sarama.Broker
 }
 
@@ -68,7 +68,7 @@ type KafkaClient interface {
 type SaramaKafkaFactory struct{}
 
 // NewClient - returns a new client
-func (f *SaramaKafkaFactory) NewClient(k KafkaCommon, clientConf *sarama.Config) (c KafkaClient, err error) {
+func (f *SaramaKafkaFactory) NewClient(k Common, clientConf *sarama.Config) (c Client, err error) {
 	var client sarama.Client
 	if client, err = sarama.NewClient(k.Conf().Brokers, clientConf); err == nil {
 		c = &saramaKafkaClient{client: client}
@@ -84,11 +84,11 @@ func (c *saramaKafkaClient) Brokers() []*sarama.Broker {
 	return c.client.Brokers()
 }
 
-func (c *saramaKafkaClient) NewProducer(k KafkaCommon) (KafkaProducer, error) {
+func (c *saramaKafkaClient) NewProducer(_ Common) (Producer, error) {
 	return sarama.NewAsyncProducerFromClient(c.client)
 }
 
-func (c *saramaKafkaClient) NewConsumer(k KafkaCommon) (KafkaConsumer, error) {
+func (c *saramaKafkaClient) NewConsumer(k Common) (Consumer, error) {
 	h := newSaramaKafkaConsumerGroupHandler(
 		&saramaConsumerGroupFactory{},
 		c.client, k.Conf().ConsumerGroup,
@@ -186,7 +186,7 @@ func (h *saramaKafkaConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSe
 	return nil
 }
 
-func (h *saramaKafkaConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+func (h *saramaKafkaConsumerGroupHandler) ConsumeClaim(_ sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
 		h.messages <- msg
 	}

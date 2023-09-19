@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -44,15 +44,15 @@ const (
 )
 
 type router struct {
-	syncDispatcher  restsync.SyncDispatcher
-	asyncDispatcher restasync.AsyncDispatcher
-	identityClient  identity.IdentityClient
+	syncDispatcher  restsync.Dispatcher
+	asyncDispatcher restasync.Dispatcher
+	identityClient  identity.Client
 	subManager      events.SubscriptionManager
 	ws              ws.WebSocketServer
 	httpRouter      *httprouter.Router
 }
 
-func newRouter(syncDispatcher restsync.SyncDispatcher, asyncDispatcher restasync.AsyncDispatcher, idClient identity.IdentityClient, sm events.SubscriptionManager, ws ws.WebSocketServer) *router {
+func newRouter(syncDispatcher restsync.Dispatcher, asyncDispatcher restasync.Dispatcher, idClient identity.Client, sm events.SubscriptionManager, ws ws.WebSocketServer) *router {
 	r := httprouter.New()
 	cors.Default().Handler(r)
 	return &router{
@@ -79,7 +79,7 @@ func (r *router) addRoutes() {
 
 	r.httpRouter.GET("/chaininfo", r.queryChainInfo)
 	r.httpRouter.GET("/blocks/:blockNumber", r.queryBlock)
-	r.httpRouter.GET("/blockByTxId/:txId", r.queryBlockByTxId)
+	r.httpRouter.GET("/blockByTxId/:txId", r.queryBlockByTxID)
 
 	r.httpRouter.POST("/query", r.queryChaincode)
 	r.httpRouter.POST("/transactions", r.sendTransaction)
@@ -129,20 +129,20 @@ func (r *router) wsHandler(res http.ResponseWriter, req *http.Request, params ht
 	r.ws.NewConnection(res, req, params)
 }
 
-func (r *router) statusHandler(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (r *router) statusHandler(res http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	reply, _ := json.Marshal(&statusMsg{OK: true})
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(200)
 	_, _ = res.Write(reply)
 }
 
-func (r *router) serveSwagger(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *router) serveSwagger(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	fs := http.FileServer(http.Dir("./openapi"))
 	fs.ServeHTTP(res, req)
 }
 
-func (r *router) serveSwaggerUI(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *router) serveSwaggerUI(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	res.Header().Add("Content-Type", "text/html")
 	_, _ = res.Write(utils.SwaggerUIHTML(req.Context()))
@@ -160,10 +160,10 @@ func (r *router) queryBlock(res http.ResponseWriter, req *http.Request, params h
 	r.syncDispatcher.GetBlock(res, req, params)
 }
 
-func (r *router) queryBlockByTxId(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *router) queryBlockByTxID(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	// query requests are always synchronous
-	r.syncDispatcher.GetBlockByTxId(res, req, params)
+	r.syncDispatcher.GetBlockByTxID(res, req, params)
 }
 
 func (r *router) queryChaincode(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
@@ -175,7 +175,7 @@ func (r *router) queryChaincode(res http.ResponseWriter, req *http.Request, para
 func (r *router) getTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	// query requests are always synchronous
-	r.syncDispatcher.GetTxById(res, req, params)
+	r.syncDispatcher.GetTxByID(res, req, params)
 }
 
 func (r *router) sendTransaction(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
@@ -448,7 +448,7 @@ func (r *router) resetSubscription(res http.ResponseWriter, req *http.Request, p
 	marshalAndReply(res, req, result)
 }
 
-func (r *router) dumpGoRoutines(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (r *router) dumpGoRoutines(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	_ = pprof.Lookup("goroutine").WriteTo(res, 1)
 }

@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,20 +26,20 @@ import (
 
 // adapted from the CommitHandler in https://github.com/hyperledger/fabric-sdk-go
 // in order to custom process the transaction status event
-type txSubmitAndListenHandler struct {
+type TxSubmitAndListenHandler struct {
 	txStatusEvent *fab.TxStatusEvent
 }
 
-func NewTxSubmitAndListenHandler(txStatus *fab.TxStatusEvent) *txSubmitAndListenHandler {
-	return &txSubmitAndListenHandler{
+func NewTxSubmitAndListenHandler(txStatus *fab.TxStatusEvent) *TxSubmitAndListenHandler {
+	return &TxSubmitAndListenHandler{
 		txStatusEvent: txStatus,
 	}
 }
 
-func (h *txSubmitAndListenHandler) Handle(requestContext *invoke.RequestContext, clientContext *invoke.ClientContext) {
+func (h *TxSubmitAndListenHandler) Handle(requestContext *invoke.RequestContext, clientContext *invoke.ClientContext) {
 	txnID := requestContext.Response.TransactionID
 
-	//Register Tx event
+	// Register Tx event
 	reg, statusNotifier, err := clientContext.EventService.RegisterTxStatusEvent(string(txnID))
 	if err != nil {
 		requestContext.Error = errors.Errorf("Error registering for TxStatus event for transaction %s. %s", txnID, err)

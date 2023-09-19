@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -44,7 +44,7 @@ type eventClientWrapper struct {
 	mu                 sync.Mutex
 }
 
-func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *eventClientWrapper {
+func newEventClient(_ core.ConfigProvider, sdk *fabsdk.FabricSDK, idClient IdentityClient) *eventClientWrapper {
 	w := &eventClientWrapper{
 		sdk:                sdk,
 		idClient:           idClient,
@@ -57,45 +57,44 @@ func newEventClient(configProvider core.ConfigProvider, sdk *fabsdk.FabricSDK, i
 }
 
 func (e *eventClientWrapper) subscribeEvent(subInfo *eventsapi.SubscriptionInfo, since uint64) (*RegistrationWrapper, <-chan *fab.BlockEvent, <-chan *fab.CCEvent, error) {
-	eventClient, err := e.getEventClient(subInfo.ChannelId, subInfo.Signer, since, subInfo.Filter.ChaincodeId)
+	eventClient, err := e.getEventClient(subInfo.ChannelID, subInfo.Signer, since, subInfo.Filter.ChaincodeID)
 	if err != nil {
 		log.Errorf("Failed to get event client. %s", err)
 		return nil, nil, nil, errors.Errorf("Failed to get event client. %s", err)
 	}
-	if subInfo.Filter.ChaincodeId != "" {
-		reg, notifier, err := eventClient.RegisterChaincodeEvent(subInfo.Filter.ChaincodeId, subInfo.Filter.EventFilter)
+	if subInfo.Filter.ChaincodeID != "" {
+		reg, notifier, err := eventClient.RegisterChaincodeEvent(subInfo.Filter.ChaincodeID, subInfo.Filter.EventFilter)
 		if err != nil {
-			return nil, nil, nil, errors.Errorf("Failed to subscribe to chaincode %s events. %s", subInfo.Filter.ChaincodeId, err)
+			return nil, nil, nil, errors.Errorf("Failed to subscribe to chaincode %s events. %s", subInfo.Filter.ChaincodeID, err)
 		}
-		log.Infof("Subscribed to events in channel %s chaincode %s from block %d", subInfo.ChannelId, subInfo.Filter.ChaincodeId, since)
+		log.Infof("Subscribed to events in channel %s chaincode %s from block %d", subInfo.ChannelID, subInfo.Filter.ChaincodeID, since)
 		regWrapper := &RegistrationWrapper{
 			registration: reg,
 			eventClient:  eventClient,
 		}
 		return regWrapper, nil, notifier, nil
-	} else {
-		blockType := subInfo.Filter.BlockType
-		var blockfilter fab.BlockFilter
-		if blockType == eventsapi.BlockType_TX {
-			blockfilter = headertypefilter.New(common.HeaderType_ENDORSER_TRANSACTION)
-		} else if blockType == eventsapi.BlockType_Config {
-			blockfilter = headertypefilter.New(common.HeaderType_CONFIG, common.HeaderType_CONFIG_UPDATE)
-		}
-
-		reg, notifier, err := eventClient.RegisterBlockEvent(blockfilter)
-		if err != nil {
-			return nil, nil, nil, errors.Errorf("Failed to subscribe to block events. %s", err)
-		}
-		log.Infof("Subscribed to events in channel %s from block %d", subInfo.ChannelId, since)
-		regWrapper := &RegistrationWrapper{
-			registration: reg,
-			eventClient:  eventClient,
-		}
-		return regWrapper, notifier, nil, nil
 	}
+	blockType := subInfo.Filter.BlockType
+	var blockfilter fab.BlockFilter
+	if blockType == eventsapi.BlockTypeTX {
+		blockfilter = headertypefilter.New(common.HeaderType_ENDORSER_TRANSACTION)
+	} else if blockType == eventsapi.BlockTypeConfig {
+		blockfilter = headertypefilter.New(common.HeaderType_CONFIG, common.HeaderType_CONFIG_UPDATE)
+	}
+
+	reg, notifier, err := eventClient.RegisterBlockEvent(blockfilter)
+	if err != nil {
+		return nil, nil, nil, errors.Errorf("Failed to subscribe to block events. %s", err)
+	}
+	log.Infof("Subscribed to events in channel %s from block %d", subInfo.ChannelID, since)
+	regWrapper := &RegistrationWrapper{
+		registration: reg,
+		eventClient:  eventClient,
+	}
+	return regWrapper, notifier, nil, nil
 }
 
-func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint64, chaincodeId string) (eventClient *event.Client, err error) {
+func (e *eventClientWrapper) getEventClient(channelID, signer string, since uint64, chaincodeID string) (eventClient *event.Client, err error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	eventClientsForSigner := e.eventClients[signer]
@@ -103,7 +102,7 @@ func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint
 		eventClientsForSigner = make(map[string]*event.Client)
 		e.eventClients[signer] = eventClientsForSigner
 	}
-	key := eventsapi.GetKeyForEventClient(channelId, chaincodeId)
+	key := eventsapi.GetKeyForEventClient(channelID, chaincodeID)
 	eventClient = eventClientsForSigner[key]
 	if eventClient == nil {
 		eventOpts := []event.ClientOption{
@@ -111,10 +110,10 @@ func (e *eventClientWrapper) getEventClient(channelId, signer string, since uint
 			event.WithSeekType(seek.FromBlock),
 			event.WithBlockNum(since),
 		}
-		if chaincodeId != "" {
-			eventOpts = append(eventOpts, event.WithChaincodeID(chaincodeId))
+		if chaincodeID != "" {
+			eventOpts = append(eventOpts, event.WithChaincodeID(chaincodeID))
 		}
-		channelProvider := e.sdk.ChannelContext(channelId, fabsdk.WithOrg(e.idClient.GetClientOrg()), fabsdk.WithUser(signer))
+		channelProvider := e.sdk.ChannelContext(channelID, fabsdk.WithOrg(e.idClient.GetClientOrg()), fabsdk.WithUser(signer))
 		eventClient, err = e.eventClientCreator(channelProvider, eventOpts...)
 		if err != nil {
 			return nil, err

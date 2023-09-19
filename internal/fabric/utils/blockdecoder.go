@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,7 +39,7 @@ func GetEvents(block *common.Block) []*api.EventEntry {
 	}
 	for idx, entry := range rawBlock.Data.Data {
 		timestamp := entry.Payload.Header.ChannelHeader.Timestamp
-		txId := entry.Payload.Header.ChannelHeader.TxId
+		txID := entry.Payload.Header.ChannelHeader.TxID
 		actions := entry.Payload.Data.Actions
 		for actionIdx, action := range actions {
 			event := action.Payload.Action.ProposalResponsePayload.Extension.Events
@@ -48,11 +48,11 @@ func GetEvents(block *common.Block) []*api.EventEntry {
 			}
 			// if the transaction did not publish any events, we need to get most of the
 			// information below from other parts of the transaction
-			chaincodeId := action.Payload.Action.ProposalResponsePayload.Extension.ChaincodeId.Name
+			chaincodeID := action.Payload.Action.ProposalResponsePayload.Extension.ChaincodeID.Name
 			eventEntry := api.EventEntry{
-				ChaincodeId:      chaincodeId,
+				ChaincodeID:      chaincodeID,
 				BlockNumber:      rawBlock.Header.Number,
-				TransactionId:    txId,
+				TransactionID:    txID,
 				TransactionIndex: idx,
 				EventIndex:       actionIdx, // each action only allowed one event, so event index is the action index
 				EventName:        event.EventName,
@@ -77,7 +77,7 @@ func DecodeBlock(block *common.Block) (*RawBlock, *Block, error) {
 	bloc := &Block{}
 
 	// this array in the block header's metadata contains each transaction's status code
-	txFilter := []byte(block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER])
+	txFilter := block.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
 	var transactions []*Transaction
 	for i, data := range block.Data.Data {
 		env, err := getEnvelopeFromBlock(data)
@@ -136,11 +136,10 @@ func (block *RawBlock) DecodeBlockDataEnvelope(env *common.Envelope) (*BlockData
 	if ok {
 		tx.Signature = dataEnv.Signature
 		return dataEnv, tx, nil
-	} else {
-		config := result.(*ConfigRecord)
-		config.Signature = dataEnv.Signature
-		return dataEnv, config, nil
 	}
+	config := result.(*ConfigRecord)
+	config.Signature = dataEnv.Signature
+	return dataEnv, config, nil
 }
 
 // based on the channel header type, returns a *Transaction (type=1) or a *ConfigRecord (type=3)
@@ -168,7 +167,7 @@ func (block *RawBlock) decodePayload(payload *common.Payload, _payload *Payload)
 		_transaction.Timestamp = timestamp
 		_transaction.Creator = _creator
 		_transaction.Nonce = hex.EncodeToString([]byte(_payloadHeader.SignatureHeader.Nonce))
-		_transaction.TxId = _payloadHeader.ChannelHeader.TxId
+		_transaction.TxID = _payloadHeader.ChannelHeader.TxID
 
 		if err := block.decodeTxPayloadData(payload.Data, _payloadData, _transaction); err != nil {
 			return nil, err
@@ -203,10 +202,10 @@ func (block *RawBlock) decodePayloadHeader(header *common.Header, _header *Paylo
 	if err := proto.Unmarshal(header.ChannelHeader, channelHeader); err != nil {
 		return errors.Wrap(err, "error decoding ChannelHeader from payload")
 	}
-	_channelHeader.ChannelId = channelHeader.ChannelId
+	_channelHeader.ChannelID = channelHeader.ChannelId
 	_channelHeader.Epoch = strconv.FormatUint(channelHeader.Epoch, 10)
 	_channelHeader.Timestamp = time.Unix(channelHeader.Timestamp.GetSeconds(), int64(channelHeader.Timestamp.GetNanos())).UnixNano()
-	_channelHeader.TxId = channelHeader.TxId
+	_channelHeader.TxID = channelHeader.TxId
 	_channelHeader.Type = common.HeaderType_name[channelHeader.Type]
 	_channelHeader.Version = int(channelHeader.Version)
 
@@ -268,7 +267,7 @@ func (block *RawBlock) decodeTxPayloadData(payloadData []byte, _payloadData *Pay
 		}
 
 		txAction.Nonce = hex.EncodeToString([]byte(_signatureHeader.Nonce))
-		txAction.ChaincodeId = _actionPayload.Action.ProposalResponsePayload.Extension.ChaincodeId
+		txAction.ChaincodeID = _actionPayload.Action.ProposalResponsePayload.Extension.ChaincodeID
 		creator := _signatureHeader.Creator
 		txAction.Creator = &Creator{
 			MspID: creator.Mspid,
@@ -292,20 +291,16 @@ func (block *RawBlock) decodeActionPayload(_actionPayload *ActionPayload, payloa
 	_chaincodeProposalPayload := &ChaincodeProposalPayload{}
 	_actionPayload.ChaincodeProposalPayload = _chaincodeProposalPayload
 
-	cap := &peer.ChaincodeActionPayload{}
-	if err := proto.Unmarshal(payload, cap); err != nil {
+	capPayload := &peer.ChaincodeActionPayload{}
+	if err := proto.Unmarshal(payload, capPayload); err != nil {
 		return errors.Wrap(err, "error decoding chaincode action payload")
 	}
 
-	if err := block.decodeActionPayloadAction(_actionPayloadAction, cap.Action); err != nil {
+	if err := block.decodeActionPayloadAction(_actionPayloadAction, capPayload.Action); err != nil {
 		return err
 	}
 
-	if err := block.decodeActionPayloadChaincodeProposalPayload(_chaincodeProposalPayload, cap.ChaincodeProposalPayload); err != nil {
-		return err
-	}
-
-	return nil
+	return block.decodeActionPayloadChaincodeProposalPayload(_chaincodeProposalPayload, capPayload.ChaincodeProposalPayload)
 }
 
 func (block *RawBlock) decodeActionPayloadChaincodeProposalPayload(chaincodeProposalPayload *ChaincodeProposalPayload, bytes []byte) error {
@@ -329,13 +324,13 @@ func (block *RawBlock) decodeActionPayloadChaincodeProposalPayload(chaincodeProp
 		chaincodeSpec.Type = ccSpec.ChaincodeSpec.Type.String()
 		proposalPayloadInput.ChaincodeSpec = chaincodeSpec
 
-		chaincodeSpec.ChaincodeId = ccSpec.ChaincodeSpec.ChaincodeId
+		chaincodeSpec.ChaincodeID = ccSpec.ChaincodeSpec.ChaincodeId
 
 		chaincodeInput := &ChaincodeSpecInput{}
 		chaincodeSpec.Input = chaincodeInput
 
 		chaincodeInputArgs := make([]interface{}, len(ccSpec.ChaincodeSpec.Input.Args))
-		if chaincodeSpec.ChaincodeId.Name == "_lifecycle" {
+		if chaincodeSpec.ChaincodeID.Name == "_lifecycle" {
 			funcName := string(ccSpec.ChaincodeSpec.Input.Args[0])
 			chaincodeInputArgs[0] = funcName
 			argsBytes := ccSpec.ChaincodeSpec.Input.Args[1]
@@ -368,10 +363,7 @@ func (block *RawBlock) decodeActionPayloadChaincodeProposalPayload(chaincodeProp
 func (block *RawBlock) decodeActionPayloadAction(_actionPayloadAction *ActionPayloadAction, action *peer.ChaincodeEndorsedAction) error {
 	_proposalResponsePayload := &ProposalResponsePayload{}
 	_actionPayloadAction.ProposalResponsePayload = _proposalResponsePayload
-	if err := block.decodeProposalResponsePayload(_proposalResponsePayload, action.ProposalResponsePayload); err != nil {
-		return err
-	}
-	return nil
+	return block.decodeProposalResponsePayload(_proposalResponsePayload, action.ProposalResponsePayload)
 }
 
 func (block *RawBlock) decodeProposalResponsePayload(_proposalResponsePayload *ProposalResponsePayload, proposalResponsePayload []byte) error {
@@ -384,10 +376,7 @@ func (block *RawBlock) decodeProposalResponsePayload(_proposalResponsePayload *P
 
 	_extension := &Extension{}
 	_proposalResponsePayload.Extension = _extension
-	if err := block.decodeProposalResponsePayloadExtension(_extension, prp.Extension); err != nil {
-		return err
-	}
-	return nil
+	return block.decodeProposalResponsePayloadExtension(_extension, prp.Extension)
 }
 
 func (block *RawBlock) decodeProposalResponsePayloadExtension(_extension *Extension, extension []byte) error {
@@ -396,7 +385,7 @@ func (block *RawBlock) decodeProposalResponsePayloadExtension(_extension *Extens
 		return errors.Wrap(err, "error decoding chaincode action")
 	}
 
-	_extension.ChaincodeId = cca.ChaincodeId
+	_extension.ChaincodeID = cca.ChaincodeId
 
 	// skipping read/write sets in the action
 	// decode events
@@ -406,8 +395,8 @@ func (block *RawBlock) decodeProposalResponsePayloadExtension(_extension *Extens
 	}
 	_chaincodeEvent := &ChaincodeEvent{}
 	_extension.Events = _chaincodeEvent
-	_chaincodeEvent.ChaincodeId = ccevt.ChaincodeId
-	_chaincodeEvent.TxId = ccevt.TxId
+	_chaincodeEvent.ChaincodeID = ccevt.ChaincodeId
+	_chaincodeEvent.TxID = ccevt.TxId
 	_chaincodeEvent.EventName = ccevt.EventName
 	_chaincodeEvent.Payload = ccevt.Payload
 
@@ -452,9 +441,9 @@ func UnmarshalTransaction(txBytes []byte) (*peer.Transaction, error) {
 
 // UnmarshalChaincodeActionPayload unmarshals bytes to a ChaincodeActionPayload
 func UnmarshalChaincodeActionPayload(capBytes []byte) (*peer.ChaincodeActionPayload, error) {
-	cap := &peer.ChaincodeActionPayload{}
-	err := proto.Unmarshal(capBytes, cap)
-	return cap, errors.Wrap(err, "error unmarshaling ChaincodeActionPayload")
+	capPayload := &peer.ChaincodeActionPayload{}
+	err := proto.Unmarshal(capBytes, capPayload)
+	return capPayload, errors.Wrap(err, "error unmarshaling ChaincodeActionPayload")
 }
 
 // UnmarshalProposalResponsePayload unmarshals bytes to a ProposalResponsePayload

@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,7 +39,7 @@ type Creator struct {
 
 type Transaction struct {
 	Type      string               `json:"type"`
-	TxId      string               `json:"tx_id"`
+	TxID      string               `json:"tx_id"`
 	Nonce     string               `json:"nonce"` // hex string
 	Creator   *Creator             `json:"creator"`
 	Status    string               `json:"status"`
@@ -52,7 +52,7 @@ type TransactionAction struct {
 	Nonce        string              `json:"nonce"` // hex string
 	Creator      *Creator            `json:"creator"`
 	TransientMap *map[string][]byte  `json:"transient_map"`
-	ChaincodeId  *peer.ChaincodeID   `json:"chaincode_id"`
+	ChaincodeID  *peer.ChaincodeID   `json:"chaincode_id"`
 	Input        *ChaincodeSpecInput `json:"input"`
 	ProposalHash string              `json:"proposal_hash"` // hex string
 	Event        *ChaincodeEvent     `json:"event"`

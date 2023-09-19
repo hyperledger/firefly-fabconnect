@@ -1,13 +1,13 @@
-// Copyright 22021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,16 +31,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// KafkaCommon is the base interface for bridges that interact with Kafka
-type KafkaCommon interface {
+// Common is the base interface for bridges that interact with Kafka
+type Common interface {
 	ValidateConf() error
 	Start() error
 	Conf() conf.KafkaConf
-	Producer() KafkaProducer
+	Producer() Producer
 }
 
-// NewKafkaCommon constructs a new KafkaCommon instance
-func NewKafkaCommon(kf KafkaFactory, conf conf.KafkaConf, kafkaGoRoutines KafkaGoRoutines) (k KafkaCommon) {
+// NewKafkaCommon constructs a new Common instance
+func NewKafkaCommon(kf Factory, conf conf.KafkaConf, kafkaGoRoutines GoRoutines) (k Common) {
 	k = &kafkaCommon{
 		factory:         kf,
 		kafkaGoRoutines: kafkaGoRoutines,
@@ -53,14 +53,14 @@ func NewKafkaCommon(kf KafkaFactory, conf conf.KafkaConf, kafkaGoRoutines KafkaG
 // producer and a consumer-group
 type kafkaCommon struct {
 	conf            conf.KafkaConf
-	factory         KafkaFactory
-	client          KafkaClient
+	factory         Factory
+	client          Client
 	signals         chan os.Signal
-	consumer        KafkaConsumer
+	consumer        Consumer
 	consumerWG      sync.WaitGroup
-	producer        KafkaProducer
+	producer        Producer
 	producerWG      sync.WaitGroup
-	kafkaGoRoutines KafkaGoRoutines
+	kafkaGoRoutines GoRoutines
 	saramaLogger    saramaLogger
 }
 
@@ -68,17 +68,17 @@ func (k *kafkaCommon) Conf() conf.KafkaConf {
 	return k.conf
 }
 
-func (k *kafkaCommon) Producer() KafkaProducer {
+func (k *kafkaCommon) Producer() Producer {
 	return k.producer
 }
 
 // ValidateConf performs common Cobra PreRunE logic for Kafka related commands
 func (k *kafkaCommon) ValidateConf() error {
-	return KafkaValidateConf(k.conf)
+	return ValidateConf(k.conf)
 }
 
-// KafkaValidateConf validates supplied configuration
-func KafkaValidateConf(kconf conf.KafkaConf) (err error) {
+// ValidateConf validates supplied configuration
+func ValidateConf(kconf conf.KafkaConf) (err error) {
 	if kconf.TopicOut == "" {
 		return errors.Errorf(errors.ConfigKafkaMissingOutputTopic)
 	}
@@ -116,8 +116,7 @@ func (k *kafkaCommon) connect() (err error) {
 
 	log.Debugf("Kafka Bootstrap brokers: %s", k.conf.Brokers)
 	if len(k.conf.Brokers) == 0 || k.conf.Brokers[0] == "" {
-		err = errors.Errorf(errors.ConfigKafkaMissingBrokers)
-		return
+		return errors.Errorf(errors.ConfigKafkaMissingBrokers)
 	}
 
 	sarama.Logger = k.saramaLogger
@@ -125,7 +124,7 @@ func (k *kafkaCommon) connect() (err error) {
 
 	var tlsConfig *tls.Config
 	if tlsConfig, err = utils.CreateTLSConfiguration(&k.conf.TLS); err != nil {
-		return
+		return nil
 	}
 
 	if k.conf.SASL.Username != "" && k.conf.SASL.Password != "" {
@@ -153,7 +152,7 @@ func (k *kafkaCommon) connect() (err error) {
 
 	if k.client, err = k.factory.NewClient(k, clientConf); err != nil {
 		log.Errorf("Failed to create Kafka client: %s", err)
-		return
+		return nil
 	}
 	var brokers []string
 	for _, broker := range k.client.Brokers() {
@@ -161,7 +160,7 @@ func (k *kafkaCommon) connect() (err error) {
 	}
 	log.Infof("Kafka Connected: %s", brokers)
 
-	return
+	return nil
 }
 
 func (k *kafkaCommon) createProducer() (err error) {
@@ -170,7 +169,7 @@ func (k *kafkaCommon) createProducer() (err error) {
 		log.Errorf("Failed to create Kafka producer: %s", err)
 		return
 	}
-	return
+	return nil
 }
 
 func (k *kafkaCommon) startProducer() (err error) {
@@ -213,19 +212,19 @@ func (k *kafkaCommon) startConsumer() (err error) {
 func (k *kafkaCommon) Start() (err error) {
 
 	if err = k.connect(); err != nil {
-		return
+		return nil
 	}
 	if err = k.createConsumer(); err != nil {
-		return
+		return nil
 	}
 	if err = k.createProducer(); err != nil {
-		return
+		return nil
 	}
 	if err = k.startConsumer(); err != nil {
-		return
+		return nil
 	}
 	if err = k.startProducer(); err != nil {
-		return
+		return nil
 	}
 
 	log.Debugf("Kafka initialization complete")
@@ -238,7 +237,7 @@ func (k *kafkaCommon) Start() (err error) {
 		k.consumerWG.Wait()
 
 		log.Infof("Kafka Bridge complete")
-		return
+		return nil
 	}
-	return
+	return nil
 }

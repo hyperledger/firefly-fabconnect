@@ -1,4 +1,4 @@
-// Copyright © 2021 Kaleido, Inc.
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -61,6 +61,6 @@ var swaggerUIHTML = `<!DOCTYPE html>
 </html>
 `
 
-func SwaggerUIHTML(ctx context.Context) []byte {
+func SwaggerUIHTML(_ context.Context) []byte {
 	return []byte(swaggerUIHTML)
 }

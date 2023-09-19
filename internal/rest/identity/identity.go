@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -56,7 +56,7 @@ type RevokeRequest struct {
 	GenCRL bool   `json:"generateCRL"`
 }
 
-type IdentityResponse struct {
+type Response struct {
 	Name    string `json:"name"`
 	Success bool   `json:"success"`
 }
@@ -66,11 +66,11 @@ type RevokeResponse struct {
 	CRL          []byte              `json:"CRL"`
 }
 
-type IdentityClient interface {
+type Client interface {
 	Register(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*RegisterResponse, *restutil.RestError)
 	Modify(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*RegisterResponse, *restutil.RestError)
-	Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*IdentityResponse, *restutil.RestError)
-	Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*IdentityResponse, *restutil.RestError)
+	Enroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*Response, *restutil.RestError)
+	Reenroll(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*Response, *restutil.RestError)
 	Revoke(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*RevokeResponse, *restutil.RestError)
 	List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*Identity, *restutil.RestError)
 	Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*Identity, *restutil.RestError)

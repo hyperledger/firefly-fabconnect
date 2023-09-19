@@ -1,11 +1,13 @@
-// Copyright 2019 Kaleido
-
+// Copyright © 2023 Kaleido, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -42,7 +44,7 @@ func MockRPCClient(fromBlock string, withReset ...bool) *mockfabric.RPCClient {
 	}
 	tx1 := &utils.Transaction{
 		Timestamp: 1000000,
-		TxId:      "3144a3ad43dcc11374832bbb71561320de81fd80d69cc8e26a9ea7d3240a5e84",
+		TxID:      "3144a3ad43dcc11374832bbb71561320de81fd80d69cc8e26a9ea7d3240a5e84",
 	}
 	block := &utils.Block{
 		Number:       uint64(20),
@@ -55,7 +57,7 @@ func MockRPCClient(fromBlock string, withReset ...bool) *mockfabric.RPCClient {
 	rpc.On("Query", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(chaincodeResult, nil)
 	rpc.On("QueryChainInfo", mock.Anything, mock.Anything).Return(res, nil)
 	rpc.On("QueryBlock", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(rawBlock, block, nil)
-	rpc.On("QueryBlockByTxId", mock.Anything, mock.Anything, mock.Anything).Return(rawBlock, block, nil)
+	rpc.On("QueryBlockByTxID", mock.Anything, mock.Anything, mock.Anything).Return(rawBlock, block, nil)
 	rpc.On("QueryTransaction", mock.Anything, mock.Anything, mock.Anything).Return(txResult, nil)
 	rpc.On("Unregister", mock.Anything).Return()
 

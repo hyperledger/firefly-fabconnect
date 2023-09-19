@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -310,7 +310,7 @@ func (a *eventStream) handleEvent(event *eventData) {
 	// Does nothing more than add it to the batch, to be picked up
 	// by the batchDispatcher
 	if a.stopped {
-		log.Infof("Event stream stopped, skipping event %s for transaction %s", event.event.EventName, event.event.TransactionId)
+		log.Infof("Event stream stopped, skipping event %s for transaction %s", event.event.EventName, event.event.TransactionID)
 	} else {
 		a.eventStream <- event
 	}
@@ -364,7 +364,7 @@ func (a *eventStream) isBlocked() bool {
 	return v
 }
 
-func (a *eventStream) markAllSubscriptionsStale(ctx context.Context) {
+func (a *eventStream) markAllSubscriptionsStale(_ context.Context) {
 	// Mark all subscriptions stale, so they will re-start from the checkpoint if/when we re-run the poller
 	subs := a.sm.subscriptionsForStream(a.spec.ID)
 	for _, sub := range subs {
@@ -442,7 +442,7 @@ func (a *eventStream) eventPoller() {
 			log.Infof("%s: Notified of an ongoing stream update, exiting event poller", a.spec.ID)
 			a.markAllSubscriptionsStale(ctx)
 			return
-		case <-time.After(a.pollingInterval): //fall through and continue to the next iteration
+		case <-time.After(a.pollingInterval): // fall through and continue to the next iteration
 		}
 	}
 
@@ -540,12 +540,11 @@ func (a *eventStream) batchProcessor() {
 				<-a.updateInterrupt
 				// we were notified by the caller about an ongoing update, return
 				log.Infof("%s: Notified of an ongoing stream update, exiting batch processor", a.spec.ID)
-				a.updateWG.Done() //Not moving this to a 'defer' since we need to unlock after calling Done()
+				a.updateWG.Done() // Not moving this to a 'defer' since we need to unlock after calling Done()
 				a.batchCond.L.Unlock()
 				return
-			} else {
-				a.batchCond.Wait()
 			}
+			a.batchCond.Wait()
 		}
 		if a.suspendOrStop() {
 			log.Infof("%s: Suspended, returning exiting batch processor", a.spec.ID)
@@ -582,7 +581,7 @@ func (a *eventStream) processBatch(batchNumber uint64, events []*eventData) {
 				// we were notified by the caller about an ongoing update, no need to continue
 				log.Infof("%s: Notified of an ongoing stream update, terminating process batch", a.spec.ID)
 				return
-			case <-time.After(time.Duration(a.spec.BlockedRetryDelaySec) * time.Second): //fall through and continue
+			case <-time.After(time.Duration(a.spec.BlockedRetryDelaySec) * time.Second): // fall through and continue
 			}
 		}
 		attempt++
@@ -645,7 +644,7 @@ func (a *eventStream) performActionWithRetry(batchNumber uint64, events []*event
 				// we were notified by the caller about an ongoing update, no need to continue
 				log.Infof("%s: Notified of an ongoing stream update, terminating perform action for batch number: %d", a.spec.ID, batchNumber)
 				return
-			case <-time.After(delay): //fall through and continue
+			case <-time.After(delay): // fall through and continue
 			}
 			delay = time.Duration(float64(delay) * a.backoffFactor)
 		}

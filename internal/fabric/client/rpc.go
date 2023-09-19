@@ -1,13 +1,13 @@
-// Copyright 2021 Kaleido
+// Copyright © 2023 Kaleido, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,14 +25,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//
 // Instantiate an RPC client to interact with a Fabric network. based on the client configuration
 // on gateway usage, it creates different types of client under the cover:
 // - "useGatewayClient: true": returned RPCClient uses the client-side Gateway
 // - "useGatewayClient: false": returned RPCClient uses a static network map described by the Connection Profile
 // - "useGatewayServer: true": for Fabric 2.4 node only, the returned RPCClient utilizes the server-side gateway service
-//
-func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.IdentityClient, error) {
+func RPCConnect(c conf.RPCConf, txTimeout int) (RPCClient, identity.Client, error) {
 	configProvider := config.FromFile(c.ConfigPath)
 	userStore, err := newUserstore(configProvider)
 	if err != nil {
