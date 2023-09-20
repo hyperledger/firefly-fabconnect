@@ -2,12 +2,12 @@
 
 The following is the list of current maintainers this repo:
 
-| Name              | GitHub          | Email                        | LFID              |
-| ----------------- | --------------- | ---------------------------- | ----------------- |
-| Jim Zhang         | jimthematrix    | jim.zhang@kaleido.io         | jimthematrix      |
-| Peter Broadhurst  | peterbroadhurst | peter.broadhurst@kaleido.io  | peterbroadhurst   |
-| Vinod Damle       | vdamle          | vinod.damle@kaleido.io       | reddevil          |
-
+| Name             | GitHub          | Email                       | LFID            |
+| ---------------- | --------------- | --------------------------- | --------------- |
+| Jim Zhang        | jimthematrix    | jim.zhang@kaleido.io        | jimthematrix    |
+| Peter Broadhurst | peterbroadhurst | peter.broadhurst@kaleido.io | peterbroadhurst |
+| Vinod Damle      | vdamle          | vinod.damle@fmr.com         | reddevil        |
+| Nicko Guyer      | nguyer          | nicko.guyer@kaleido.io      | nguyer          |
 
 This list is to be kept up to date as maintainers are added or removed.
 
