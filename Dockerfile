@@ -6,9 +6,10 @@ RUN go mod download
 ADD . .
 RUN make build
 
-FROM alpine:latest
+FROM alpine:3.18.3
 WORKDIR /fabconnect
-COPY --from=fabconnect-builder /fabconnect/fabconnect ./
+COPY --from=fabconnect-builder --chown=1001:0 /fabconnect/fabconnect ./
 ADD ./openapi ./openapi/
 RUN ln -s /fabconnect/fabconnect /usr/bin/fabconnect
+USER 1001
 ENTRYPOINT [ "fabconnect" ]
