@@ -19,7 +19,7 @@ coverage: test coverage.html
 lint: ${LINT}
 		GOGC=20 $(LINT) run -v --timeout 5m
 ${LINT}:
-		$(VGO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.47.3
+		$(VGO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
 firefly-nocgo: ${GOFILES}		
 	CGO_ENABLED=0 $(VGO) build -o ${BINARY_NAME}-nocgo -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v
 firefly: ${GOFILES}
@@ -32,7 +32,7 @@ clean:
 	$(VGO) clean
 	rm -f *.so ${BINARY_NAME}
 builddeps:
-	$(VGO) get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
+	$(VGO) get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
 deps: builddeps
 	$(VGO) get
 mockery: .ALWAYS

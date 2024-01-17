@@ -1,12 +1,14 @@
-FROM golang:1.20-alpine3.18 AS fabconnect-builder
+FROM golang:1.21-alpine3.19 AS fabconnect-builder
 RUN apk add make
+ADD --chown=1001:0 . /fabconnect
 WORKDIR /fabconnect
-ADD go.mod go.sum ./
-RUN go mod download
-ADD . .
-RUN make build
+RUN mkdir /.cache \
+    && chgrp -R 0 /.cache \
+    && chmod -R g+rwX /.cache
+USER 1001
+RUN make
 
-FROM alpine:3.18.3
+FROM alpine:3.19
 WORKDIR /fabconnect
 COPY --from=fabconnect-builder --chown=1001:0 /fabconnect/fabconnect ./
 ADD ./openapi ./openapi/
