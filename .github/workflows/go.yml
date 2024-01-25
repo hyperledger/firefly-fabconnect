@@ -29,11 +29,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-          check-latest: true
+      - name: Set build tag
+        id: build_tag_generator
+        run: |
+          RELEASE_TAG=$(curl https://api.github.com/repos/hyperledger/firefly-fabconnect/releases/latest -s | jq .tag_name -r)
+          BUILD_TAG=$RELEASE_TAG-$(date +"%Y%m%d")-$GITHUB_RUN_NUMBER
+          echo ::set-output name=BUILD_TAG::$BUILD_TAG
 
       - name: Build
         run: |
