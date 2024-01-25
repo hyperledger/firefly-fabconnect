@@ -218,6 +218,8 @@ github.com/hyperledger/fabric-protos-go v0.3.2 h1:mQmbHw3lyDV2+W5b0FitV/SjM4LLDj
 github.com/hyperledger/fabric-protos-go v0.3.2/go.mod h1:WWnyWP40P2roPmmvxsUXSvVI/CF6vwY1K1UFidnKBys=
 github.com/hyperledger/fabric-sdk-go v1.0.1-0.20220617091732-e170b98fa821 h1:0VfkWCv8MPDjm+6xoD6t3yN075AQ2x2KTcLY1m5BJno=
 github.com/hyperledger/fabric-sdk-go v1.0.1-0.20220617091732-e170b98fa821/go.mod h1:JRplpKBeAvXjsBhOCCM/KvMRUbdDyhsAh80qbXzKc10=
+github.com/hyperledger/fabric-sdk-go v1.0.1-0.20240123083657-5d6ca326e01b h1:ioSmXcO2r9+Sf7QbeaCQkWuTy5uHd+4u5CtFKLJhvRU=
+github.com/hyperledger/fabric-sdk-go v1.0.1-0.20240123083657-5d6ca326e01b/go.mod h1:JRplpKBeAvXjsBhOCCM/KvMRUbdDyhsAh80qbXzKc10=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=

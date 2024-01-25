@@ -11,7 +11,7 @@ require (
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hyperledger/fabric-protos-go v0.3.2
-	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20220617091732-e170b98fa821
+	github.com/hyperledger/fabric-sdk-go v1.0.1-0.20240123083657-5d6ca326e01b
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/oklog/ulid/v2 v2.1.0
