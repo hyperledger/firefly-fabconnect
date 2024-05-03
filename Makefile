@@ -5,7 +5,7 @@ TESTED_INTERNALS := $(shell go list ./internal/... | grep -v test | grep -v kafk
 TESTED_CMD := $(shell go list ./cmd/...)
 COVERPKG_INTERNALS = $(shell go list ./internal/... | grep -v test | grep -v kafka | tr "\n" ",")
 COVERPKG_CMD = $(shell go list ./cmd/... | tr "\n" ",")
-# Expect that FireFly compiles with CGO disabled
+# Expect that FireFly-FabConnect compiles with CGO disabled
 CGO_ENABLED=0
 GOGC=30
 .DELETE_ON_ERROR:
@@ -20,13 +20,13 @@ lint: ${LINT}
 		GOGC=20 $(LINT) run -v --timeout 5m
 ${LINT}:
 		$(VGO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
-firefly-nocgo: ${GOFILES}		
+firefly-fabconnect-nocgo: ${GOFILES}		
 	CGO_ENABLED=0 $(VGO) build -o ${BINARY_NAME}-nocgo -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v
-firefly: ${GOFILES}
+firefly-fabconnect: ${GOFILES}
 	$(VGO) build -o ${BINARY_NAME} -ldflags "-X main.buildDate=`date -u +\"%Y-%m-%dT%H:%M:%SZ\"` -X main.buildVersion=$(BUILD_VERSION)" -tags=prod -tags=prod -v
 go-mod-tidy: .ALWAYS
 	go mod tidy
-build: firefly-nocgo firefly
+build: firefly-fabconnect-nocgo firefly-fabconnect
 .ALWAYS: ;
 clean: 
 	$(VGO) clean

@@ -18,6 +18,10 @@ type TxProcessor struct {
 func (_m *TxProcessor) GetRPCClient() client.RPCClient {
 	ret := _m.Called()
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetRPCClient")
+	}
+
 	var r0 client.RPCClient
 	if rf, ok := ret.Get(0).(func() client.RPCClient); ok {
 		r0 = rf()

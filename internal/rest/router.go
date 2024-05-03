@@ -67,8 +67,7 @@ func newRouter(syncDispatcher restsync.Dispatcher, asyncDispatcher restasync.Dis
 
 func (r *router) addRoutes() {
 	r.httpRouter.GET("/api", r.serveSwaggerUI)
-	r.httpRouter.GET("/spec.yaml", r.serveSwagger)
-
+	r.httpRouter.ServeFiles("/api/*filepath", http.Dir("./openapi"))
 	r.httpRouter.POST("/identities", r.registerUser)
 	r.httpRouter.PUT("/identities/:username", r.modifyUser)
 	r.httpRouter.POST("/identities/:username/enroll", r.enrollUser)
@@ -136,13 +135,7 @@ func (r *router) statusHandler(res http.ResponseWriter, _ *http.Request, _ httpr
 	_, _ = res.Write(reply)
 }
 
-func (r *router) serveSwagger(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	log.Infof("--> %s %s", req.Method, req.URL)
-	fs := http.FileServer(http.Dir("./openapi"))
-	fs.ServeHTTP(res, req)
-}
-
-func (r *router) serveSwaggerUI(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (r *router) serveSwaggerUI(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Infof("--> %s %s", req.Method, req.URL)
 	res.Header().Add("Content-Type", "text/html")
 	_, _ = res.Write(utils.SwaggerUIHTML(req.Context()))

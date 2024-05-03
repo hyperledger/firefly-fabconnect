@@ -154,7 +154,14 @@ func (g *Gateway) Start() error {
 	go func() {
 		<-readyToListen
 		log.Printf("HTTP server listening on %s", g.srv.Addr)
-		err := g.srv.ListenAndServe()
+		var err error
+		if tlsConfig != nil {
+			// Under the covers it will use g.srv.TLSConfig
+			// If the cert and key file are not present, it will use the CA from the TLSConfig
+			err = g.srv.ListenAndServeTLS(g.config.HTTP.TLS.ClientCertsFile, g.config.HTTP.TLS.ClientKeyFile)
+		} else {
+			err = g.srv.ListenAndServe()
+		}
 		if err != nil {
 			log.Errorf("Listening ended with: %s", err)
 		}

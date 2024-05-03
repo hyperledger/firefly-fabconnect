@@ -40,7 +40,7 @@ var swaggerUIHTML = `<!DOCTYPE html>
     window.onload = function() {
       // Begin Swagger UI call region
       const ui = SwaggerUIBundle({
-        url: "/spec.yaml",
+        url: "/api/spec.yaml",
         dom_id: '#swagger-ui',
         deepLinking: true,
         presets: [

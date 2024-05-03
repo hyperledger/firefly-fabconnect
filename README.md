@@ -2,6 +2,12 @@
 
 A reliable REST and websocket API to interact with a Fabric network and stream events.
 
+This component provides 3 high level sets of API endpoints:
+
+- Client MSPs (aka the wallet): registering and enrolling identities to be used for signing transactions
+- Transactions: submit transactions and query for transaction result/receipts
+- Events: subscribe to events with regex based filter and stream to the client app via websocket
+
 ## Architecture
 
 ### High Level Components
@@ -12,12 +18,6 @@ A reliable REST and websocket API to interact with a Fabric network and stream e
 
 ![objects and flows architecture](/images/arch-2.png)
 ![kafkal handler architecture](/images/arch-3.png)
-
-The component provides 3 high level sets of API endpoints:
-
-- Client MSPs (aka the wallet): registering and enrolling identities to be used for signing transactions
-- Transactions: submit transactions and query for transaction result/receipts
-- Events: subscribe to events with regex based filter and stream to the client app via websocket
 
 ## Getting Started
 
@@ -57,6 +57,7 @@ To launch, first prepare the 2 configurations files:
 }
 ```
 
+// TODO clean this up
 - the standard Fabric common connection profile (CCP) file that describes the target Fabric network, at the location specified in the main config file above under `rpc.configPath`. For details on the CCP file, see [Fabric SDK documentation](https://hyperledger.github.io/fabric-sdk-node/release-1.4/tutorial-network-config.html). Note that the CCP file must contain the `client` section, which is required for the fabconnect to act as a client to Fabric networks.
 
 Use the following command to launch the connector:

@@ -45,6 +45,10 @@ func (_m *ReceiptStore) Init(_a0 ws.WebSocketChannels, _a1 ...api.ReceiptStorePe
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
+	if len(ret) == 0 {
+		panic("no return value specified for Init")
+	}
+
 	var r0 error
 	if rf, ok := ret.Get(0).(func(ws.WebSocketChannels, ...api.ReceiptStorePersistence) error); ok {
 		r0 = rf(_a0, _a1...)
@@ -63,6 +67,10 @@ func (_m *ReceiptStore) ProcessReceipt(msgBytes []byte) {
 // ValidateConf provides a mock function with given fields:
 func (_m *ReceiptStore) ValidateConf() error {
 	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ValidateConf")
+	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func() error); ok {
