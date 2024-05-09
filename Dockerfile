@@ -8,6 +8,7 @@ RUN mkdir /.cache \
 RUN make
 
 FROM alpine:3.19
+RUN apk add curl
 WORKDIR /fabconnect
 COPY --from=fabconnect-builder /fabconnect/fabconnect ./
 ADD ./openapi ./openapi/

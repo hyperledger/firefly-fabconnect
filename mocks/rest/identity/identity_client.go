@@ -50,6 +50,10 @@ func (_m *IdentityClient) Enroll(res http.ResponseWriter, req *http.Request, par
 func (_m *IdentityClient) Get(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.Identity, *util.RestError) {
 	ret := _m.Called(res, req, params)
 
+	if len(ret) == 0 {
+		panic("no return value specified for Get")
+	}
+
 	var r0 *identity.Identity
 	var r1 *util.RestError
 	if rf, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, httprouter.Params) (*identity.Identity, *util.RestError)); ok {
@@ -78,6 +82,10 @@ func (_m *IdentityClient) Get(res http.ResponseWriter, req *http.Request, params
 func (_m *IdentityClient) List(res http.ResponseWriter, req *http.Request, params httprouter.Params) ([]*identity.Identity, *util.RestError) {
 	ret := _m.Called(res, req, params)
 
+	if len(ret) == 0 {
+		panic("no return value specified for List")
+	}
+
 	var r0 []*identity.Identity
 	var r1 *util.RestError
 	if rf, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, httprouter.Params) ([]*identity.Identity, *util.RestError)); ok {
@@ -105,6 +113,10 @@ func (_m *IdentityClient) List(res http.ResponseWriter, req *http.Request, param
 // Modify provides a mock function with given fields: res, req, params
 func (_m *IdentityClient) Modify(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RegisterResponse, *util.RestError) {
 	ret := _m.Called(res, req, params)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Modify")
+	}
 
 	var r0 *identity.RegisterResponse
 	var r1 *util.RestError
@@ -162,6 +174,10 @@ func (_m *IdentityClient) Reenroll(res http.ResponseWriter, req *http.Request, p
 func (_m *IdentityClient) Register(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RegisterResponse, *util.RestError) {
 	ret := _m.Called(res, req, params)
 
+	if len(ret) == 0 {
+		panic("no return value specified for Register")
+	}
+
 	var r0 *identity.RegisterResponse
 	var r1 *util.RestError
 	if rf, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, httprouter.Params) (*identity.RegisterResponse, *util.RestError)); ok {
@@ -189,6 +205,10 @@ func (_m *IdentityClient) Register(res http.ResponseWriter, req *http.Request, p
 // Revoke provides a mock function with given fields: res, req, params
 func (_m *IdentityClient) Revoke(res http.ResponseWriter, req *http.Request, params httprouter.Params) (*identity.RevokeResponse, *util.RestError) {
 	ret := _m.Called(res, req, params)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Revoke")
+	}
 
 	var r0 *identity.RevokeResponse
 	var r1 *util.RestError
