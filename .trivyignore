@@ -1,0 +1,3 @@
+# not relevant to the way grpc is used in fabconnect
+# see https://github.com/hyperledger/firefly-fabconnect/pull/123#discussion_r1543748524
+GHSA-m425-mq94-257g
