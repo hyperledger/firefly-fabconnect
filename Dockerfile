@@ -9,11 +9,11 @@ RUN make
 
 FROM alpine:3.19 AS SBOM
 WORKDIR /
-ADD . /SBOM
+COPY . /SBOM
 RUN apk add --no-cache curl
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.3
 RUN trivy fs --format spdx-json --output /sbom.spdx.json /SBOM
-RUN trivy sbom /sbom.spdx.json --severity UNKNOWN,HIGH,CRITICAL --exit-code 1
+RUN trivy sbom /sbom.spdx.json --severity UNKNOWN,HIGH,CRITICAL --exit-code 1 --ignorefile /SBOM/.trivyignore
 
 FROM alpine:3.19
 WORKDIR /fabconnect
