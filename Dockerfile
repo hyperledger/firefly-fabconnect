@@ -1,3 +1,5 @@
+ARG BASE_IMAGE
+
 FROM golang:1.21-alpine3.19 AS fabconnect-builder
 RUN apk add make
 ADD . /fabconnect
@@ -15,7 +17,7 @@ RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/
 RUN trivy fs --format spdx-json --output /sbom.spdx.json /SBOM
 RUN trivy sbom /sbom.spdx.json --severity UNKNOWN,HIGH,CRITICAL --exit-code 1 --ignorefile /SBOM/.trivyignore
 
-FROM alpine:3.19
+FROM $BASE_IMAGE
 RUN apk add curl
 WORKDIR /fabconnect
 COPY --from=fabconnect-builder /fabconnect/fabconnect ./
