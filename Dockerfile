@@ -22,4 +22,5 @@ COPY --from=fabconnect-builder /fabconnect/fabconnect ./
 ADD ./openapi ./openapi/
 RUN ln -s /fabconnect/fabconnect /usr/bin/fabconnect
 COPY --from=SBOM /sbom.spdx.json /sbom.spdx.json
+COPY --from=SBOM /SBOM/.trivyignore /.trivyignore
 ENTRYPOINT [ "fabconnect" ]
