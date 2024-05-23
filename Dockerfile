@@ -1,6 +1,7 @@
 ARG BASE_IMAGE
+ARG BUILD_IMAGE
 
-FROM golang:1.21-alpine3.19 AS fabconnect-builder
+FROM ${BUILD_IMAGE} AS fabconnect-builder
 RUN apk add make
 ADD . /fabconnect
 WORKDIR /fabconnect
