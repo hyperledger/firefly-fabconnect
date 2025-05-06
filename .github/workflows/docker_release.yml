@@ -20,7 +20,7 @@ jobs:
             --label build_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
             --label tag=${GITHUB_REF##*/} \
             --build-arg BASE_IMAGE=alpine:3.19 \
-            --build-arg BUILD_IMAGE=golang:1.22-alpine3.19 \
+            --build-arg BUILD_IMAGE=golang:1.23-alpine3.19 \
             --tag ghcr.io/hyperledger/firefly-fabconnect:${GITHUB_REF##*/} \
             --tag ghcr.io/hyperledger/firefly-fabconnect:head \
             .
