@@ -16,7 +16,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: "1.22"
+          go-version: "1.23"
           check-latest: true
 
       - name: Build and Test
@@ -43,5 +43,5 @@ jobs:
             --label build_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
             --label tag=${{ steps.build_tag_generator.outputs.BUILD_TAG }} \
             --build-arg BASE_IMAGE=alpine:3.19 \
-            --build-arg BUILD_IMAGE=golang:1.22-alpine3.19 \
+            --build-arg BUILD_IMAGE=golang:1.23-alpine3.19 \
             --tag ghcr.io/hyperledger/firefly-fabconnect:${{ steps.build_tag_generator.outputs.BUILD_TAG }} .
